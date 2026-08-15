@@ -1,0 +1,31 @@
+{
+  "id": "summit",
+  "name": "The Summit",
+  "intro": "The light is a room, and the room has someone in it, and they have been expecting you for a very long time.",
+  "outro": "",
+  "nodes": [
+    { "id": "threshold_room", "type": "free", "label": "The Doorway",
+      "text": "They do not turn around. They already know exactly how you are standing.",
+      "next": ["last_climb"] },
+
+    { "id": "last_climb", "type": "task", "label": "Cross The Room",
+      "text": "It is further than it looks. Everything here is.",
+      "task": { "movement": "$choose:move", "units": "$set" },
+      "grit": 30, "loot": "uncommon", "next": ["breathe_here"] },
+
+    { "id": "breathe_here", "type": "task", "label": "Breathe",
+      "text": "Whatever they say next, you would rather hear it with a slow pulse.",
+      "task": { "movement": "$choose:mind", "units": "$set" },
+      "grit": 30, "loot": "uncommon", "next": ["warden"] },
+
+    { "id": "warden", "type": "warden", "label": "The Warden of the Loop",
+      "text": "They turn around." },
+
+    { "id": "out", "type": "threshold", "label": "The Way Out",
+      "text": "The loop opens like a held breath finally let go." }
+  ],
+  "slots": [
+    { "attach": "last_climb", "chance": 0.8,
+      "table": [ { "type": "mirror", "w": 5 }, { "type": "echo", "w": 5 } ] }
+  ]
+}

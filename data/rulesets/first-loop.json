@@ -1,0 +1,9 @@
+{
+  "id": "first_loop",
+  "name": "The First Loop",
+  "desc": "The journey as it was meant to be walked. Deadlines as written.",
+  "unlocked_by_default": true,
+  "unlock_cost": 0,
+  "modifiers": [],
+  "hooks": {}
+}

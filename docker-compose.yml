@@ -1,0 +1,30 @@
+# Serves the exported web build (build/) on port 8070.
+#
+# The build directory is bind-mounted read-only, so `./run.sh` re-exporting the
+# game is picked up on a browser reload — no container restart needed.
+#
+# The image is a tiny Alpine + nginx + brotli build (see Dockerfile): the stock
+# nginx:alpine has gzip_static but no brotli_static, and run.sh precompresses
+# the ~40MB wasm to both .gz and .br.
+#
+# Exposed publicly at https://fitrogue.home.kevinhorecka.com:1403 by the nginx
+# reverse proxy in ~/homie/nginx-proxy (Google OAuth, kevin only).
+
+services:
+  fitrogue:
+    build: .
+    image: fitrogue-nginx:latest
+    container_name: fitrogue
+    restart: unless-stopped
+    ports:
+      - "8070:8070"
+    volumes:
+      - ./build:/usr/share/nginx/html:ro
+      # Alpine's nginx.conf includes /etc/nginx/http.d/*.conf inside `http`
+      # (/etc/nginx/conf.d/*.conf is included at the *root* context here).
+      - ./web.conf:/etc/nginx/http.d/default.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

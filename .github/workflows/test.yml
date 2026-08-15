@@ -1,0 +1,65 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: 4.7
+
+jobs:
+  selftest:
+    name: headless self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The editor build, not the export template: the self-test runs the
+      # project from source with --headless, which needs the full binary.
+      - name: Cache Godot
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-stable-linux
+
+      - name: Install Godot
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          URL="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fsSL -o godot.zip "$URL"
+          unzip -q godot.zip
+          mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot
+          chmod +x godot
+
+      - name: Import project
+        run: ~/godot/godot --headless --path . --import
+
+      - name: Self-test
+        run: GODOT=~/godot/godot ./test.sh
+
+  data:
+    name: data files parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate every JSON file under data/
+        run: |
+          python3 - <<'PY'
+          import glob, json, sys
+          bad = []
+          files = sorted(glob.glob("data/**/*.json", recursive=True)) + ["web/manifest.webmanifest"]
+          for path in files:
+              try:
+                  with open(path, encoding="utf-8") as f:
+                      json.load(f)
+              except Exception as exc:
+                  bad.append("%s: %s" % (path, exc))
+          print("checked %d files" % len(files))
+          if bad:
+              print("\n".join(bad))
+              sys.exit(1)
+          PY

@@ -1,0 +1,41 @@
+{
+  "id": "tall_grass",
+  "name": "The Tall Grass",
+  "intro": "The path gives up halfway and becomes grass taller than you are.",
+  "outro": "The grass thins. Ahead, the road, and past the road, the first real slope.",
+  "nodes": [
+    { "id": "edge", "type": "free", "label": "The Edge of It",
+      "text": "Something moves alongside you and does not show itself.",
+      "next": ["push"] },
+
+    { "id": "push", "type": "task", "label": "Push In",
+      "text": "Head down. It is only grass.",
+      "task": { "movement": "$choose:move", "units": "$set" },
+      "grit": 18, "loot": "common", "next": ["keep"] },
+
+    { "id": "keep", "type": "task", "label": "Keep Going",
+      "text": "Halfway is the worst place to stop and you know it.",
+      "task": { "movement": "$same", "units": "$set" },
+      "grit": 22, "loot": "common", "next": ["new_shape", "third"], "exclusive_next": true },
+
+    { "id": "new_shape", "type": "task", "label": "A Different Shape",
+      "text": "Something is aching. Give it a rest and work something else.",
+      "task": { "movement": "$other:move", "units": "$set" },
+      "grit": 24, "grants": ["varied"], "loot": "uncommon", "next": ["road"] },
+
+    { "id": "third", "type": "task", "label": "All The Way Through",
+      "text": "One more and you are out the other side.",
+      "task": { "movement": "$same", "units": "$set" },
+      "grit": 38, "loot": "uncommon", "next": ["road"] },
+
+    { "id": "road", "type": "threshold", "label": "The Road Again",
+      "text": "You are out, and slightly cut about the forearms, and pleased about it." }
+  ],
+  "slots": [
+    { "attach": "push", "chance": 0.6,
+      "table": [ { "type": "echo", "w": 4 }, { "type": "cache", "grit": 16, "w": 3 }, { "type": "trinket", "w": 2 } ] },
+    { "attach": "keep", "chance": 0.5,
+      "table": [ { "type": "spite", "w": 3 }, { "type": "mirror", "w": 2 },
+                 { "type": "task", "label": "Drink Something", "movement": "water", "units": 1, "grit": 8, "w": 3 } ] }
+  ]
+}

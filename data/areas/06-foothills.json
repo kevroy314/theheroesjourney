@@ -1,0 +1,45 @@
+{
+  "id": "foothills",
+  "name": "The Foothills",
+  "intro": "The ground tilts. From here the light on the mountain is clearly a window.",
+  "outro": "Above the treeline. Someone has been camping up here for a very long time.",
+  "nodes": [
+    { "id": "slope", "type": "free", "label": "The First Slope",
+      "text": "Switchbacks. Old cairns, stacked by someone with your habits.",
+      "next": ["climb"] },
+
+    { "id": "climb", "type": "task", "label": "Climb",
+      "text": "Steady. This is a long day and you are not in a hurry.",
+      "task": { "movement": "$choose:move", "units": "$set" },
+      "grit": 20, "loot": "common", "next": ["drink"] },
+
+    { "id": "drink", "type": "task", "label": "Drink Properly",
+      "text": "Thin air takes more out of you than the slope does.",
+      "task": { "movement": "$choose:water", "units": "$set" },
+      "grit": 14, "next": ["eat"] },
+
+    { "id": "eat", "type": "task", "label": "Eat On The Move",
+      "text": "Not much. Enough.",
+      "task": { "movement": "$choose:fuel", "units": "$set" },
+      "grit": 18, "loot": "common", "next": ["push_on", "make_camp"], "exclusive_next": true },
+
+    { "id": "push_on", "type": "task", "label": "Push On",
+      "text": "There is more light left than there is fear.",
+      "task": { "movement": "$other:move", "units": "$set" },
+      "grit": 40, "loot": "uncommon", "next": ["treeline"] },
+
+    { "id": "make_camp", "type": "task", "label": "Make Camp Early",
+      "text": "Stop while stopping is still a choice.",
+      "task": { "movement": "$choose:rest", "units": "$set" },
+      "grit": 30, "grants": ["rested"], "loot": "uncommon", "next": ["treeline"] },
+
+    { "id": "treeline", "type": "threshold", "label": "The Treeline",
+      "text": "Above the trees the wind has opinions. The window is closer." }
+  ],
+  "slots": [
+    { "attach": "climb", "chance": 0.6,
+      "table": [ { "type": "echo", "w": 5 }, { "type": "cache", "grit": 20, "w": 3 }, { "type": "mirror", "w": 3 } ] },
+    { "attach": "eat", "chance": 0.5,
+      "table": [ { "type": "spite", "w": 3 }, { "type": "trinket", "w": 2 }, { "type": "cache", "grit": 18, "w": 2 } ] }
+  ]
+}

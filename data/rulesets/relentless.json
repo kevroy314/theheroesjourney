@@ -1,0 +1,16 @@
+{
+  "id": "relentless",
+  "name": "Relentless",
+  "desc": "Eight fewer hours on every deadline, and the loop keeps nothing when it closes — but Grit runs 60% richer and Charms fall twice as often.",
+  "unlocked_by_default": false,
+  "unlock_cost": 150,
+  "modifiers": [
+    { "key": "area.deadline_bonus_hours", "op": "add", "value": -8 },
+    { "key": "run.grit_mult", "op": "mul", "value": 1.6 },
+    { "key": "run.loop_keep", "op": "set", "value": 0.0 },
+    { "key": "loot.trinket_weight", "op": "mul", "value": 2.0 }
+  ],
+  "hooks": {
+    "on_run_start": [ { "type": "log", "text": "No slack in the rope this time." } ]
+  }
+}

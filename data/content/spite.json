@@ -1,0 +1,42 @@
+{
+  "_comment": "Spite is fractured by the loop — the only other person who half-remembers the resets. Two halves, neither of them a villain: one wants you out, one has decided the loop is safer. Their unpredictability is the player's first hard evidence that the loop is real.",
+  "spite": {
+    "name": "Spite",
+    "alters": [
+      { "id": "kind", "name": "the one who remembers you",
+        "line": "Their face is doing the open thing. This is the half that wants you out." },
+      { "id": "wary", "name": "the one who remembers the endings",
+        "line": "Their face is doing the closed thing. This is the half that has watched you fail more times than you have been alive." }
+    ],
+
+    "events": [
+      { "alter": "kind", "weight": 3,
+        "text": "\"You always stop here,\" they say, and shove you bodily forward. \"Not this time. Go on.\"",
+        "effect": { "type": "grit", "amount": 25 } },
+      { "alter": "kind", "weight": 3,
+        "text": "They press something into your hand without explaining it and are gone before you can ask.",
+        "effect": { "type": "item" } },
+      { "alter": "kind", "weight": 2,
+        "text": "\"Left at the fork. Trust me, I've done this bit four hundred times.\"",
+        "effect": { "type": "reveal_area" } },
+      { "alter": "kind", "weight": 2,
+        "text": "They sit with you a minute and say nothing at all, and somehow that is the useful thing.",
+        "effect": { "type": "trinket" } },
+
+      { "alter": "wary", "weight": 3,
+        "text": "\"It doesn't matter,\" they say, very reasonably, and while you are arguing they go through your pack.",
+        "effect": { "type": "grit", "amount": -18 } },
+      { "alter": "wary", "weight": 2,
+        "text": "They take something of yours and will not say which. You find out later.",
+        "effect": { "type": "steal_item" } },
+      { "alter": "wary", "weight": 2,
+        "text": "\"Stay. It's warm here and tomorrow is the same anyway.\" You lose an hour to the conversation.",
+        "effect": { "type": "deadline", "amount": -1 } },
+      { "alter": "wary", "weight": 2,
+        "text": "They walk you the wrong way on purpose, cheerfully, all the way to a wall.",
+        "effect": { "type": "hide_area" } }
+    ],
+
+    "warded": "You brace for it — and the Tonic does its work. Whichever half of them arrived, they think better of it and wander off."
+  }
+}

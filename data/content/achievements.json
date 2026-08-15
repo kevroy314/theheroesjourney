@@ -1,0 +1,43 @@
+{
+  "_comment": "The Wheel. Six spokes, three rings each, and a centre that only opens when every spoke has moved. Rewards stay small and capped — the Wheel is identity, not power.",
+  "axes": [
+    { "id": "move",  "name": "Move",  "angle": -90, "desc": "Everything you did with your body." },
+    { "id": "water", "name": "Water", "angle": -30, "desc": "The cheapest habit there is." },
+    { "id": "fuel",  "name": "Fuel",  "angle": 30,  "desc": "Actions, never numbers." },
+    { "id": "rest",  "name": "Rest",  "angle": 90,  "desc": "The half of training nobody posts about." },
+    { "id": "mind",  "name": "Mind",  "angle": 150, "desc": "Stillness, on purpose." },
+    { "id": "bond",  "name": "Bond",  "angle": 210, "desc": "The axis everyone forgets is a health axis." }
+  ],
+
+  "rings": [
+    { "ring": 1, "count": 3,  "suffix": "Begun",   "resolve": 15 },
+    { "ring": 2, "count": 15, "suffix": "Kept",    "resolve": 40 },
+    { "ring": 3, "count": 50, "suffix": "Carried", "resolve": 100 }
+  ],
+
+  "centre": {
+    "id": "balance",
+    "name": "Balance",
+    "desc": "Every spoke off the mark. The loop cannot hold someone who is looking after all of it.",
+    "req": { "type": "all_axes_ring", "ring": 1 },
+    "resolve": 150,
+    "modifiers": [ { "key": "run.grit_mult", "op": "mul", "value": 1.15 } ]
+  },
+
+  "special": [
+    { "id": "unbroken", "name": "Unbroken", "desc": "Hold a 30-day streak.",
+      "req": { "type": "streak", "count": 30 }, "resolve": 120,
+      "modifiers": [ { "key": "streak.cap_days", "op": "add", "value": 10 } ] },
+    { "id": "listener", "name": "The Listener", "desc": "Collect every Echo.",
+      "req": { "type": "echoes_all" }, "resolve": 150 },
+    { "id": "persistent", "name": "Persistent", "desc": "Survive ten loop resets and keep going.",
+      "req": { "type": "loops", "count": 10 }, "resolve": 80,
+      "modifiers": [ { "key": "run.loop_keep", "op": "add", "value": 0.1 } ] },
+    { "id": "first_light", "name": "First Light", "desc": "Clear The Waking Room.",
+      "req": { "type": "chapter", "count": 1 }, "resolve": 20 },
+    { "id": "wayfarer", "name": "Wayfarer", "desc": "Reach the Foothills.",
+      "req": { "type": "chapter", "count": 6 }, "resolve": 90 },
+    { "id": "witness", "name": "Witness", "desc": "Stand in front of the Warden.",
+      "req": { "type": "chapter", "count": 8 }, "resolve": 200 }
+  ]
+}

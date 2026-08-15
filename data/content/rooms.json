@@ -1,0 +1,85 @@
+{
+  "_comment": "The Mind Palace. The only thing you carry between loops is yourself, so home is a place inside your own head. Rooms are bought with Resolve and placed on a grid; sitting two related rooms next to each other pays an adjacency bonus. The grid is deliberately tight — you cannot have everything touching everything.",
+
+  "palace": {
+    "start_size": 3,
+    "max_size": 5,
+    "expand_cost": [220, 480],
+    "expand_name": "Widen the Palace"
+  },
+
+  "rooms": [
+    {
+      "id": "atrium", "name": "The Atrium", "glyph": "@", "cost": 0, "starter": true,
+      "screen": "",
+      "desc": "Bare, and yours. The room you are standing in when you are nowhere at all.",
+      "adjacency": {
+        "hearth": { "desc": "+1% streak growth per day", "modifiers": [ { "key": "streak.per_day", "op": "add", "value": 0.01 } ] },
+        "study": { "desc": "Echoes surface 30% more often", "modifiers": [ { "key": "loot.echo_weight", "op": "mul", "value": 1.3 } ] }
+      }
+    },
+    {
+      "id": "gym", "name": "The Gym", "glyph": "»", "cost": 60,
+      "screen": "gym",
+      "desc": "Every movement you know, racked and labelled — and the ones you have not earned yet, behind glass.",
+      "adjacency": {
+        "identity": { "desc": "+12% Grit from Move tasks", "modifiers": [ { "key": "run.grit_mult", "op": "mul", "value": 1.12, "when": { "axis": "move" } } ] },
+        "hearth": { "desc": "Scaling down keeps 15% more Grit", "modifiers": [ { "key": "task.partial_grit", "op": "add", "value": 0.15 } ] }
+      }
+    },
+    {
+      "id": "identity", "name": "The Identity", "glyph": "¤", "cost": 80,
+      "screen": "wheel",
+      "desc": "A wheel of six spokes with your name at the middle of it. What you have actually done, as opposed to what you meant to.",
+      "adjacency": {
+        "gym": { "desc": "+8% Grit from everything", "modifiers": [ { "key": "run.grit_mult", "op": "mul", "value": 1.08 } ] },
+        "observatory": { "desc": "Grit converts to Resolve 20% better", "modifiers": [ { "key": "run.resolve_rate", "op": "mul", "value": 1.2 } ] }
+      }
+    },
+    {
+      "id": "study", "name": "The Study", "glyph": "~", "cost": 70,
+      "screen": "codex",
+      "desc": "Fragments pinned to a board, in an order that has not resolved into a shape yet.",
+      "adjacency": {
+        "atrium": { "desc": "Echoes surface 30% more often", "modifiers": [ { "key": "loot.echo_weight", "op": "mul", "value": 1.3 } ] },
+        "observatory": { "desc": "+6 hours on every deadline", "modifiers": [ { "key": "area.deadline_bonus_hours", "op": "add", "value": 6 } ] }
+      }
+    },
+    {
+      "id": "stores", "name": "The Stores", "glyph": "$", "cost": 50,
+      "screen": "stores",
+      "desc": "Shelves of small useful things. Nothing here will do a rep for you.",
+      "adjacency": {
+        "workshop": { "desc": "Everything costs 15% less", "modifiers": [ { "key": "shop.discount", "op": "add", "value": 0.15 } ] },
+        "gym": { "desc": "One extra side node in every area", "modifiers": [ { "key": "area.slot_bonus", "op": "add", "value": 1 } ] }
+      }
+    },
+    {
+      "id": "workshop", "name": "The Workshop", "glyph": "§", "cost": 90,
+      "screen": "workshop",
+      "desc": "Where you file down the parts of yourself that keep catching.",
+      "adjacency": {
+        "stores": { "desc": "Everything costs 15% less", "modifiers": [ { "key": "shop.discount", "op": "add", "value": 0.15 } ] },
+        "identity": { "desc": "Keep 10% more Grit when the loop closes", "modifiers": [ { "key": "run.loop_keep", "op": "add", "value": 0.1 } ] }
+      }
+    },
+    {
+      "id": "hearth", "name": "The Hearth", "glyph": "+", "cost": 40,
+      "screen": "hearth",
+      "desc": "Warm, low-lit, and the only room with a chair in it. Rest is not the opposite of the work.",
+      "adjacency": {
+        "atrium": { "desc": "+1% streak growth per day", "modifiers": [ { "key": "streak.per_day", "op": "add", "value": 0.01 } ] },
+        "gym": { "desc": "Scaling down keeps 15% more Grit", "modifiers": [ { "key": "task.partial_grit", "op": "add", "value": 0.15 } ] }
+      }
+    },
+    {
+      "id": "observatory", "name": "The Observatory", "glyph": "^", "cost": 100,
+      "screen": "observatory",
+      "desc": "Instruments pointed at your own record. Every loop you have walked, and how far.",
+      "adjacency": {
+        "identity": { "desc": "Grit converts to Resolve 20% better", "modifiers": [ { "key": "run.resolve_rate", "op": "mul", "value": 1.2 } ] },
+        "study": { "desc": "+6 hours on every deadline", "modifiers": [ { "key": "area.deadline_bonus_hours", "op": "add", "value": 6 } ] }
+      }
+    }
+  ]
+}

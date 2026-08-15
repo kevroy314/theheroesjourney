@@ -1,0 +1,66 @@
+{
+  "_comment": "Run-scoped boons. Same modifier/hook schema as rulesets. None of them may reduce the amount of real work a node asks for — they move rewards and information only.",
+  "trinkets": [
+    {
+      "id": "morning_light", "name": "Morning Light",
+      "desc": "+25% Grit from everything.",
+      "modifiers": [ { "key": "run.grit_mult", "op": "mul", "value": 1.25 } ]
+    },
+    {
+      "id": "second_breath", "name": "Second Breath",
+      "desc": "Scaling a movement down costs you nothing — full Grit either way.",
+      "modifiers": [ { "key": "task.partial_grit", "op": "set", "value": 1.0 } ]
+    },
+    {
+      "id": "wanderers_charm", "name": "Wanderer's Charm",
+      "desc": "One extra side node rolls in every area.",
+      "modifiers": [ { "key": "area.slot_bonus", "op": "add", "value": 1 } ]
+    },
+    {
+      "id": "clear_eyes", "name": "Clear Eyes",
+      "desc": "Every side node is visible from the moment you enter.",
+      "modifiers": [ { "key": "area.reveal_sides", "op": "set", "value": 1 } ]
+    },
+    {
+      "id": "deep_well", "name": "Deep Well",
+      "desc": "Caches pay double.",
+      "modifiers": [ { "key": "loot.cache_mult", "op": "mul", "value": 2.0 } ]
+    },
+    {
+      "id": "long_memory", "name": "Long Memory",
+      "desc": "Echoes surface twice as often.",
+      "modifiers": [ { "key": "loot.echo_weight", "op": "mul", "value": 2.0 } ]
+    },
+    {
+      "id": "steady_hand", "name": "Steady Hand",
+      "desc": "+4 Grit every time you finish a task.",
+      "modifiers": [],
+      "hooks": { "on_task_complete": [ { "type": "grit", "amount": 4, "silent": true } ] }
+    },
+    {
+      "id": "open_road", "name": "Open Road",
+      "desc": "Six extra hours on every deadline.",
+      "modifiers": [ { "key": "area.deadline_bonus_hours", "op": "add", "value": 6 } ]
+    },
+    {
+      "id": "kind_word", "name": "Kind Word",
+      "desc": "Spite's gentler half turns up twice as often.",
+      "modifiers": [ { "key": "spite.kind_weight", "op": "mul", "value": 2.0 } ]
+    },
+    {
+      "id": "collectors_eye", "name": "Collector's Eye",
+      "desc": "Charms drop far more readily.",
+      "modifiers": [ { "key": "loot.trinket_weight", "op": "mul", "value": 2.5 } ]
+    },
+    {
+      "id": "first_of_many", "name": "First of Many",
+      "desc": "+50 Grit when you clear an area.",
+      "modifiers": [ { "key": "run.clear_bonus", "op": "add", "value": 50 } ]
+    },
+    {
+      "id": "banked_fire", "name": "Banked Fire",
+      "desc": "Grit converts to Resolve 40% better at the end of the run.",
+      "modifiers": [ { "key": "run.resolve_rate", "op": "mul", "value": 1.4 } ]
+    }
+  ]
+}

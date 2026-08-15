@@ -1,0 +1,59 @@
+{
+  "_comment": "Always unlocked. Carries at least one movement on every axis so no chapter can ever become unplayable because a pack is unaffordable.",
+  "pack": {
+    "id": "starter",
+    "name": "First Steps",
+    "cost": 0,
+    "desc": "What you can do on the floor beside your bed, plus one small thing on every other axis."
+  },
+  "movements": [
+    {
+      "id": "pushup", "name": "Push-up", "axis": "move",
+      "unit": "rep", "set": 5, "seconds_per_unit": 4,
+      "scaling": ["Knee push-up", "Incline push-up", "Wall push-up"],
+      "cue": "Hands under shoulders. Down slow, up slower."
+    },
+    {
+      "id": "squat", "name": "Squat", "axis": "move",
+      "unit": "rep", "set": 10, "seconds_per_unit": 3,
+      "scaling": ["Half squat", "Chair squat", "Sit-to-stand"],
+      "cue": "Feet shoulder width. Sit back, not down."
+    },
+    {
+      "id": "crunch", "name": "Crunch", "axis": "move",
+      "unit": "rep", "set": 10, "seconds_per_unit": 3,
+      "scaling": ["Half crunch", "Dead bug", "Knee lift"],
+      "cue": "Chin off your chest. Curl, don't yank."
+    },
+    {
+      "id": "water", "name": "A glass of water", "axis": "water",
+      "unit": "glass", "set": 1, "seconds_per_unit": 8,
+      "scaling": ["Half a glass", "A few mouthfuls"],
+      "cue": "Cold tap. All of it, before you put the glass down."
+    },
+    {
+      "id": "veg", "name": "Eat something green", "axis": "fuel",
+      "unit": "serving", "set": 1, "seconds_per_unit": 25,
+      "scaling": ["A few bites", "One piece"],
+      "cue": "It counts if it grew. Frozen counts. Tinned counts."
+    },
+    {
+      "id": "breathe", "name": "Box breathing", "axis": "mind",
+      "unit": "second", "set": 60, "seconds_per_unit": 1,
+      "scaling": ["30 seconds", "Four slow breaths"],
+      "cue": "In four, hold four, out four, hold four."
+    },
+    {
+      "id": "bedtime", "name": "Be in bed on time", "axis": "rest",
+      "unit": "night", "set": 1, "seconds_per_unit": 6,
+      "scaling": ["Within half an hour of target"],
+      "cue": "Log it when you're actually horizontal, not when you plan to be."
+    },
+    {
+      "id": "message", "name": "Message someone", "axis": "bond",
+      "unit": "message", "set": 1, "seconds_per_unit": 20,
+      "scaling": ["A single line"],
+      "cue": "Anyone you've been meaning to. It does not have to be profound."
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "id": "observatory",
+  "name": "The Observatory",
+  "intro": "A building full of instruments, all of them pointed not at the sky but at the town below.",
+  "outro": "The last flight of stairs goes up into the light you have been watching all week.",
+  "nodes": [
+    { "id": "door_obs", "type": "free", "label": "Unlocked",
+      "text": "The door is unlocked. Of course it is. You know where the key is anyway.",
+      "next": ["steady"] },
+
+    { "id": "steady", "type": "task", "label": "Steady Yourself",
+      "text": "Whatever is in here, you would rather meet it breathing slowly.",
+      "task": { "movement": "$choose:mind", "units": "$set" },
+      "grit": 20, "loot": "common", "next": ["read"] },
+
+    { "id": "read", "type": "task", "label": "Read The Notes",
+      "text": "Years of observations, in handwriting you recognise. It is yours. It is not yours yet.",
+      "task": { "movement": "$other:mind", "units": "$set" },
+      "grit": 24, "loot": "uncommon", "next": ["call_home", "sit_long"], "exclusive_next": true },
+
+    { "id": "call_home", "type": "task", "label": "Call Someone",
+      "text": "Before you go up. Just in case going up is a one-way thing.",
+      "task": { "movement": "$choose:bond", "units": "$set" },
+      "grit": 34, "grants": ["anchored"], "loot": "uncommon", "next": ["stairs_up"] },
+
+    { "id": "sit_long", "type": "task", "label": "Sit With It",
+      "text": "Nobody to call. That is also an answer, and it is not a sad one.",
+      "task": { "movement": "$other:mind", "units": "$set" },
+      "grit": 34, "grants": ["settled"], "loot": "uncommon", "next": ["stairs_up"] },
+
+    { "id": "stairs_up", "type": "threshold", "label": "The Last Stairs",
+      "text": "Up. The light gets warmer with every step, which is somehow worse." }
+  ],
+  "slots": [
+    { "attach": "steady", "chance": 0.7,
+      "table": [ { "type": "echo", "w": 6 }, { "type": "mirror", "w": 4 }, { "type": "cache", "grit": 22, "w": 2 } ] },
+    { "attach": "read", "chance": 0.5,
+      "table": [ { "type": "echo", "w": 5 }, { "type": "trinket", "w": 2 } ] }
+  ]
+}

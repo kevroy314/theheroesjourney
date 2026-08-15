@@ -1,0 +1,78 @@
+{
+  "_comment": "Items buy time, comfort or information. None of them completes a task on the player's behalf — see the Warp Stone note below for the closest call.",
+  "items": [
+    {
+      "id": "rest_token",
+      "name": "Rest Token",
+      "cost": 45,
+      "desc": "Today counts toward your streak without a single step. Rest is training.",
+      "use": "keep_streak",
+      "where": "home"
+    },
+    {
+      "id": "hourglass",
+      "name": "Hourglass",
+      "cost": 30,
+      "desc": "Twelve more hours on the deadline you are currently staring at.",
+      "use": "extend_deadline",
+      "amount": 12,
+      "where": "run"
+    },
+    {
+      "id": "tonic",
+      "name": "Tonic",
+      "cost": 25,
+      "desc": "Cancels the next setback — a Snag, or Spite at their worst.",
+      "use": "ward",
+      "where": "run"
+    },
+    {
+      "id": "warp_stone",
+      "name": "Warp Stone",
+      "cost": 55,
+      "desc": "Walk straight to the door, abandoning whatever is left in the room. Needs at least one task already done — it ends a session early, it never starts one for you.",
+      "use": "skip_to_threshold",
+      "where": "run"
+    },
+    {
+      "id": "echo_lens",
+      "name": "Echo Lens",
+      "cost": 35,
+      "desc": "Every hidden node in this area becomes visible at once.",
+      "use": "reveal_area",
+      "where": "run"
+    },
+    {
+      "id": "scaling_chalk",
+      "name": "Scaling Chalk",
+      "cost": 20,
+      "desc": "Take the easier version of the next movement and lose nothing for it.",
+      "use": "full_scale",
+      "where": "run"
+    },
+    {
+      "id": "whistle",
+      "name": "Whistle",
+      "cost": 40,
+      "desc": "The next time Spite finds you, it will be the half of them that wants you out.",
+      "use": "guarantee_kind_spite",
+      "where": "run"
+    },
+    {
+      "id": "lantern",
+      "name": "Lantern",
+      "cost": 50,
+      "desc": "Surfaces an Echo you have not heard yet, here and now.",
+      "use": "reveal_echo",
+      "where": "run"
+    },
+    {
+      "id": "second_wind",
+      "name": "Second Wind",
+      "cost": 90,
+      "desc": "When the loop resets, begin again at the chapter you reached instead of the bed. Once.",
+      "use": "resume_run",
+      "where": "auto"
+    }
+  ]
+}

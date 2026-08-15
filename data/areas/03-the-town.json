@@ -1,0 +1,42 @@
+{
+  "id": "the_town",
+  "name": "The Town",
+  "intro": "Someone in the square greets you by name before you speak. You have not met them yet.",
+  "outro": "The road out of town is signposted, which is the first honest thing all morning.",
+  "nodes": [
+    { "id": "square", "type": "free", "label": "The Square",
+      "text": "Stalls, a fountain, a shopkeeper who is already reaching for your usual.",
+      "next": ["errand"] },
+
+    { "id": "errand", "type": "task", "label": "The Errand",
+      "text": "Nothing heroic. Move something, somewhere, on foot.",
+      "task": { "movement": "$choose:move", "units": "$set" },
+      "grit": 16, "loot": "common", "next": ["greet"] },
+
+    { "id": "greet", "type": "task", "label": "Say Something",
+      "text": "To anyone. It does not have to be about anything.",
+      "task": { "movement": "$choose:bond", "units": "$set" },
+      "grit": 16, "loot": "common", "next": ["long_way", "sit_with"], "exclusive_next": true },
+
+    { "id": "long_way", "type": "task", "label": "The Long Way Round",
+      "text": "You could go straight to the gate. You could also not.",
+      "task": { "movement": "$other:move", "units": "$set" },
+      "grit": 30, "loot": "uncommon", "next": ["gate"] },
+
+    { "id": "sit_with", "type": "task", "label": "Sit With Them A While",
+      "text": "The errand will keep.",
+      "task": { "movement": "$other:bond", "units": "$set" },
+      "grit": 26, "grants": ["companioned"], "loot": "uncommon", "next": ["gate"] },
+
+    { "id": "gate", "type": "threshold", "label": "The Town Gate",
+      "text": "Beyond it the road narrows and the grass begins." }
+  ],
+  "slots": [
+    { "attach": "square", "chance": 1.0,
+      "table": [ { "type": "spite", "w": 1 } ] },
+    { "attach": "errand", "chance": 0.6,
+      "table": [ { "type": "echo", "w": 4 }, { "type": "cache", "grit": 14, "w": 3 }, { "type": "trinket", "w": 2 } ] },
+    { "attach": "greet", "chance": 0.4,
+      "table": [ { "type": "mirror", "w": 2 }, { "type": "cache", "grit": 12, "w": 2 } ] }
+  ]
+}

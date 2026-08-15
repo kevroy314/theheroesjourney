@@ -1,0 +1,23 @@
+{
+  "_comment": "Reward tables rolled by nodes. 'w' is a weight; echo and trinket weights are bent by loot.echo_weight / loot.trinket_weight.",
+  "loot": {
+    "common": [
+      { "type": "grit", "amount": 6, "w": 6 },
+      { "type": "echo", "w": 2, "scaled_by": "loot.echo_weight" },
+      { "type": "trinket", "w": 1, "scaled_by": "loot.trinket_weight" },
+      { "type": "item", "w": 1 }
+    ],
+    "uncommon": [
+      { "type": "grit", "amount": 14, "w": 4 },
+      { "type": "trinket", "w": 3, "scaled_by": "loot.trinket_weight" },
+      { "type": "echo", "w": 2, "scaled_by": "loot.echo_weight" },
+      { "type": "item", "w": 2 }
+    ],
+    "rare": [
+      { "type": "trinket", "w": 5, "scaled_by": "loot.trinket_weight" },
+      { "type": "item", "w": 3 },
+      { "type": "grit", "amount": 30, "w": 2 },
+      { "type": "echo", "w": 2, "scaled_by": "loot.echo_weight" }
+    ]
+  }
+}

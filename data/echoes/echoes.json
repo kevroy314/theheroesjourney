@@ -1,0 +1,59 @@
+{
+  "_comment": "Story fragments, surfaced roughly in order. The player never gets told the plot; they assemble it. 'reveal' entries are fired by the game at fixed beats rather than rolled.",
+  "echoes": [
+    { "id": "e01", "order": 1, "title": "The Ceiling",
+      "text": "You have counted the cracks in this ceiling before. You are certain of it, and you have lived here four months, and you have never once looked up." },
+
+    { "id": "e02", "order": 2, "title": "The Kettle",
+      "text": "Warm. Not hot — warm, the way it is twenty minutes after. You live alone." },
+
+    { "id": "e03", "order": 3, "title": "The Shopkeeper",
+      "text": "\"Same as always,\" she says, and hands it over before you open your mouth. You have never been in this shop. She is already looking past you at the next person." },
+
+    { "id": "e04", "order": 4, "title": "A Note In Your Handwriting",
+      "text": "Tucked in a book you have not read. It says: DO THE FIRST ONE. THE REST IS EASIER THAN YOU REMEMBER. You do not remember writing it. The ink is old." },
+
+    { "id": "e05", "order": 5, "title": "The Light",
+      "text": "There is a light on the mountain. It is on at three in the afternoon and it is on at three in the morning. Nobody in town mentions it, and when you ask, they answer a slightly different question." },
+
+    { "id": "e06", "order": 6, "title": "Spite Counts Something",
+      "text": "You catch them muttering. \"...forty-one, forty-one, forty-one.\" When they notice you they stop and grin and say they were counting birds. There are no birds." },
+
+    { "id": "e07", "order": 7, "title": "The Cairns",
+      "text": "Stacked stones all the way up the foothills, hundreds of them, in a pattern you would use. Every one is weathered. Some are decades old." },
+
+    { "id": "e08", "order": 8, "title": "Half A Second Late",
+      "text": "Your reflection follows you. Not badly. Just late enough that you notice, and then it corrects, and then it is exactly you again, and it does not do it twice while you are watching." },
+
+    { "id": "e09", "order": 9, "title": "The Other Half Of Spite",
+      "text": "\"I've met you more times than you've met me,\" they say, and then their face does something complicated, and then they are the other one, and the other one is angry that you heard that." },
+
+    { "id": "e10", "order": 10, "title": "The Log Book",
+      "text": "An observation log at the Observatory. Thousands of entries. Each one a date, a time, and a single number. The number is how far you got." },
+
+    { "id": "e11", "order": 11, "title": "Attempt 3,491",
+      "text": "The most recent entry is in wet ink. It has today's date. The number beside it is one higher than the last time you were here, and you have never been here." },
+
+    { "id": "e12", "order": 12, "title": "What The Instruments Point At",
+      "text": "Not the sky. Every telescope in the building is aimed down, at the town, at the houses, at one window in particular. Yours." },
+
+    { "id": "e13", "order": 13, "title": "The Argument, Overheard",
+      "text": "Two voices upstairs, and both of them are yours. One is pleading. One is explaining, patiently, the way you explain something to a child who will not understand it for twenty years." },
+
+    { "id": "e14", "order": 14, "title": "Why It Has To Be You",
+      "text": "\"Because I am what you become,\" they say, \"and you have not become it yet, and if you stop, I stop.\" They say it kindly. That is the worst part." },
+
+    { "id": "e15", "order": 15, "title": "The Loop Is Not A Punishment",
+      "text": "It is a rehearsal. Every morning you get back is a morning you already used badly, handed to you again, by someone who could not bear to watch you waste the last one." },
+
+    { "id": "e16", "order": 16, "title": "The Way Out",
+      "text": "There is only one exit condition and it was written on the first day: become the person who does not need the loop. The Warden has been waiting for you to be dangerous enough to leave." }
+  ],
+
+  "reveals": {
+    "first_loop_reset": "e01",
+    "first_spite": "e06",
+    "first_mirror": "e08",
+    "reach_summit": "e14"
+  }
+}

@@ -1,0 +1,38 @@
+name: Bug report
+description: Something behaved wrong in the game
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The fastest possible bug report: in the app, tap the **dbg** bubble →
+        **Copy state**, and paste it below. That carries the screen, the run,
+        the node graph, your meta progress and every debug knob value.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+      placeholder: |
+        I cleared The Waking Room and tapped The Door. I expected to move on to
+        Chapter 2; instead nothing was tappable except Bag and Abandon.
+    validations:
+      required: true
+  - type: textarea
+    id: state
+    attributes:
+      label: Game state
+      description: From the debug panel — dbg bubble → Copy state.
+      render: json
+    validations:
+      required: false
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      placeholder: "iPhone 15 / Safari / installed PWA, or Chrome desktop"
+  - type: textarea
+    id: shot
+    attributes:
+      label: Screenshot
+      description: Drag an image in if you have one.

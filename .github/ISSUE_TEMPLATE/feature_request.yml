@@ -1,0 +1,32 @@
+name: Feature or content
+description: A new mechanic, chapter, movement, room, or change to an existing one
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What
+      description: One paragraph. What should exist that does not?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: |
+        What does this do for the player? If it touches the health axes, say how
+        it stays on the right side of the duty-of-care rules in CONTRIBUTING.md.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Content (JSON only — movement, chapter, item, room, echo)
+        - Mechanic (needs code)
+        - UI / UX
+        - Art
+        - Infrastructure
+    validations:
+      required: true

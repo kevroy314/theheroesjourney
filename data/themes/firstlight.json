@@ -1,0 +1,47 @@
+{
+  "id": "firstlight",
+  "name": "First Light",
+  "desc": "Dawn through a gap in the curtains. The world before it has decided anything.",
+  "unlocked_by_default": true,
+  "unlock_cost": 0,
+
+  "colors": {
+    "bg": "#12131C",
+    "panel": "#1B1D28",
+    "panel_alt": "#242737",
+    "line": "#333749",
+    "text": "#EFE7DA",
+    "muted": "#948E9E",
+    "accent": "#E9A94E",
+    "accent_2": "#8FBFD8",
+    "danger": "#D9675C",
+    "good": "#7FC08A",
+    "warn": "#E0C15F"
+  },
+
+  "labels": {
+    "grit": "Grit",
+    "resolve": "Resolve",
+    "journey": "Journey",
+    "trinket": "Charm",
+    "echo": "Echo",
+    "streak": "Streak",
+    "area": "Room"
+  },
+
+  "glyphs": {
+    "start": "@",
+    "task": "»",
+    "free": "·",
+    "threshold": "^",
+    "echo": "~",
+    "cache": "$",
+    "mirror": "§",
+    "trinket": "¤",
+    "spite": "&",
+    "locked": "?",
+    "done": "+"
+  },
+
+  "mountain_line": "Far off, past the window, a single light on the mountain. It has not gone out."
+}

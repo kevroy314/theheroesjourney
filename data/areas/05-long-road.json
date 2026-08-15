@@ -1,0 +1,40 @@
+{
+  "id": "long_road",
+  "name": "The Long Road",
+  "intro": "There is nowhere to stay tonight, so how you sleep becomes the terrain.",
+  "outro": "You wake on the road at an hour you chose, which has not happened in a while.",
+  "nodes": [
+    { "id": "dusk", "type": "free", "label": "Dusk",
+      "text": "The mountain is no closer than this morning. The light on it is already on.",
+      "next": ["wind"] },
+
+    { "id": "wind", "type": "task", "label": "Wind Down",
+      "text": "The hour before sleep is the part of sleep you can actually control.",
+      "task": { "movement": "$choose:rest", "units": "$set" },
+      "grit": 18, "loot": "common", "next": ["dark"] },
+
+    { "id": "dark", "type": "task", "label": "Make It Dark",
+      "text": "Cold, dark, quiet. Two of the three will do.",
+      "task": { "movement": "$other:rest", "units": "$set" },
+      "grit": 22, "loot": "common", "next": ["settle", "early"], "exclusive_next": true },
+
+    { "id": "settle", "type": "task", "label": "Settle The Head",
+      "text": "Whatever is looping in there, give it somewhere to go.",
+      "task": { "movement": "$choose:mind", "units": "$set" },
+      "grit": 26, "grants": ["settled"], "loot": "uncommon", "next": ["morning"] },
+
+    { "id": "early", "type": "task", "label": "Actually Go To Bed",
+      "text": "The whole chapter has been leading here and you knew it.",
+      "task": { "movement": "bedtime", "units": 1 },
+      "grit": 40, "loot": "uncommon", "next": ["morning"] },
+
+    { "id": "morning", "type": "threshold", "label": "Morning On The Road",
+      "text": "Frost on the pack. You feel, irritatingly, quite good." }
+  ],
+  "slots": [
+    { "attach": "wind", "chance": 0.55,
+      "table": [ { "type": "echo", "w": 5 }, { "type": "cache", "grit": 16, "w": 3 }, { "type": "mirror", "w": 3 } ] },
+    { "attach": "dark", "chance": 0.4,
+      "table": [ { "type": "spite", "w": 2 }, { "type": "trinket", "w": 2 } ] }
+  ]
+}

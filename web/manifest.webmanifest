@@ -1,0 +1,19 @@
+{
+  "name": "The Heroes' Journey",
+  "short_name": "Heroes'",
+  "description": "A life-balance habit app wearing a roguelike as a costume. You wake in a bed you have woken in before. The way out of the room is one push-up wide.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
+  "orientation": "portrait",
+  "background_color": "#12131C",
+  "theme_color": "#12131C",
+  "categories": ["games", "health", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,411 @@
+{
+  "_comment": "Purchasable packs. Each adds depth to an axis the Starter pack only touches. Buying is never required to progress — only to have more to choose from.",
+  "packs": [
+    {
+      "pack": {
+        "id": "house",
+        "name": "Around the House",
+        "cost": 40,
+        "desc": "Standing work. Nothing that needs a floor you'd be embarrassed to lie on.",
+        "min_chapter": 1
+      },
+      "movements": [
+        {
+          "id": "lunge",
+          "name": "Lunge",
+          "axis": "move",
+          "unit": "rep",
+          "set": 8,
+          "seconds_per_unit": 4,
+          "scaling": [
+            "Static lunge",
+            "Supported lunge",
+            "Step back only"
+          ],
+          "cue": "Long step. Back knee toward the floor, not forward."
+        },
+        {
+          "id": "stepup",
+          "name": "Step-up",
+          "axis": "move",
+          "unit": "rep",
+          "set": 10,
+          "seconds_per_unit": 4,
+          "scaling": [
+            "Lower step",
+            "Bottom stair only"
+          ],
+          "cue": "Bottom stair is fine. Whole foot on the step."
+        },
+        {
+          "id": "calfraise",
+          "name": "Calf raise",
+          "axis": "move",
+          "unit": "rep",
+          "set": 15,
+          "seconds_per_unit": 2,
+          "scaling": [
+            "Both feet, held",
+            "Against a wall"
+          ],
+          "cue": "Up slow, down slower. Hold the top for a beat."
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "floor",
+        "name": "Floor Work",
+        "cost": 60,
+        "desc": "Holds instead of reps. Time is the unit, which changes how a set feels.",
+        "min_chapter": 2
+      },
+      "movements": [
+        {
+          "id": "plank",
+          "name": "Plank",
+          "axis": "move",
+          "unit": "second",
+          "set": 20,
+          "seconds_per_unit": 1,
+          "scaling": [
+            "Knee plank",
+            "Incline plank",
+            "10 seconds"
+          ],
+          "cue": "Ribs down, hips level. Stop when the line breaks, not when it hurts."
+        },
+        {
+          "id": "bridge",
+          "name": "Glute bridge",
+          "axis": "move",
+          "unit": "rep",
+          "set": 12,
+          "seconds_per_unit": 3,
+          "scaling": [
+            "Hold at the top",
+            "Half range"
+          ],
+          "cue": "Push through the heels. Squeeze at the top."
+        },
+        {
+          "id": "deadbug",
+          "name": "Dead bug",
+          "axis": "move",
+          "unit": "rep",
+          "set": 10,
+          "seconds_per_unit": 4,
+          "scaling": [
+            "Arms only",
+            "Legs only"
+          ],
+          "cue": "Lower back stays glued to the floor. That's the whole exercise."
+        },
+        {
+          "id": "birddog",
+          "name": "Bird dog",
+          "axis": "move",
+          "unit": "rep",
+          "set": 10,
+          "seconds_per_unit": 4,
+          "scaling": [
+            "Arm only",
+            "Leg only"
+          ],
+          "cue": "Reach long, don't lift high."
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "outdoor",
+        "name": "Out the Door",
+        "cost": 90,
+        "desc": "Movements that need shoes. These take real minutes, and the timer will hold you to them.",
+        "min_chapter": 3
+      },
+      "movements": [
+        {
+          "id": "walk5",
+          "name": "Walk",
+          "axis": "move",
+          "unit": "minute",
+          "set": 5,
+          "seconds_per_unit": 60,
+          "scaling": [
+            "3 minutes",
+            "To the end of the road and back"
+          ],
+          "cue": "Out the door is the hard part. The rest is just walking."
+        },
+        {
+          "id": "stairs",
+          "name": "Stairs",
+          "axis": "move",
+          "unit": "flight",
+          "set": 3,
+          "seconds_per_unit": 30,
+          "scaling": [
+            "1 flight",
+            "Up only, lift down"
+          ],
+          "cue": "Whole foot on each step. No hands if you can help it."
+        },
+        {
+          "id": "jog2",
+          "name": "Jog",
+          "axis": "move",
+          "unit": "minute",
+          "set": 2,
+          "seconds_per_unit": 60,
+          "scaling": [
+            "Brisk walk",
+            "1 minute"
+          ],
+          "cue": "Slower than you think. If you can't talk, you're racing."
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "kitchen",
+        "name": "The Kitchen",
+        "cost": 50,
+        "desc": "Fuel as actions, never as numbers. Nothing here weighs anything.",
+        "min_chapter": 2
+      },
+      "movements": [
+        {
+          "id": "protein",
+          "name": "Eat some protein",
+          "axis": "fuel",
+          "unit": "serving",
+          "set": 1,
+          "seconds_per_unit": 25,
+          "scaling": [
+            "Part of a serving"
+          ],
+          "cue": "Eggs, beans, fish, tofu, yoghurt. Whatever's actually in the house."
+        },
+        {
+          "id": "cook",
+          "name": "Cook instead of ordering",
+          "axis": "fuel",
+          "unit": "meal",
+          "set": 1,
+          "seconds_per_unit": 45,
+          "scaling": [
+            "Assemble instead of cook"
+          ],
+          "cue": "Toast with something on it counts. The bar is low on purpose."
+        },
+        {
+          "id": "fruit",
+          "name": "Eat a piece of fruit",
+          "axis": "fuel",
+          "unit": "piece",
+          "set": 1,
+          "seconds_per_unit": 20,
+          "scaling": [
+            "Half a piece"
+          ],
+          "cue": "The one in the bowl that's about to go."
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "stillness",
+        "name": "Stillness",
+        "cost": 110,
+        "desc": "The hardest pack to start and the easiest to finish.",
+        "min_chapter": 5
+      },
+      "movements": [
+        {
+          "id": "sit2",
+          "name": "Sit quietly",
+          "axis": "mind",
+          "unit": "second",
+          "set": 120,
+          "seconds_per_unit": 1,
+          "scaling": [
+            "60 seconds",
+            "30 seconds"
+          ],
+          "cue": "Not meditation. Just sitting, without a screen."
+        },
+        {
+          "id": "gratitude",
+          "name": "Name three good things",
+          "axis": "mind",
+          "unit": "list",
+          "set": 1,
+          "seconds_per_unit": 30,
+          "scaling": [
+            "Name one"
+          ],
+          "cue": "Small ones count. Especially small ones."
+        },
+        {
+          "id": "stretch",
+          "name": "Stretch what hurts",
+          "axis": "mind",
+          "unit": "second",
+          "set": 60,
+          "seconds_per_unit": 1,
+          "scaling": [
+            "30 seconds"
+          ],
+          "cue": "Whatever's been complaining. Hold it, breathe, don't bounce."
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "nightfall",
+        "name": "Nightfall",
+        "cost": 70,
+        "desc": "Sleep is a thing you do all evening, not a thing that happens to you at midnight.",
+        "min_chapter": 4
+      },
+      "movements": [
+        {
+          "id": "winddown",
+          "name": "Wind down",
+          "axis": "rest",
+          "unit": "minute",
+          "set": 10,
+          "seconds_per_unit": 60,
+          "scaling": [
+            "5 minutes"
+          ],
+          "cue": "Lights low, no feeds. Read something on paper if you have it."
+        },
+        {
+          "id": "screensoff",
+          "name": "Screens away",
+          "axis": "rest",
+          "unit": "night",
+          "set": 1,
+          "seconds_per_unit": 10,
+          "scaling": [
+            "Screens dimmed"
+          ],
+          "cue": "Phone somewhere that isn't arm's reach of the bed."
+        },
+        {
+          "id": "airbed",
+          "name": "Make the room dark and cool",
+          "axis": "rest",
+          "unit": "room",
+          "set": 1,
+          "seconds_per_unit": 15,
+          "scaling": [
+            "One of the two"
+          ],
+          "cue": "Curtains shut, window cracked. Two minutes of setup for eight hours of payoff."
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "company",
+        "name": "Company",
+        "cost": 60,
+        "desc": "The axis everyone forgets is a health axis.",
+        "min_chapter": 3
+      },
+      "movements": [
+        {
+          "id": "call",
+          "name": "Call someone",
+          "axis": "bond",
+          "unit": "minute",
+          "set": 5,
+          "seconds_per_unit": 60,
+          "scaling": [
+            "2 minutes",
+            "A voice note"
+          ],
+          "cue": "Voice, not text. Five minutes is plenty."
+        },
+        {
+          "id": "walkwith",
+          "name": "Walk with someone",
+          "axis": "bond",
+          "unit": "minute",
+          "set": 10,
+          "seconds_per_unit": 60,
+          "scaling": [
+            "5 minutes",
+            "To the corner and back"
+          ],
+          "cue": "Counts for Move as well. The only movement that does."
+        },
+        {
+          "id": "thanks",
+          "name": "Thank someone properly",
+          "axis": "bond",
+          "unit": "message",
+          "set": 1,
+          "seconds_per_unit": 30,
+          "scaling": [
+            "A short one"
+          ],
+          "cue": "Specific. Say what they did."
+        }
+      ]
+    },
+    {
+      "pack": {
+        "id": "iron",
+        "name": "Iron",
+        "cost": 140,
+        "desc": "Needs equipment. Bought last by most people, and that is the correct order.",
+        "min_chapter": 6
+      },
+      "movements": [
+        {
+          "id": "row",
+          "name": "Row",
+          "axis": "move",
+          "unit": "rep",
+          "set": 10,
+          "seconds_per_unit": 4,
+          "scaling": [
+            "Lighter weight",
+            "Backpack of books"
+          ],
+          "cue": "Elbow past your ribs. Shoulder down and back."
+        },
+        {
+          "id": "press",
+          "name": "Overhead press",
+          "axis": "move",
+          "unit": "rep",
+          "set": 8,
+          "seconds_per_unit": 4,
+          "scaling": [
+            "Lighter weight",
+            "One arm at a time"
+          ],
+          "cue": "Ribs down. Press up, not forward."
+        },
+        {
+          "id": "carry",
+          "name": "Loaded carry",
+          "axis": "move",
+          "unit": "second",
+          "set": 40,
+          "seconds_per_unit": 1,
+          "scaling": [
+            "20 seconds",
+            "Lighter load"
+          ],
+          "cue": "Something heavy in each hand. Walk. Stand tall."
+        }
+      ]
+    }
+  ]
+}

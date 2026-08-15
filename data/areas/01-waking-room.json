@@ -1,0 +1,47 @@
+{
+  "id": "waking_room",
+  "name": "The Waking Room",
+  "intro": "The ceiling. Familiar in a way you can't place. The door is across the room.",
+  "outro": "The handle is cold. Behind you the bed is already making its case.",
+  "nodes": [
+    { "id": "wake", "type": "free", "label": "Open your eyes",
+      "text": "You are awake, and horizontal, and those are two different problems.",
+      "next": ["rep"] },
+
+    { "id": "rep", "type": "task", "label": "The First Rep",
+      "text": "One repetition. Not a workout. Not a plan. One.",
+      "task": { "movement": "$choose:move", "units": 1 },
+      "grit": 5, "next": ["set1"] },
+
+    { "id": "set1", "type": "task", "label": "A Set",
+      "text": "Well. You're on the floor anyway.",
+      "task": { "movement": "$same", "units": "$set" },
+      "grit": 12, "loot": "common", "next": ["set2"] },
+
+    { "id": "set2", "type": "task", "label": "Again",
+      "text": "The second set is the one nobody sees you do.",
+      "task": { "movement": "$same", "units": "$set" },
+      "grit": 18, "loot": "common", "next": ["breadth", "depth"], "exclusive_next": true },
+
+    { "id": "breadth", "type": "task", "label": "Something New",
+      "text": "A different shape. Just once, to see.",
+      "task": { "movement": "$other:move", "units": 1 },
+      "grit": 10, "grants": ["varied"], "loot": "common", "next": ["door"] },
+
+    { "id": "depth", "type": "task", "label": "One More",
+      "text": "You know exactly what this costs now. That is the whole point.",
+      "task": { "movement": "$same", "units": "$set" },
+      "grit": 30, "loot": "uncommon", "next": ["door"] },
+
+    { "id": "door", "type": "threshold", "label": "The Door",
+      "text": "Out. The hallway is cold and enormously ordinary." }
+  ],
+  "slots": [
+    { "attach": "set1", "chance": 0.55,
+      "table": [ { "type": "echo", "w": 3 }, { "type": "cache", "grit": 8, "w": 3 }, { "type": "mirror", "w": 1 } ] },
+    { "attach": "rep", "chance": 0.4,
+      "table": [ { "type": "task", "label": "The Glass by the Bed", "movement": "water", "units": 1, "grit": 6, "w": 1 } ] },
+    { "attach": "set2", "chance": 0.3,
+      "table": [ { "type": "trinket", "w": 2 }, { "type": "cache", "grit": 12, "w": 3 } ] }
+  ]
+}

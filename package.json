@@ -1,0 +1,37 @@
+{
+  "name": "theheroesjourney",
+  "version": "0.2.0",
+  "private": true,
+  "description": "A life-balance habit app wearing a roguelike as a costume. Godot 4.7, mobile-first, installable as a PWA.",
+  "homepage": "https://github.com/kevroy314/theheroesjourney",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kevroy314/theheroesjourney.git"
+  },
+  "author": "Kevin Horecka",
+  "license": "UNLICENSED",
+  "_comment": [
+    "This is a Godot project, not a Node project — there are no dependencies to install.",
+    "package.json exists as a single discoverable entry point for the build commands,",
+    "which are all thin shell scripts. Node is only required for the push server (see",
+    "server/), which has its own package.json."
+  ],
+  "engines": {
+    "godot": "4.7",
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "./run.sh",
+    "serve": "./run.sh --no-build",
+    "stop": "./stop.sh",
+    "test": "./test.sh",
+    "import": "$GODOT_BIN --headless --path . --import",
+    "icons": "python3 tools/make_icons.py",
+    "export:linux": "mkdir -p build/linux && $GODOT_BIN --headless --path . --export-release Linux build/linux/heroes.x86_64",
+    "selftest:build": "npm run export:linux && ./build/linux/heroes.x86_64 --headless -- --selftest",
+    "fast": "BROTLI_QUALITY=5 ./run.sh"
+  },
+  "config": {
+    "godotBin": "/home/kevin/godot-tools/Godot_v4.7-stable_linux.x86_64"
+  }
+}

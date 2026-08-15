@@ -1,0 +1,9 @@
+Now turn that exact image into a short looping animation, delivered as ONE image containing a 2x2 grid of 4 frames. Frames read left-to-right, then top-to-bottom. The four cells must be exactly equal in size, with no gutters, no gaps, no borders, no text, no frame numbers, no labels, no captions anywhere in the image.
+
+Keep the room pixel-identical across all four frames: same camera, same composition, same bed frame, same window frame and mullions, same door, same floorboards, same wall panelling, same palette, same pixel size, same dither patterns.
+
+Across the four frames ONLY these change:
+1. The single amber light on the distant mountain breathes — slightly brighter in frame 2, brightest in frame 3, easing back down in frame 4. A slow pulse, not a flicker. Its warm spill on the window glass follows it.
+2. The cold dawn glow in the sky lifts very slightly from frame to frame.
+
+Nothing else moves. This is a seamless loop, so frame 4 must lead naturally back into frame 1.

@@ -1,0 +1,53 @@
+{
+  "_comment": "Permanent traits bought with Resolve. Deliberately modest — the real progression is unlocking movements and clearing chapters, not stacking multipliers.",
+  "upgrades": [
+    {
+      "id": "early_riser", "name": "Early Riser",
+      "desc": "+10% Grit from everything, per level.",
+      "max_level": 4, "cost": [25, 45, 75, 120],
+      "modifiers": [ { "key": "run.grit_mult", "op": "mul", "value": 1.1, "per_level": true } ]
+    },
+    {
+      "id": "refinery", "name": "Refinery",
+      "desc": "Grit converts to Resolve 15% better, per level.",
+      "max_level": 4, "cost": [30, 55, 90, 140],
+      "modifiers": [ { "key": "run.resolve_rate", "op": "mul", "value": 1.15, "per_level": true } ]
+    },
+    {
+      "id": "salvage", "name": "Salvage",
+      "desc": "Keep +10% more Grit when the loop resets, per level.",
+      "max_level": 3, "cost": [35, 65, 110],
+      "modifiers": [ { "key": "run.loop_keep", "op": "add", "value": 0.1, "per_level": true } ]
+    },
+    {
+      "id": "wanderer", "name": "Wanderer",
+      "desc": "One extra side node rolls in every area, per level.",
+      "max_level": 2, "cost": [60, 130],
+      "modifiers": [ { "key": "area.slot_bonus", "op": "add", "value": 1, "per_level": true } ]
+    },
+    {
+      "id": "long_hours", "name": "Long Hours",
+      "desc": "+4 hours on every deadline, per level.",
+      "max_level": 3, "cost": [50, 95, 160],
+      "modifiers": [ { "key": "area.deadline_bonus_hours", "op": "add", "value": 4, "per_level": true } ]
+    },
+    {
+      "id": "kindness", "name": "Kindness To Yourself",
+      "desc": "Scaling a movement down keeps +15% more Grit, per level.",
+      "max_level": 3, "cost": [20, 40, 70],
+      "modifiers": [ { "key": "task.partial_grit", "op": "add", "value": 0.15, "per_level": true } ]
+    },
+    {
+      "id": "open_ear", "name": "Open Ear",
+      "desc": "Echoes surface 40% more often, per level.",
+      "max_level": 2, "cost": [40, 80],
+      "modifiers": [ { "key": "loot.echo_weight", "op": "mul", "value": 1.4, "per_level": true } ]
+    },
+    {
+      "id": "steady_streak", "name": "Steady",
+      "desc": "Streak bonus grows 2% faster per day, per level.",
+      "max_level": 3, "cost": [45, 85, 145],
+      "modifiers": [ { "key": "streak.per_day", "op": "add", "value": 0.02, "per_level": true } ]
+    }
+  ]
+}

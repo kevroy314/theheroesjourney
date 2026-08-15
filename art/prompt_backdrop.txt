@@ -1,0 +1,20 @@
+Please generate one image. Portrait, 2:3 aspect ratio. No text, no labels, no captions, no watermark, no border, no UI elements anywhere in the image.
+
+SUBJECT — a background plate for a mobile game.
+The view from inside a small, almost-dark bedroom in the last minutes before dawn. We look across the room at a single window. The room reads as silhouette: the corner of an iron bed frame low on the left, one bare floorboard, a plain wooden door standing shut on the right. Through the window, a cold pale sky just beginning to lift, and far off, a black mountain ridge. On that mountain there is one small warm amber light, burning, steady, the only warm thing in the entire picture.
+
+MOOD — quiet, patient, faintly occult. A room someone has woken in more times than they can remember. Not frightening. Waiting.
+
+STYLE — limited-palette pixel art, as if authored at 180x320 pixels and displayed large, so the pixels are clearly visible and square. About 16 colours total. Ordered/Bayer dithering in the sky gradient and in the falloff of the window light. Crisp flat silhouettes. No black outlines around the landscape. Deep shadow holds most of the frame; let large areas be nearly pure dark.
+
+PALETTE — use these closely and do not introduce unrelated hues:
+#12131C darkest background
+#1B1D28 dark
+#242737 lighter dark
+#333749 cool line
+#EFE7DA bone white
+#948E9E muted grey-violet
+#E9A94E amber, used ONLY for the light on the mountain and the faintest warm spill it throws
+#8FBFD8 cold dawn sky blue
+
+COMPOSITION — the mountain and its light sit in the upper third, inside the window. Keep the middle band of the image relatively quiet and low-contrast so that interface panels can be laid over it. The bottom fifth should fall away into near-black.

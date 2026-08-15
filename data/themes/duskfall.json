@@ -1,0 +1,47 @@
+{
+  "id": "duskfall",
+  "name": "Duskfall",
+  "desc": "The same day, seen at the other end. Everything is longer here.",
+  "unlocked_by_default": false,
+  "unlock_cost": 120,
+
+  "colors": {
+    "bg": "#131019",
+    "panel": "#1D1826",
+    "panel_alt": "#282034",
+    "line": "#3B3049",
+    "text": "#E9E2F2",
+    "muted": "#9A90AC",
+    "accent": "#B08BE0",
+    "accent_2": "#E0A06A",
+    "danger": "#E0697F",
+    "good": "#79C2A8",
+    "warn": "#DFB964"
+  },
+
+  "labels": {
+    "grit": "Embers",
+    "resolve": "Ash",
+    "journey": "Descent",
+    "trinket": "Relic",
+    "echo": "Whisper",
+    "streak": "Vigil",
+    "area": "Hollow"
+  },
+
+  "glyphs": {
+    "start": "@",
+    "task": "»",
+    "free": "·",
+    "threshold": ">",
+    "echo": "~",
+    "cache": "$",
+    "mirror": "©",
+    "trinket": "¤",
+    "spite": "&",
+    "locked": "?",
+    "done": "+"
+  },
+
+  "mountain_line": "The mountain keeps its one light. From here it looks like it is waiting."
+}

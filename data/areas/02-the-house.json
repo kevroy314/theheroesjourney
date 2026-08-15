@@ -1,0 +1,41 @@
+{
+  "id": "the_house",
+  "name": "The House",
+  "intro": "Downstairs. The kettle is warm, which is strange, because you have not been up yet.",
+  "outro": "The front door sticks the way it always has. You have never lived here.",
+  "nodes": [
+    { "id": "kitchen", "type": "free", "label": "The Kitchen",
+      "text": "Everything is where you would have put it.",
+      "next": ["glass"] },
+
+    { "id": "glass", "type": "task", "label": "First, Water",
+      "text": "You have not had any yet today. You never have.",
+      "task": { "movement": "$choose:water", "units": "$set" },
+      "grit": 8, "next": ["food"] },
+
+    { "id": "food", "type": "task", "label": "Something Real",
+      "text": "Not a plan, not a diet. One thing that grew, or one thing with protein in it.",
+      "task": { "movement": "$choose:fuel", "units": "$set" },
+      "grit": 16, "loot": "common", "next": ["more_water", "cook_it"], "exclusive_next": true },
+
+    { "id": "more_water", "type": "task", "label": "One More Glass",
+      "text": "Cheap, fast, and your head will thank you around eleven.",
+      "task": { "movement": "$choose:water", "units": "$set" },
+      "grit": 12, "grants": ["hydrated"], "loot": "common", "next": ["front_door"] },
+
+    { "id": "cook_it", "type": "task", "label": "Make It Properly",
+      "text": "Longer. Better. The kind of thing you tell people you do.",
+      "task": { "movement": "$other:fuel", "units": "$set" },
+      "grit": 28, "loot": "uncommon", "next": ["front_door"] },
+
+    { "id": "front_door", "type": "threshold", "label": "The Front Door",
+      "text": "Outside, the street is doing its impression of an ordinary morning." }
+  ],
+  "slots": [
+    { "attach": "glass", "chance": 0.5,
+      "table": [ { "type": "echo", "w": 4 }, { "type": "cache", "grit": 10, "w": 3 }, { "type": "mirror", "w": 2 } ] },
+    { "attach": "food", "chance": 0.45,
+      "table": [ { "type": "task", "label": "Stretch Out The Night", "movement": "$choose:mind", "units": "$set", "grit": 12, "w": 2 },
+                 { "type": "trinket", "w": 1 } ] }
+  ]
+}

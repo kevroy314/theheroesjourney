@@ -1,0 +1,2 @@
+# The image COPYs nothing, so keep the ~40MB build/ out of the build context.
+*

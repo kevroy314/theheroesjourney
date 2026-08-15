@@ -1,0 +1,51 @@
+; The Heroes' Journey — a life-balance habit app couched in a roguelike.
+; Data-driven: see res://data/ for themes, rulesets, movements, areas and story.
+
+config_version=5
+
+[application]
+
+config/name="The Heroes' Journey"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+boot_splash/show_image=false
+config/icon="res://icon.png"
+
+[autoload]
+
+Events="*res://scripts/autoload/Events.gd"
+Debug="*res://scripts/autoload/Debug.gd"
+Content="*res://scripts/autoload/Content.gd"
+Rules="*res://scripts/autoload/Rules.gd"
+Meta="*res://scripts/autoload/Meta.gd"
+Palette="*res://scripts/autoload/Palette.gd"
+Notify="*res://scripts/autoload/Notify.gd"
+Game="*res://scripts/autoload/Game.gd"
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/handheld/orientation=1
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep_width"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.07, 0.075, 0.11, 1)
+textures/vram_compression/import_etc2_astc=true
+
+[debug]
+
+gdscript/warnings/untyped_declaration=0
+gdscript/warnings/unsafe_call_argument=0
+gdscript/warnings/unsafe_method_access=0
+gdscript/warnings/unsafe_property_access=0
+gdscript/warnings/shadowed_variable=0
+gdscript/warnings/shadowed_variable_base_class=0
