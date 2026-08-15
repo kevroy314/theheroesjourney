@@ -23,6 +23,28 @@ services:
       # Alpine's nginx.conf includes /etc/nginx/http.d/*.conf inside `http`
       # (/etc/nginx/conf.d/*.conf is included at the *root* context here).
       - ./web.conf:/etc/nginx/http.d/default.conf:ro
+    depends_on:
+      - push
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Web Push: holds subscriptions and sends the game's scheduled reminders.
+  # Not published to the host — nginx proxies /push/* to it over the compose
+  # network, so it inherits the OAuth protection in front of the site.
+  push:
+    build: ./server
+    image: heroes-push:latest
+    container_name: heroes-push
+    restart: unless-stopped
+    expose:
+      - "8071"
+    volumes:
+      - ./server/data:/data
+    environment:
+      VAPID_CONTACT: "mailto:kevin.horecka@gmail.com"
     logging:
       driver: json-file
       options:

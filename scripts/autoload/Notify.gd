@@ -1,47 +1,139 @@
 extends Node
-## Deadline reminders.
+## Deadline and streak reminders, delivered as Web Push.
 ##
-## The web build cannot deliver real notifications, and a habit app lives on
-## them — so this is the seam, not the implementation. Everything the game wants
-## to tell the player at a future time goes through schedule(); today that only
-## records the intent. When an Android export happens, this is the one file that
-## needs a backend behind it, and nothing above it has to change.
+## The game owns all the scheduling. It computes the whole list of "say this at
+## that time" reminders and hands it to the browser bridge (web/push.js), which
+## posts it to the push server; the server is dumb plumbing that fires them.
+## Recomputing and replacing the entire list on every change means there is no
+## incremental state to get out of step.
+##
+## On iOS this only works for a PWA added to the home screen — Safari tabs cannot
+## receive push at all. `status()` reports that honestly rather than pretending.
 
-var scheduled: Array = []   ## [{ id, title, body, at_unix }]
+const LEAD_OFFSETS := [24 * 3600, 6 * 3600, 3600]   ## seconds before a deadline
+
+var last_status: Dictionary = {}
 
 
-func clear(id_prefix: String = "") -> void:
-	if id_prefix == "":
-		scheduled.clear()
+func _ready() -> void:
+	# Re-sync whenever anything that changes a reminder time changes.
+	Events.run_changed.connect(sync)
+	Events.meta_changed.connect(sync)
+
+
+func available() -> bool:
+	return OS.has_feature("web") and JavaScriptBridge.get_interface("HJPush") != null
+
+
+func _eval(code: String) -> Variant:
+	if not OS.has_feature("web"):
+		return null
+	return JavaScriptBridge.eval(code, true)
+
+
+## { supported, standalone, permission, subscribed, id, busy, error, lastPush }
+func status() -> Dictionary:
+	if not available():
+		last_status = {"supported": false, "permission": "unsupported", "subscribed": false}
+		return last_status
+	var raw: Variant = _eval("window.HJPush ? HJPush.status() : ''")
+	if raw == null or String(raw) == "":
+		return last_status
+	var parsed: Variant = JSON.parse_string(String(raw))
+	if parsed is Dictionary:
+		last_status = parsed
+	return last_status
+
+
+func prefs() -> Dictionary:
+	return Meta.notify_prefs
+
+
+## Must be triggered by a real tap — browsers refuse an unprompted permission ask.
+func enable() -> void:
+	if not available():
+		Game.say("Notifications need the installed app.", "warn")
 		return
-	scheduled = scheduled.filter(func(n): return not String(n["id"]).begins_with(id_prefix))
+	_eval("HJPush.enable(%s)" % JSON.stringify(JSON.stringify(prefs())))
+	Meta.notify_prefs["enabled"] = true
+	Meta.save_game()
 
 
-func schedule(id: String, title: String, body: String, at_unix: int) -> void:
-	if at_unix <= HJClock.now():
+func disable() -> void:
+	if available():
+		_eval("HJPush.disable()")
+	Meta.notify_prefs["enabled"] = false
+	Meta.save_game()
+	Events.meta_changed.emit()
+
+
+func send_test() -> void:
+	if available():
+		_eval("HJPush.test()")
+		Game.say("Test sent. It should arrive in a moment.", "good")
+
+
+func push_prefs() -> void:
+	if available():
+		_eval("HJPush.prefs(%s)" % JSON.stringify(JSON.stringify(prefs())))
+
+
+## Rebuild the whole reminder list and hand it over.
+func sync() -> void:
+	if not available() or not bool(prefs().get("enabled", false)):
 		return
-	scheduled.append({ "id": id, "title": title, "body": body, "at_unix": at_unix })
-	print("[notify] %s @ %s — %s" % [id, HJClock.format_deadline(at_unix), title])
+	var reminders := build_reminders()
+	_eval("HJPush.schedule(%s)" % JSON.stringify(JSON.stringify(reminders)))
 
 
-## Called whenever a deadline is set or moved. Three nudges, spaced so they are
-## useful rather than nagging.
-func schedule_deadline(area_name: String, deadline_unix: int) -> void:
-	clear("deadline")
-	var remaining := deadline_unix - HJClock.now()
-	for offset in [24 * 3600, 6 * 3600, 3600]:
-		if remaining > offset:
-			schedule(
-				"deadline_%d" % offset,
-				"%s is still waiting" % area_name,
-				"%s left before the loop resets." % HJClock.format_remaining(offset),
-				deadline_unix - offset)
+## Everything the player should hear about, as absolute times. Kept pure so the
+## self-test can check it without a browser.
+func build_reminders() -> Array:
+	var out: Array = []
+	var p := prefs()
+	var now := HJClock.now()
+
+	if Game.has_active_run() and not Meta.paused and bool(p.get("deadline", true)):
+		var run: HJRun = Game.run
+		var area_name := String(run.area.get("name", "the road"))
+		for offset in LEAD_OFFSETS:
+			var at := run.deadline_unix - int(offset)
+			if at <= now:
+				continue
+			out.append({
+				"at": at * 1000,
+				"kind": "deadline",
+				"tag": "deadline",
+				"title": "%s is still waiting" % area_name,
+				"body": "%s before the loop resets." % HJClock.format_remaining(int(offset)),
+			})
+
+	if bool(p.get("streak", true)) and not Meta.paused:
+		# One nudge, early evening, only on a day with nothing logged yet.
+		var evening := HJClock.day_to_unix(HJClock.today()) + int(p.get("nudge_hour", 19)) * 3600 - HJClock.tz_offset_seconds()
+		if evening > now and Meta.last_active_day != HJClock.today():
+			out.append({
+				"at": evening * 1000,
+				"kind": "streak",
+				"tag": "streak",
+				"title": "One rep keeps it alive",
+				"body": "%d day%s so far. A single step is enough." % [
+					Meta.streak, "" if Meta.streak == 1 else "s"],
+			})
+
+	return out
 
 
-func schedule_streak_nudge() -> void:
-	clear("streak")
-	if Meta.last_active_day == HJClock.today():
-		return
-	var end_of_day := HJClock.day_to_unix(HJClock.today()) + 20 * 3600 - HJClock.tz_offset_seconds()
-	schedule("streak_evening", "One rep keeps it alive",
-		"Your streak is %d days. A single step is enough." % Meta.streak, end_of_day)
+## Used by the Hearth to describe the current state in one line.
+func describe() -> String:
+	var s := status()
+	if not bool(s.get("supported", false)):
+		return "Not available in this browser. Install the app to your home screen first."
+	if String(s.get("permission", "")) == "denied":
+		return "Blocked in your browser settings — the app cannot ask again."
+	if bool(s.get("subscribed", false)):
+		return "On. %d reminder%s queued." % [
+			build_reminders().size(), "" if build_reminders().size() == 1 else "s"]
+	if String(s.get("error", "")) != "":
+		return "Not on: %s" % s["error"]
+	return "Off."

@@ -111,3 +111,53 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(cacheFirst(request));
   }
 });
+
+
+/* ------------------------------------------------------------------ push */
+/* The payload is written by server/index.js. Everything the notification says
+ * was computed by the game — this worker only renders it. */
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (err) {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+
+  const title = data.title || "The Heroes' Journey";
+  const options = {
+    body: data.body || "",
+    icon: "icons/icon-192.png",
+    badge: "icons/favicon-64.png",
+    tag: data.tag || "hj",
+    renotify: false,
+    requireInteraction: false,
+    data: { url: data.url || "./" },
+  };
+
+  event.waitUntil((async () => {
+    await self.registration.showNotification(title, options);
+    // Let any open tab know one arrived — used by the tests, and by the app to
+    // refresh its "last notified" state without a round trip.
+    for (const client of await self.clients.matchAll({ includeUncontrolled: true })) {
+      client.postMessage({ type: "push", title, body: options.body, tag: options.tag });
+    }
+  })());
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "./";
+  event.waitUntil((async () => {
+    const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    // Prefer focusing a tab that is already open over spawning another one.
+    for (const client of clients) {
+      if ("focus" in client) {
+        await client.focus();
+        if ("navigate" in client && target !== "./") await client.navigate(target);
+        return;
+      }
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(target);
+  })());
+});
