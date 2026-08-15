@@ -58,6 +58,7 @@ func _on_bubble_moved() -> void:
 
 
 func _style_bubble() -> void:
+	HJUI.building_debug = true
 	var sb := HJUI.flat(Palette.ca("panel_alt", 0.94), int(BUBBLE_SIZE / 2), Palette.c("accent"), 3)
 	bubble.add_theme_stylebox_override("panel", sb)
 	for child in bubble.get_children():
@@ -75,6 +76,7 @@ func _style_bubble() -> void:
 	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bubble.add_child(label)
 	bubble.size = Vector2(BUBBLE_SIZE, BUBBLE_SIZE)
+	HJUI.building_debug = false
 
 
 func _restyle() -> void:
@@ -95,6 +97,12 @@ func _sync() -> void:
 # --- the panel -----------------------------------------------------------------
 
 func _build_panel() -> void:
+	HJUI.building_debug = true
+	_build_panel_inner()
+	HJUI.building_debug = false
+
+
+func _build_panel_inner() -> void:
 	if panel != null:
 		panel.queue_free()
 	panel = PanelContainer.new()
