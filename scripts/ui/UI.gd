@@ -21,15 +21,35 @@ static func fs(size: int) -> int:
 	return maxi(9, int(round(size * Debug.knob("ui_scale"))))
 
 
-static func stylebox(fill: Color, radius: int = RADIUS, border: Color = Color(0, 0, 0, 0), border_w: int = 0) -> StyleBoxFlat:
+## Opacity for one UI layer: its own knob times the master. "debug" is exempt —
+## the tool has to stay readable while it dims everything else.
+##
+## This is a stopgap for judging art behind the UI. The real answer is a UI that
+## belongs to the art rather than sitting on top of it in boxes.
+static var building_debug := false
+
+
+static func alpha_for(kind: String) -> float:
+	# The debug panel is the thing doing the dimming, so it never dims itself —
+	# an opacity slider you cannot read at low opacity is not a slider.
+	if kind == "debug" or building_debug:
+		return 1.0
+	return clampf(Debug.knob("%s_opacity" % kind) * Debug.knob("ui_opacity"), 0.0, 1.0)
+
+
+static func tint(colour: Color, kind: String) -> Color:
+	return Color(colour.r, colour.g, colour.b, colour.a * alpha_for(kind))
+
+
+static func stylebox(fill: Color, radius: int = RADIUS, border: Color = Color(0, 0, 0, 0), border_w: int = 0, kind: String = "panel") -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = fill
+	sb.bg_color = tint(fill, kind)
 	sb.corner_radius_top_left = radius
 	sb.corner_radius_top_right = radius
 	sb.corner_radius_bottom_left = radius
 	sb.corner_radius_bottom_right = radius
 	if border_w > 0:
-		sb.border_color = border
+		sb.border_color = tint(border, "border")
 		sb.set_border_width_all(border_w)
 	sb.content_margin_left = PAD
 	sb.content_margin_right = PAD
@@ -38,8 +58,8 @@ static func stylebox(fill: Color, radius: int = RADIUS, border: Color = Color(0,
 	return sb
 
 
-static func flat(fill: Color, radius: int = RADIUS, border: Color = Color(0, 0, 0, 0), border_w: int = 0) -> StyleBoxFlat:
-	var sb := stylebox(fill, radius, border, border_w)
+static func flat(fill: Color, radius: int = RADIUS, border: Color = Color(0, 0, 0, 0), border_w: int = 0, kind: String = "panel") -> StyleBoxFlat:
+	var sb := stylebox(fill, radius, border, border_w, kind)
 	sb.content_margin_left = 0
 	sb.content_margin_right = 0
 	sb.content_margin_top = 0
@@ -50,7 +70,7 @@ static func flat(fill: Color, radius: int = RADIUS, border: Color = Color(0, 0, 
 static func panel(role: String = "panel", border_role: String = "") -> PanelContainer:
 	var p := PanelContainer.new()
 	var border := Palette.c(border_role) if border_role != "" else Color(0, 0, 0, 0)
-	p.add_theme_stylebox_override("panel", stylebox(Palette.ca(role, Debug.knob("panel_opacity")), RADIUS, border, 2 if border_role != "" else 0))
+	p.add_theme_stylebox_override("panel", stylebox(Palette.c(role), RADIUS, border, 2 if border_role != "" else 0))
 	return p
 
 
@@ -58,7 +78,7 @@ static func label(text: String, size: int = FS_BODY, role: String = "text", alig
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", fs(size))
-	l.add_theme_color_override("font_color", Palette.c(role))
+	l.add_theme_color_override("font_color", tint(Palette.c(role), "text"))
 	l.horizontal_alignment = align
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -94,14 +114,15 @@ static func button(text: String, kind: String = "ghost", enabled: bool = true) -
 			fg = Palette.c("muted")
 			border = Palette.ca("line", 0.6)
 
-	b.add_theme_stylebox_override("normal", stylebox(fill, RADIUS, border, 2))
-	b.add_theme_stylebox_override("hover", stylebox(fill.lightened(0.06), RADIUS, border, 2))
-	b.add_theme_stylebox_override("pressed", stylebox(fill.darkened(0.15), RADIUS, border, 2))
-	b.add_theme_stylebox_override("disabled", stylebox(Palette.ca("panel_alt", 0.5), RADIUS, Palette.ca("line", 0.4), 2))
-	b.add_theme_color_override("font_color", fg)
-	b.add_theme_color_override("font_hover_color", fg)
-	b.add_theme_color_override("font_pressed_color", fg)
-	b.add_theme_color_override("font_disabled_color", Palette.ca("muted", 0.45))
+	b.add_theme_stylebox_override("normal", stylebox(fill, RADIUS, border, 2, "button"))
+	b.add_theme_stylebox_override("hover", stylebox(fill.lightened(0.06), RADIUS, border, 2, "button"))
+	b.add_theme_stylebox_override("pressed", stylebox(fill.darkened(0.15), RADIUS, border, 2, "button"))
+	b.add_theme_stylebox_override("disabled", stylebox(Palette.ca("panel_alt", 0.5), RADIUS, Palette.ca("line", 0.4), 2, "button"))
+	var caption := tint(fg, "text")
+	b.add_theme_color_override("font_color", caption)
+	b.add_theme_color_override("font_hover_color", caption)
+	b.add_theme_color_override("font_pressed_color", caption)
+	b.add_theme_color_override("font_disabled_color", tint(Palette.ca("muted", 0.45), "text"))
 	return b
 
 
@@ -141,7 +162,7 @@ static func spacer(height: float = 0.0) -> Control:
 
 static func rule() -> ColorRect:
 	var r := ColorRect.new()
-	r.color = Palette.ca("line", 0.7)
+	r.color = tint(Palette.ca("line", 0.7), "border")
 	r.custom_minimum_size.y = 2
 	return r
 
@@ -153,14 +174,14 @@ static func bar(value: float, maximum: float, role: String = "good", height: flo
 	p.show_percentage = false
 	p.custom_minimum_size.y = height
 	p.add_theme_stylebox_override("background", flat(Palette.ca("bg", 0.85), 8))
-	p.add_theme_stylebox_override("fill", flat(Palette.c(role), 8))
+	p.add_theme_stylebox_override("fill", flat(Palette.c(role), 8, Color(0, 0, 0, 0), 0, "button"))
 	return p
 
 
 static func set_bar(p: ProgressBar, value: float, maximum: float, role: String) -> void:
 	p.max_value = maxf(1.0, maximum)
 	p.value = clampf(value, 0.0, p.max_value)
-	p.add_theme_stylebox_override("fill", flat(Palette.c(role), 8))
+	p.add_theme_stylebox_override("fill", flat(Palette.c(role), 8, Color(0, 0, 0, 0), 0, "button"))
 
 
 static func chip(caption: String, value: String, role: String = "accent") -> PanelContainer:
@@ -187,7 +208,7 @@ static func set_chip(p: PanelContainer, value: String, role: String = "") -> voi
 	if is_instance_valid(l):
 		l.text = value
 		if role != "":
-			l.add_theme_color_override("font_color", Palette.c(role))
+			l.add_theme_color_override("font_color", tint(Palette.c(role), "text"))
 
 
 static func scroll() -> ScrollContainer:

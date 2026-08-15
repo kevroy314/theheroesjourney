@@ -20,8 +20,16 @@ const KNOBS := [
 	  "rebuild": true, "hint": "Scales every font. Rebuilds the screen when you let go." },
 	{ "id": "backdrop", "name": "Backdrop", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.55,
 	  "rebuild": true, "hint": "Generated art behind the area screen. 0 hides it. Unfinished — see issue #1." },
-	{ "id": "panel_opacity", "name": "Panel opacity", "min": 0.3, "max": 1.0, "step": 0.01, "default": 1.0,
-	  "rebuild": true, "hint": "How solid the UI panels sit — matters once art is behind them." },
+	{ "id": "ui_opacity", "name": "All UI", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
+	  "rebuild": true, "hint": "Master. Multiplies every layer below — drag this first." },
+	{ "id": "panel_opacity", "name": "Panel fills", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
+	  "rebuild": true, "hint": "The card backgrounds." },
+	{ "id": "button_opacity", "name": "Button fills", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
+	  "rebuild": true, "hint": "The solid slabs. Usually the thing hiding the art." },
+	{ "id": "border_opacity", "name": "Borders", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
+	  "rebuild": true, "hint": "Every outline. Drop to 0 for a borderless look." },
+	{ "id": "text_opacity", "name": "Text", "min": 0.2, "max": 1.0, "step": 0.01, "default": 1.0,
+	  "rebuild": true, "hint": "Labels and button captions." },
 ]
 
 signal knob_changed(id: String, value: float)
