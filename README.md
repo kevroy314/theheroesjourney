@@ -302,12 +302,21 @@ hours*, and a Godot web export cannot deliver one. The Android export templates
 are already installed on this machine; when that build happens, `Notify.gd` is
 the only file that needs a backend behind it.
 
+## Notifications
+
+Web Push, working on Android and on iPhone (iOS 16.4+, **home-screen install
+only** — Safari tabs cannot receive push). Turn them on in **The Hearth**.
+
+Defaults are off. One nudge before a deadline, one in the evening if you have
+not moved yet, nothing else. Every kind can be silenced on its own and quiet
+hours are enforced server-side. See [`docs/DEPLOY.md`](docs/DEPLOY.md#push-notifications).
+
 ## Not built yet
 
 - **Guilds** — trans-dimensional status sharing with others in their own loops.
   Status only, never items or help. `Meta.guild_id` is the reserved seam.
-- **Android build** and real notifications.
 - Rep counting from device motion, Health Connect / HealthKit import.
+- Art: the language is not locked yet — see issues #1–#3.
 
 ## Testing
 

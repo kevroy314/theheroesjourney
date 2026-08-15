@@ -13,6 +13,8 @@ func build() -> void:
 	scroll.add_child(list)
 	v.add_child(scroll)
 
+	_notifications(list)
+
 	list.add_child(HJUI.label("WHEN LIFE HAPPENS", HJUI.FS_SMALL, "muted"))
 	var pause_card := HJUI.panel("panel", "accent_2" if Meta.paused else "")
 	var pv := HJUI.vbox(6)
@@ -55,6 +57,89 @@ func build() -> void:
 		Game.rebuild_rules()
 		Game.say("Wiped. Back to the first morning.", "warn"))
 	list.add_child(wipe)
+
+
+## Notifications. The defaults are off and every kind can be silenced on its
+## own — a health app that nags is a health app people delete.
+func _notifications(list: VBoxContainer) -> void:
+	var prefs: Dictionary = Meta.notify_prefs
+	var on: bool = bool(prefs.get("enabled", false)) and bool(Notify.status().get("subscribed", false))
+
+	list.add_child(HJUI.label("REMINDERS", HJUI.FS_SMALL, "muted"))
+	var card := HJUI.panel("panel", "accent_2" if on else "")
+	var v := HJUI.vbox(8)
+	v.add_child(HJUI.label(Notify.describe(), HJUI.FS_SMALL, "accent_2" if on else "muted"))
+
+	if not on:
+		v.add_child(HJUI.label(
+			"One nudge before a deadline, and one in the evening if you have not moved yet. Nothing else, ever.",
+			HJUI.FS_TINY, "muted"))
+		var turn_on := HJUI.button("Turn on reminders", "primary")
+		turn_on.custom_minimum_size.y = 70
+		turn_on.pressed.connect(func() -> void:
+			Notify.enable()
+			# The browser prompt resolves asynchronously; give it a beat.
+			await get_tree().create_timer(1.2).timeout
+			Notify.sync()
+			refresh())
+		v.add_child(turn_on)
+	else:
+		v.add_child(_toggle("Deadline warnings", "deadline", prefs))
+		v.add_child(_toggle("Evening streak nudge", "streak", prefs))
+		v.add_child(_hour_row("Quiet from", "quiet_start", prefs))
+		v.add_child(_hour_row("Quiet until", "quiet_end", prefs))
+
+		var row := HJUI.hbox(10)
+		var test := HJUI.button("Send a test", "ghost")
+		test.custom_minimum_size.y = 66
+		test.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		test.pressed.connect(func(): Notify.send_test())
+		row.add_child(test)
+
+		var off := HJUI.button("Turn off", "danger")
+		off.custom_minimum_size.y = 66
+		off.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		off.pressed.connect(func() -> void:
+			Notify.disable()
+			refresh())
+		row.add_child(off)
+		v.add_child(row)
+
+	card.add_child(v)
+	list.add_child(card)
+
+
+func _toggle(label: String, key: String, prefs: Dictionary) -> HBoxContainer:
+	var row := HJUI.hbox(10)
+	row.add_child(HJUI.label(label, HJUI.FS_SMALL, "text"))
+	var value: bool = bool(prefs.get(key, true))
+	var b := HJUI.button("On" if value else "Off", "primary" if value else "quiet")
+	b.custom_minimum_size = Vector2(120, 58)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_END
+	b.pressed.connect(func() -> void:
+		Meta.notify_prefs[key] = not value
+		Meta.save_game()
+		Notify.push_prefs()
+		Notify.sync()
+		refresh())
+	row.add_child(b)
+	return row
+
+
+func _hour_row(label: String, key: String, prefs: Dictionary) -> HBoxContainer:
+	var row := HJUI.hbox(10)
+	row.add_child(HJUI.label(label, HJUI.FS_SMALL, "text"))
+	var hour := int(prefs.get(key, 22))
+	var b := HJUI.button("%02d:00" % hour, "ghost")
+	b.custom_minimum_size = Vector2(140, 58)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_END
+	b.pressed.connect(func() -> void:
+		Meta.notify_prefs[key] = (hour + 1) % 24
+		Meta.save_game()
+		Notify.push_prefs()
+		refresh())
+	row.add_child(b)
+	return row
 
 
 func _selectable(entry: Dictionary, is_selected: bool, on_select: Callable) -> PanelContainer:

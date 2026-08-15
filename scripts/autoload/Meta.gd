@@ -38,6 +38,17 @@ var selected_theme: String = ""
 var selected_ruleset: String = ""
 var guild_id: String = ""              ## reserved: trans-dimensional status sharing
 
+## Notification preferences. Defaults are deliberately quiet: nothing is sent
+## until the player turns it on, and every kind can be silenced on its own.
+var notify_prefs: Dictionary = {
+	"enabled": false,
+	"deadline": true,
+	"streak": true,
+	"nudge_hour": 19,
+	"quiet_start": 22,
+	"quiet_end": 8,
+}
+
 var stats: Dictionary = {
 	"runs": 0, "clears": 0, "tasks": 0, "scaled": 0, "grit_earned": 0, "resolve_earned": 0,
 }
@@ -494,7 +505,7 @@ func save_game() -> void:
 		"seen_first_reset": seen_first_reset, "seen_warden": seen_warden,
 		"paused": paused, "pause_started": pause_started,
 		"selected_theme": selected_theme, "selected_ruleset": selected_ruleset,
-		"guild_id": guild_id, "stats": stats,
+		"guild_id": guild_id, "stats": stats, "notify_prefs": notify_prefs,
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -533,6 +544,7 @@ func load_game() -> void:
 			selected_theme = String(parsed.get("selected_theme", ""))
 			selected_ruleset = String(parsed.get("selected_ruleset", ""))
 			guild_id = String(parsed.get("guild_id", ""))
+			notify_prefs.merge(parsed.get("notify_prefs", {}), true)
 			stats.merge(parsed.get("stats", {}), true)
 	_ensure_defaults()
 	refresh_streak()

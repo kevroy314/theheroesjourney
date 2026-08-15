@@ -18,7 +18,7 @@ func boot() -> void:
 	if run != null and not run.finished:
 		check_deadline()
 	goto("title")
-	Notify.schedule_streak_nudge()
+	Notify.sync()
 
 
 func goto(screen_name: String) -> void:
@@ -121,7 +121,7 @@ func enter_chapter(index: int) -> void:
 
 	Meta.chapters_reached = maxi(Meta.chapters_reached, index)
 	Meta.save_game()
-	Notify.schedule_deadline(String(run.area.get("name", "")), run.deadline_unix)
+	Notify.sync()
 
 	apply_effects(Rules.hook("on_area_enter", run.ctx()))
 	changed()
@@ -161,7 +161,7 @@ func end_run(outcome: String) -> void:
 		"first_reset": first_reset,
 		"repeats": Meta.runs_completed_today(),
 	}
-	Notify.clear("deadline")
+	Notify.sync()
 	clear_saved_run()
 	goto("summary")
 
@@ -313,7 +313,7 @@ func complete_task(movement_id: String, scaled: bool) -> void:
 	Meta.record_task(axis, scaled)
 	if Meta.touch_streak():
 		say("%s: %d %s." % [Palette.word("streak"), Meta.streak, "day" if Meta.streak == 1 else "days"], "good")
-		Notify.schedule_streak_nudge()
+		Notify.sync()
 
 	apply_effects(Rules.hook("on_task_complete", ctx))
 
@@ -494,7 +494,7 @@ func _apply_spite_effect(effect: Dictionary) -> void:
 			run.revealed = false
 		"deadline":
 			run.deadline_unix += HJClock.hours_to_seconds(float(effect.get("amount", -1)))
-			Notify.schedule_deadline(String(run.area.get("name", "")), run.deadline_unix)
+			Notify.sync()
 
 
 # --- the Warden ----------------------------------------------------------------
@@ -655,7 +655,7 @@ func use_item(id: String) -> bool:
 				return false
 			Meta.take_item(id)
 			run.deadline_unix += HJClock.hours_to_seconds(float(item.get("amount", 12)))
-			Notify.schedule_deadline(String(run.area.get("name", "")), run.deadline_unix)
+			Notify.sync()
 			say("The hour hand slips back. %s left." % HJClock.format_remaining(run.seconds_left()), "good")
 		"ward":
 			if not has_active_run():
@@ -718,14 +718,14 @@ func set_paused(value: bool) -> void:
 	if value:
 		Meta.paused = true
 		Meta.pause_started = HJClock.now()
-		Notify.clear()
+		Notify.sync()
 		say("Paused. Nothing is counting.", "info")
 	else:
 		var elapsed := HJClock.now() - Meta.pause_started
 		Meta.paused = false
 		if has_active_run() and elapsed > 0:
 			run.deadline_unix += elapsed
-			Notify.schedule_deadline(String(run.area.get("name", "")), run.deadline_unix)
+			Notify.sync()
 			save_run()
 		say("Welcome back. The clock starts again now.", "info")
 	Meta.save_game()
