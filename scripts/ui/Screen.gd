@@ -18,11 +18,29 @@ func _exit_tree() -> void:
 	Events.theme_changed.disconnect(refresh)
 
 
+var _rebuild_queued := false
+
+
 func _ready() -> void:
-	refresh()
+	_rebuild()
 
 
+## Coalesced: a dozen signals in one frame produce one rebuild, not a dozen.
+##
+## Without this, anything that emits in a tight loop (Meta.give_item fires
+## meta_changed per item) tears the screen down and rebuilds it repeatedly in a
+## single frame. queue_free() is deferred, so every generation is still in the
+## tree while the next is added, and the layout ends up wrong — the symptom was
+## the title screen losing everything below its expanding spacer.
 func refresh() -> void:
+	if not is_inside_tree() or _rebuild_queued:
+		return
+	_rebuild_queued = true
+	_rebuild.call_deferred()
+
+
+func _rebuild() -> void:
+	_rebuild_queued = false
 	if not is_inside_tree():
 		return
 	for child in get_children():
@@ -40,6 +58,24 @@ func build() -> void:
 ## place. Rebuilding the node tree costs ~30ms; syncing costs ~1ms.
 func sync() -> void:
 	refresh()
+
+
+## Optional art behind the screen, named by the active theme and dialled in with
+## the `backdrop` debug knob. Added before page() so it sits underneath, and
+## filtered NEAREST because the default linear filter turns pixel art to mush.
+func backdrop() -> void:
+	var alpha := Debug.knob("backdrop")
+	var path := String(Palette.data.get("backdrop", ""))
+	if alpha <= 0.0 or path == "" or not ResourceLoader.exists(path):
+		return
+	var art := TextureRect.new()
+	art.texture = load(path)
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	art.modulate.a = clampf(alpha, 0.0, 1.0)
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(art)
 
 
 ## Standard page scaffold: outer margins + a vertical stack.
