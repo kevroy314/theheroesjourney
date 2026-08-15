@@ -72,6 +72,9 @@ static func button(text: String, kind: String = "ghost", enabled: bool = true) -
 	b.custom_minimum_size.y = TAP
 	b.add_theme_font_size_override("font_size", fs(FS_BODY))
 	b.focus_mode = Control.FOCUS_NONE
+	# STOP would swallow a drag that started on the button and leave lists of
+	# buttons unscrollable; PASS keeps the press and lets the scroller pan.
+	b.mouse_filter = Control.MOUSE_FILTER_PASS
 	b.disabled = not enabled
 
 	var fill := Palette.c("panel_alt")
@@ -220,28 +223,55 @@ static func run_header(title: String, subtitle: String) -> HJRunHeader:
 
 ## A panel that reports taps — Button cannot hold a multi-line themed layout.
 ##
+## Two things it has to get right, both of which it once got wrong:
+##
+## 1. It fires on *release*, not press, and only if the pointer barely moved.
+##    Firing on press means a finger starting a scroll immediately activates
+##    whatever it landed on.
+## 2. It does not consume the press or the drag. A ScrollContainer can only pan
+##    if the events reach it, so accepting the press here made every list that
+##    is covered in cards unscrollable except through the gaps between them.
+##
 ## With `pointing/emulate_touch_from_mouse` on, one press arrives as both a touch
-## and a mouse event. Arming on release means a single press emits once, whether
-## the platform sends one family or both.
+## and a mouse event, so only the family that started a press may finish it.
 class TapCard extends PanelContainer:
 	signal tapped
 
-	var _armed := true
+	const DRAG_SLOP := 12.0
+
+	func _init() -> void:
+		# PASS, not STOP: STOP consumes the event even when _gui_input does not
+		# handle it, which stops a ScrollContainer above from ever seeing the
+		# drag. This is the whole reason card-covered lists would not scroll.
+		mouse_filter = Control.MOUSE_FILTER_PASS
+
+	var _pressing := false
+	var _source := ""
+	var _travel := 0.0
 
 	func _gui_input(event: InputEvent) -> void:
-		var is_down := false
-		var is_up := false
 		if event is InputEventScreenTouch:
-			is_down = event.pressed
-			is_up = not event.pressed
+			_press("touch", event.pressed)
 		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-			is_down = event.pressed
-			is_up = not event.pressed
-		else:
+			_press("mouse", event.pressed)
+		elif _pressing and event is InputEventScreenDrag and _source == "touch":
+			_travel += event.relative.length()
+		elif _pressing and event is InputEventMouseMotion and _source == "mouse":
+			_travel += event.relative.length()
+
+	func _press(source: String, is_down: bool) -> void:
+		if is_down:
+			if _pressing:
+				return          # the duplicate from the other input family
+			_pressing = true
+			_source = source
+			_travel = 0.0
 			return
-		accept_event()
-		if is_down and _armed:
-			_armed = false
+		if not _pressing or _source != source:
+			return
+		_pressing = false
+		_source = ""
+		if _travel < DRAG_SLOP:
+			# Only a real tap is consumed; a drag is left for the scroller.
+			accept_event()
 			tapped.emit()
-		elif is_up:
-			_armed = true

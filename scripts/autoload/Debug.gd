@@ -18,6 +18,8 @@ const KNOBS := [
 	  "hint": "Multiplies the whole frame. Below 1 darkens, above 1 lifts." },
 	{ "id": "ui_scale", "name": "Text size", "min": 0.7, "max": 1.4, "step": 0.05, "default": 1.0,
 	  "rebuild": true, "hint": "Scales every font. Rebuilds the screen when you let go." },
+	{ "id": "backdrop", "name": "Backdrop", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.55,
+	  "rebuild": true, "hint": "Generated art behind the area screen. 0 hides it. Unfinished — see issue #1." },
 	{ "id": "panel_opacity", "name": "Panel opacity", "min": 0.3, "max": 1.0, "step": 0.01, "default": 1.0,
 	  "rebuild": true, "hint": "How solid the UI panels sit — matters once art is behind them." },
 ]
