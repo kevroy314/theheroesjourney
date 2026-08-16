@@ -93,13 +93,24 @@ def plate():
     return img
 
 
+## Four chalk frames rather than one. A single frame repeated down a list is a
+## widget no matter how rough its edges are — the eye reads the repeat before it
+## reads the roughness. Callers pick one by hashing the node id, so a given node
+## keeps its own box across rebuilds while its neighbours differ.
+CHALK_VARIANTS = 4
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
-    for name, img in (("chalk", chalk()), ("plate", plate())):
+    frames = [("chalk", chalk(7)), ("plate", plate())]
+    for i in range(CHALK_VARIANTS):
+        frames.append(("chalk_%d" % i, chalk(11 + i * 37)))
+    for name, img in frames:
         img.save(os.path.join(OUT, "%s.png" % name))
         img.resize((SIZE * 4, SIZE * 4), Image.NEAREST).save(
             os.path.join(OUT, "_%s_x4.png" % name))
-    print("wrote frames to %s (size %d, margin %d)" % (OUT, SIZE, MARGIN))
+    print("wrote %d frames to %s (size %d, margin %d)"
+          % (len(frames), OUT, SIZE, MARGIN))
 
 
 if __name__ == "__main__":

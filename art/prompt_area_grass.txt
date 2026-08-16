@@ -1,0 +1,31 @@
+Please generate one image. Portrait, 9:16 aspect ratio. No text, no labels, no captions, no lettering of any kind, no watermark, no border, no UI elements anywhere in the image. No people, no faces, no figures.
+
+SUBJECT — a background plate for a mobile game, part of a set. A path that gives up halfway and becomes grass taller than a person. Dense stalks of tall grass stand in silhouette along the left and right edges, leaning inward and nearly meeting overhead. Between them a trodden channel of flattened grass runs away from us toward a gap, and through the gap a black mountain ridge. A wooden stake leans at the left with a small lamp hung on it.
+
+COMPOSITION — this is a strict requirement and the most important part of the brief.
+The picture is read through a narrow column of interface sitting down the MIDDLE of the frame, roughly the middle 60% of the width, from about 15% height to about 85% height.
+- That CENTRE COLUMN must be QUIET: even, low contrast, one continuous surface, no fine detail, no bright highlights, no busy texture. It is ground, floor, road, water or wall — never the subject.
+- Put the interesting content in a BAND ACROSS THE UPPER THIRD, and down the LEFT and RIGHT EDGES. Frame the view like a vignette: foreground objects standing at the left and right margins, the distance visible between them.
+- The very bottom edge stays lit rather than falling away into black.
+
+LIGHTING
+- One practical warm light source is in frame: the small lamp hung on the leaning stake at the left edge. It is dim, warm and muted. It casts a soft pool that keeps the near ground readable.
+- Nothing is crushed to pure black. The ground in the lower half sits at roughly 20 percent brightness — dark, but you can plainly read its surface.
+- Far off there is a single small warm amber light on a black mountain ridge. It is the most SATURATED point in the picture and the thing the eye goes to. The practical light is warm but desaturated by comparison.
+- The overall read is "dimly lit before dawn", never "unlit". A phone screen in daylight must still show the ground.
+
+STYLE — limited-palette pixel art, as if authored at 180x320 pixels and displayed large, so the pixels are clearly visible and square. About 16 colours total. Ordered/Bayer dithering in the sky gradient and in the light's falloff across the ground. Crisp flat silhouettes. No black outlines around the landscape.
+
+PALETTE — use these closely and do not introduce unrelated hues:
+#12131C darkest background, used sparingly — only the deepest corners
+#1B1D28 dark
+#242737 mid dark
+#2E3242 the lit ground — one of the most common colours in the lower half
+#333749 cool line
+#EFE7DA bone white, for the brightest sky only
+#948E9E muted grey-violet
+#E9A94E amber — the light on the mountain, the single most saturated point
+#C98F49 a duller warm — the practical light and the pool it casts
+#8FBFD8 cold dawn sky blue
+
+MOOD — quiet, close, faintly watchful. Nothing is hunting you. It is only that you cannot see.

@@ -10,9 +10,12 @@ extends CanvasLayer
 const BUBBLE_SIZE := 78.0
 const DRAG_SLOP := 10.0     ## px of movement before a press stops counting as a tap
 
+const SECTIONS := ["Knobs", "God", "Do", "Report"]
+
 var bubble: Bubble
 var panel: PanelContainer
 var _body: VBoxContainer
+var _section := "Knobs"
 
 
 func _init() -> void:
@@ -126,15 +129,33 @@ func _build_panel_inner() -> void:
 	top.add_child(close)
 	v.add_child(top)
 
+	# Sections, not one long roll. All four at once was ~3000px of content in a
+	# 570px window: everything was four screens of dragging away from everything
+	# else, which is not a debug tool, it is an endurance test.
+	var tabs := HJUI.hbox(6)
+	for entry in SECTIONS:
+		var section := String(entry)
+		var t := HJUI.button(section, "primary" if section == _section else "quiet")
+		t.custom_minimum_size = Vector2(0, 54)
+		t.add_theme_font_size_override("font_size", HJUI.fs(HJUI.FS_SMALL))
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var picked := section
+		t.pressed.connect(func() -> void:
+			_section = picked
+			_build_panel())
+		tabs.add_child(t)
+	v.add_child(tabs)
+
 	var scroll := HJUI.scroll()
 	_body = HJUI.vbox(12)
 	scroll.add_child(_body)
 	v.add_child(scroll)
 
-	_knobs()
-	_god()
-	_actions()
-	_report()
+	match _section:
+		"Knobs": _knobs()
+		"God": _god()
+		"Do": _actions()
+		"Report": _report()
 
 
 func _knobs() -> void:
@@ -162,13 +183,8 @@ func _knob_row(def: Dictionary) -> PanelContainer:
 	row.add_child(value_label)
 	cv.add_child(row)
 
-	var slider := HSlider.new()
-	slider.min_value = float(def["min"])
-	slider.max_value = float(def["max"])
-	slider.step = float(def.get("step", 0.01))
-	slider.value = Debug.knob(id)
-	slider.custom_minimum_size.y = 52
-	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var slider := HJUI.slider(float(def["min"]), float(def["max"]),
+		float(def.get("step", 0.01)), Debug.knob(id))
 	cv.add_child(slider)
 
 	cv.add_child(HJUI.label(String(def.get("hint", "")), HJUI.FS_TINY, "muted"))

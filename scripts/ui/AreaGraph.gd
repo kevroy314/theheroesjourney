@@ -13,6 +13,17 @@ const NODE_ICONS := {
 	"mirror": "mirror", "trinket": "charm", "spite": "spite", "warden": "warden",
 }
 
+## Cards are sized to what they say and centred, never stretched to the frame.
+## A column of full-width rounded rectangles is a settings screen no matter what
+## texture you put on it — the width itself is the tell. Chalk on a floor is
+## whatever size the thing you wrote needed to be.
+const CARD_MIN := 200.0
+const CARD_MAX := 360.0
+const NUDGE := 26.0         ## how far off centre a card may sit
+const TILT := 0.034         ## radians, about 2 degrees
+const FRAME := 720.0        ## logical canvas width the layout has to fit inside
+const GUTTER := 44.0        ## page margins plus a little air at each edge
+
 var run: HJRun
 var _rows: Array = []       ## Array of Array[Control], top to bottom
 var _cards: Dictionary = {} ## node id -> card
@@ -20,13 +31,21 @@ var _cards: Dictionary = {} ## node id -> card
 
 func _init(run_ref: HJRun) -> void:
 	run = run_ref
-	add_theme_constant_override("separation", 26)
+	add_theme_constant_override("separation", 34)
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 
 func _ready() -> void:
 	_build()
 	sort_children.connect(queue_redraw)
+
+
+## A stable pseudo-random in [0,1) for a node. Stable is the point: the jitter
+## has to survive a rebuild or the whole board twitches every time anything
+## changes, which reads as a rendering fault rather than a hand.
+static func _wobble(id: String, salt: int) -> float:
+	var h := hash(id + "/" + str(salt))
+	return float(h % 10007) / 10007.0
 
 
 func _depths() -> Dictionary:
@@ -68,20 +87,36 @@ func _build() -> void:
 	keys.sort()
 	for key in keys:
 		var row_box := HBoxContainer.new()
-		row_box.add_theme_constant_override("separation", 14)
+		row_box.add_theme_constant_override("separation", 12)
 		row_box.alignment = BoxContainer.ALIGNMENT_CENTER
 		row_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# Cards are free to be whatever width their text wants, but a row still
+		# has to fit the frame. Without this the widest row silently stretches
+		# the whole column past the viewport and every label on the screen wraps
+		# against a rect nobody can see.
+		var row_ids: Array = by_row[key]
+		var count := row_ids.size()
+		var budget := (FRAME - GUTTER - 12.0 * float(count - 1)) / float(count) - NUDGE
+
 		var controls: Array = []
 		for id in by_row[key]:
-			var card := _make_card(String(id))
-			row_box.add_child(card)
+			var node_id := String(id)
+			var card := _make_card(node_id, budget)
+			# Off-centre by a stable amount. Containers own position, so the nudge
+			# has to be margin rather than a poke at the card's own transform.
+			var lean := (_wobble(node_id, 3) - 0.5) * 2.0 * NUDGE
+			var holder := HJUI.margins(int(maxf(0.0, lean)), 0, int(maxf(0.0, -lean)), 0)
+			holder.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			holder.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			holder.add_child(card)
+			row_box.add_child(holder)
 			controls.append(card)
-			_cards[String(id)] = card
+			_cards[node_id] = card
 		_rows.append(controls)
 		add_child(row_box)
 
 
-func _make_card(id: String) -> Control:
+func _make_card(id: String, budget: float = CARD_MAX) -> Control:
 	var node := run.node(id)
 	var type_id := String(node.get("type", "free"))
 	var done := run.is_done(id)
@@ -90,8 +125,8 @@ func _make_card(id: String) -> Control:
 	var visible_now := HJAreaGen.is_visible(run, id)
 
 	var card := HJUI.TapCard.new()
-	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card.custom_minimum_size.y = 104
+	card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
 	var fill := Palette.c("panel")
 	var border := Palette.ca("line", 0.7)
@@ -132,11 +167,43 @@ func _make_card(id: String) -> Control:
 	var wash := Color(fill.r, fill.g, fill.b, fill.a * 0.55)
 	card.add_theme_stylebox_override("panel", HJUI.stylebox(wash, 4, Color(0, 0, 0, 0), 0))
 	var sb: StyleBoxFlat = card.get_theme_stylebox("panel")
-	sb.content_margin_top = 12
-	sb.content_margin_bottom = 12
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
-	card.add_child(HJUI.nine("chalk", border))
+	sb.content_margin_top = 14
+	sb.content_margin_bottom = 14
+	sb.content_margin_left = 16
+	sb.content_margin_right = 16
+	# One of four hands, picked by the node's own id, so neighbours differ but a
+	# node keeps its box across rebuilds.
+	card.add_child(HJUI.nine("chalk_%d" % (hash(id) % 4), border))
+
+	# Sized to what it says — the long "choose · 16 options" nodes get to be wide
+	# and the bare ones stay small. Title and subtitle are set at different sizes,
+	# so they are measured at different rates rather than by raw character count.
+	var wanted := 104.0 \
+		+ maxf(float(title.length()) * 12.5, float(sub.length()) * 9.5) \
+		+ _wobble(id, 1) * 40.0
+	var ceiling := maxf(CARD_MIN, minf(CARD_MAX, budget))
+	# Height wanders a little too. Boxes that are all exactly one height read as
+	# rows in a table however rough their edges are.
+	card.custom_minimum_size = Vector2(
+		clampf(wanted, CARD_MIN, ceiling), 92.0 + _wobble(id, 4) * 18.0)
+
+	# A hand-drawn box is never quite square to the wall. Rotation is applied
+	# after the container has sized the card, since containers own size but not
+	# transform.
+	var tilt := (_wobble(id, 2) - 0.5) * 2.0 * TILT
+	card.resized.connect(func() -> void:
+		card.pivot_offset = card.size * 0.5
+		card.rotation = tilt)
+
+	# Written down one after another, top of the tree first, the way you would
+	# actually chalk a plan onto a floor.
+	if Debug.knob("motion") > 0.0:
+		card.modulate.a = 0.0
+		card.ready.connect(func() -> void:
+			var delay := 0.035 * float(_cards.size())
+			var tween := card.create_tween()
+			tween.tween_interval(delay)
+			tween.tween_property(card, "modulate:a", 1.0, 0.16))
 
 	var v := HJUI.vbox(2)
 	var top := HJUI.hbox(8)
@@ -196,16 +263,53 @@ static func _plural(unit: String, count: int) -> String:
 	return unit + "s"
 
 
+## Where a card sits in this control's own space. The card is two containers
+## deep and none of the ancestors rotate, so subtracting origins is enough.
+func _rect_of(card: Control) -> Rect2:
+	return Rect2(card.get_global_position() - get_global_position(), card.size)
+
+
+## The links, following the real `next` edges rather than joining every card in
+## one row to every card in the next. With full-width boxes that shortcut was
+## invisible; with narrow centred ones it would draw a lie.
 func _draw() -> void:
-	if run == null or _rows.size() < 2:
+	if run == null or _cards.is_empty():
 		return
-	for row_index in range(_rows.size() - 1):
-		for card in _rows[row_index]:
-			var from := Vector2(
-				card.get_parent().position.x + card.position.x + card.size.x * 0.5,
-				card.get_parent().position.y + card.position.y + card.size.y)
-			for other in _rows[row_index + 1]:
-				var to := Vector2(
-					other.get_parent().position.x + other.position.x + other.size.x * 0.5,
-					other.get_parent().position.y + other.position.y)
-				draw_line(from, to, Palette.ca("line", 0.55), 2.0, true)
+	for id in _cards:
+		var from_card: Control = _cards[id]
+		if not is_instance_valid(from_card):
+			continue
+		var a := _rect_of(from_card)
+		for nxt in run.node(String(id)).get("next", []):
+			var to_card: Control = _cards.get(String(nxt), null)
+			if to_card == null or not is_instance_valid(to_card):
+				continue
+			var b := _rect_of(to_card)
+			if b.position.y <= a.position.y:
+				continue        # a side node hanging off its anchor, not a step down
+			var done := run.is_done(String(id))
+			var role := "accent" if done else "muted"
+			var alpha := 0.85 if done else 0.55
+			_chalk_line(
+				Vector2(a.position.x + a.size.x * 0.5, a.position.y + a.size.y),
+				Vector2(b.position.x + b.size.x * 0.5, b.position.y),
+				Palette.ca(role, alpha), String(id) + String(nxt))
+
+
+## A line drawn the way the boxes are: short strokes with gaps and a wandering
+## middle, not a straight rule. The wander is hashed off the edge's own name so
+## it holds still between frames.
+func _chalk_line(from: Vector2, to: Vector2, colour: Color, seed_key: String) -> void:
+	var span := to - from
+	var normal := Vector2(-span.y, span.x).normalized()
+	var bow := (_wobble(seed_key, 5) - 0.5) * 18.0
+	var steps := 14
+	var prev := from
+	for i in range(1, steps + 1):
+		var t := float(i) / float(steps)
+		var arc := sin(t * PI) * bow
+		var point := from + span * t + normal * arc
+		# Skip roughly one stroke in five: chalk does not lay down continuously.
+		if _wobble(seed_key, 20 + i) > 0.2:
+			draw_line(prev, point, colour, 3.0, false)
+		prev = point

@@ -3,6 +3,8 @@ extends MarginContainer
 ## Base for every screen. Screens are built in code so a theme swap can restyle
 ## them wholesale — there are no baked colours in .tscn files.
 
+const LAMPLIGHT := "res://assets/shaders/lamplight.gdshader"
+
 
 func _enter_tree() -> void:
 	Events.run_changed.connect(sync)
@@ -50,6 +52,19 @@ func _rebuild() -> void:
 	backdrop()
 	build()
 	Palette.register = ""
+	_fade_in()
+
+
+## A screen arrives rather than appearing. Short enough not to be in the way of
+## someone tapping through quickly — 140ms is under the threshold where a wait
+## registers as a wait.
+func _fade_in() -> void:
+	if Debug.knob("motion") <= 0.0:
+		modulate.a = 1.0
+		return
+	modulate.a = 0.0
+	var tween := create_tween()
+	tween.tween_property(self, "modulate:a", 1.0, 0.14)
 
 
 ## Which palette register this screen paints in: "" for reality, "palace" for
@@ -99,7 +114,22 @@ func backdrop() -> void:
 	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	art.modulate.a = clampf(alpha, 0.0, 1.0)
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# Every plate is lit by one flame, and a flame is never steady.
+	var flicker := Debug.knob("flicker")
+	if flicker > 0.0 and ResourceLoader.exists(LAMPLIGHT):
+		var mat := ShaderMaterial.new()
+		mat.shader = load(LAMPLIGHT)
+		mat.set_shader_parameter("amount", 0.28 * flicker)
+		mat.set_shader_parameter("speed", 1.0)
+		art.material = mat
 	add_child(art)
+
+	# Dust rising through it. Warm dust in the Palace, cold in the world.
+	if Debug.knob("motes") > 0.0:
+		var dust := HJMotes.new(Palette.ca("accent" if register() != "" else "muted",
+			0.42 * Debug.knob("motes")))
+		add_child(dust)
 
 
 ## Standard page scaffold: outer margins + a vertical stack.

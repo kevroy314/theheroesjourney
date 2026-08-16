@@ -44,7 +44,15 @@
     "default": "res://assets/backdrops/waking_room.png",
     "title": "res://assets/backdrops/title.png",
     "journey": "res://assets/backdrops/journey.png",
-    "summary": "res://assets/backdrops/summary.png"
+    "summary": "res://assets/backdrops/summary.png",
+    "waking_room": "res://assets/backdrops/areas/waking_room.png",
+    "the_house": "res://assets/backdrops/areas/the_house.png",
+    "the_town": "res://assets/backdrops/areas/the_town.png",
+    "tall_grass": "res://assets/backdrops/areas/tall_grass.png",
+    "long_road": "res://assets/backdrops/areas/long_road.png",
+    "foothills": "res://assets/backdrops/areas/foothills.png",
+    "observatory": "res://assets/backdrops/areas/observatory.png",
+    "summit": "res://assets/backdrops/areas/summit.png"
   },
   "palace_backdrops": {
     "default": "res://assets/backdrops/palace.png",
