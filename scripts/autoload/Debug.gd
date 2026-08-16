@@ -12,6 +12,12 @@ extends Node
 const SETTINGS_PATH := "user://debug.json"
 const REPORT_DIR := "user://reports"
 
+## Every screen, for the god-mode jump list.
+const SCREENS := [
+	"title", "palace", "journey", "area", "task", "boon", "event", "summary",
+	"gym", "workshop", "stores", "hearth", "observatory", "codex", "wheel", "inventory",
+]
+
 ## Add a knob here and it appears in the panel. `apply` names what reads it.
 const KNOBS := [
 	{ "id": "brightness", "name": "Brightness", "min": 0.35, "max": 1.65, "step": 0.01, "default": 1.0,
@@ -34,6 +40,12 @@ const KNOBS := [
 
 signal knob_changed(id: String, value: float)
 signal visibility_changed()
+
+## God mode: nothing costs anything, everything is unlocked, every Wheel node is
+## claimable, and any screen can be jumped to. Purely a testing affordance — it
+## is checked at the point of *asking*, so it never writes "unlocked" into a save
+## that would then keep it after god mode is switched off.
+var god := false
 
 var open := false
 var bubble_visible := true
@@ -76,6 +88,18 @@ func reset_knobs() -> void:
 	save_settings()
 	for k in KNOBS:
 		knob_changed.emit(String(k["id"]), float(k["default"]))
+
+
+func set_god(value: bool) -> void:
+	god = value
+	save_settings()
+	Game.rebuild_rules()
+	Events.meta_changed.emit()
+	say_state()
+
+
+func say_state() -> void:
+	Game.say("God mode %s." % ("on — nothing costs anything" if god else "off"), "warn")
 
 
 func set_open(value: bool) -> void:
@@ -222,6 +246,7 @@ func save_settings() -> void:
 	if f == null:
 		return
 	f.store_string(JSON.stringify({
+		"god": god,
 		"open": open, "bubble_visible": bubble_visible,
 		"bubble_pos": [bubble_pos.x, bubble_pos.y], "values": values,
 	}))
@@ -234,6 +259,7 @@ func load_settings() -> void:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
 	if not (parsed is Dictionary):
 		return
+	god = bool(parsed.get("god", false))
 	open = bool(parsed.get("open", false))
 	bubble_visible = bool(parsed.get("bubble_visible", true))
 	values = parsed.get("values", {})

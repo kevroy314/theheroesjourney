@@ -62,6 +62,8 @@ func _ready() -> void:
 # --- unlocks -------------------------------------------------------------------
 
 func pack_unlocked(pack_id: String) -> bool:
+	if Debug.god:
+		return true
 	var pack: Dictionary = Content.packs.get(pack_id, {})
 	if int(pack.get("cost", 0)) <= 0:
 		return true
@@ -69,15 +71,19 @@ func pack_unlocked(pack_id: String) -> bool:
 
 
 func is_unlocked(entry: Dictionary) -> bool:
+	if Debug.god:
+		return true
 	if entry.get("unlocked_by_default", false) or int(entry.get("cost", -1)) == 0:
 		return true
 	return unlocked.has(entry.get("id", ""))
 
 
 func unlock(id: String, cost: int) -> bool:
-	if unlocked.has(id) or resolve < cost:
+	if unlocked.has(id):
 		return false
-	resolve -= cost
+	if not Debug.god and resolve < cost:
+		return false
+	resolve -= 0 if Debug.god else cost
 	unlocked.append(id)
 	save_game()
 	Events.meta_changed.emit()
@@ -98,13 +104,14 @@ func cost_of(upgrade: Dictionary) -> int:
 
 func can_buy(upgrade: Dictionary) -> bool:
 	var cost := cost_of(upgrade)
-	return cost >= 0 and resolve >= cost
+	return cost >= 0 and (Debug.god or resolve >= cost)
 
 
 func buy(upgrade: Dictionary) -> bool:
 	if not can_buy(upgrade):
 		return false
-	resolve -= cost_of(upgrade)
+	if not Debug.god:
+		resolve -= cost_of(upgrade)
 	levels[upgrade["id"]] = level_of(upgrade["id"]) + 1
 	save_game()
 	Events.meta_changed.emit()
@@ -157,6 +164,8 @@ func take_item(id: String) -> bool:
 
 ## Shop prices bend to the shop.discount key (Stores next to the Workshop).
 func price(base_cost: int) -> int:
+	if Debug.god:
+		return 0
 	var discount := clampf(Rules.value("shop.discount", {}, 0.0), 0.0, 0.6)
 	return maxi(0, int(round(base_cost * (1.0 - discount))))
 
@@ -283,6 +292,8 @@ func axis_ring(axis: String) -> int:
 
 
 func wheel_met(node: Dictionary) -> bool:
+	if Debug.god:
+		return true
 	var req: Dictionary = node.get("req", {})
 	match String(req.get("type", "")):
 		"axis_tasks":

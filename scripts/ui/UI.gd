@@ -150,6 +150,27 @@ static func has_icon(id: String) -> bool:
 	return id != "" and ResourceLoader.exists("res://assets/icons/%s.png" % id)
 
 
+## A 9-slice frame from assets/frames, tinted by the palette.
+##
+## TILE rather than STRETCH: the chalk edge is broken on purpose, and stretching
+## it smears the breaks into streaks. Tiling repeats the strokes instead.
+static func nine(kind: String, colour: Color) -> NinePatchRect:
+	var n := NinePatchRect.new()
+	var path := "res://assets/frames/%s.png" % kind
+	if ResourceLoader.exists(path):
+		n.texture = load(path)
+	n.patch_margin_left = 16
+	n.patch_margin_right = 16
+	n.patch_margin_top = 16
+	n.patch_margin_bottom = 16
+	n.axis_stretch_horizontal = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	n.axis_stretch_vertical = NinePatchRect.AXIS_STRETCH_MODE_TILE
+	n.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	n.modulate = colour
+	n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return n
+
+
 static func vbox(separation: int = 12) -> VBoxContainer:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", separation)

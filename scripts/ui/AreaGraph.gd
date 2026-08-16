@@ -126,12 +126,17 @@ func _make_card(id: String) -> Control:
 		border = Palette.c("danger")
 		title_role = "danger" if available else title_role
 
-	card.add_theme_stylebox_override("panel", HJUI.stylebox(fill, 12, border, 3 if available else 2))
+	# The box is chalk: scratched onto the floor of a room the loop is going to
+	# take back. The fill is a wash rather than a panel, so the room reads
+	# through it — you are looking at marks on the boards, not at a widget.
+	var wash := Color(fill.r, fill.g, fill.b, fill.a * 0.55)
+	card.add_theme_stylebox_override("panel", HJUI.stylebox(wash, 4, Color(0, 0, 0, 0), 0))
 	var sb: StyleBoxFlat = card.get_theme_stylebox("panel")
-	sb.content_margin_top = 10
-	sb.content_margin_bottom = 10
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
+	sb.content_margin_top = 12
+	sb.content_margin_bottom = 12
+	sb.content_margin_left = 14
+	sb.content_margin_right = 14
+	card.add_child(HJUI.nine("chalk", border))
 
 	var v := HJUI.vbox(2)
 	var top := HJUI.hbox(8)
