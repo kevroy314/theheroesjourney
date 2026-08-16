@@ -1,0 +1,35 @@
+Please generate one image. Portrait, 2:3 aspect ratio. No text, no labels, no captions, no watermark, no border, no UI elements anywhere in the image.
+
+This is a revision of the bedroom plate. Same room, same style, same palette. The change is the lighting and the composition.
+
+SUBJECT — a background plate for a mobile game.
+The view from inside a small bedroom in the last minutes before dawn. We look across the room at a window. The room reads as silhouette: the corner of an iron bed frame low on the left, plain floorboards, a wooden door standing shut on the right. Through the window, a cold pale sky just beginning to lift, and far off, a black mountain ridge with one small warm amber light burning steadily on it.
+
+THE LIGHTING — this is the important part, and the previous version got it wrong by being too dark.
+
+1. There is now a PRACTICAL LIGHT SOURCE INSIDE THE ROOM: a small oil lamp with a low flame, sitting on the floor beside the bed, near the bottom left. It is dim and warm. It throws a soft pool of light across the floorboards and up the near edge of the bed frame.
+2. Because of that lamp, THE FLOOR IS CLEARLY VISIBLE. The floorboards should sit at roughly 20 percent brightness — dark, but you can plainly read the boards, their seams, and the grain. They must NOT be near-black. Nothing in the lower half of the picture should be crushed to pure shadow.
+3. The window is still the brightest area of the picture.
+4. The one amber light on the mountain is still the most SATURATED point in the picture. The lamp is warm but muted and desaturated by comparison — the mountain light stays the thing your eye goes to.
+5. Overall the room should read as "dimly lit at dawn", not "unlit". A phone screen in daylight must still show the floor and the bed.
+
+COMPOSITION — this also changes.
+- Put the window HIGH: its top edge should be cropped by the top edge of the image, and the whole window, the mountain and its light should sit entirely within the TOP THIRD of the picture.
+- The LOWER TWO THIRDS is floor, bed and door — and it must be a QUIET BAND: even, low contrast, softly lit by the lamp, with no fine detail, no bright highlights and no busy texture. Interface panels will be laid over this area and must stay readable, so keep it calm and let it read as one continuous surface.
+- The very bottom edge should stay lit by the lamp rather than falling away into black.
+
+STYLE — limited-palette pixel art, as if authored at 180x320 pixels and displayed large, so the pixels are clearly visible and square. About 16 colours total. Ordered/Bayer dithering in the sky gradient, in the lamp's falloff across the floor, and in the window light. Crisp flat silhouettes. No black outlines around the landscape.
+
+PALETTE — use these closely and do not introduce unrelated hues:
+#12131C darkest background, used sparingly now — only the deepest corners
+#1B1D28 dark
+#242737 mid dark
+#2E3242 the lit floorboards — this should be one of the most common colours in the lower half
+#333749 cool line
+#EFE7DA bone white, for the brightest part of the window only
+#948E9E muted grey-violet
+#E9A94E amber — the light on the mountain, the single most saturated point
+#C98F49 a duller warm — the lamp flame and the warm pool it casts on the floor
+#8FBFD8 cold dawn sky blue
+
+MOOD — quiet, patient, faintly occult. A room someone has woken in more times than they can remember. Not frightening. Waiting. Now with one small light someone lit before they went to sleep.
