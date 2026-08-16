@@ -3,6 +3,10 @@ extends HJScreen
 ## the centre will not open for someone who has only trained one axis.
 
 
+func register() -> String:
+	return "palace"
+
+
 func build() -> void:
 	var v := page(12)
 	v.add_child(HJUI.header("The Wheel", "Six axes. The middle opens when every spoke has moved.",
@@ -19,7 +23,7 @@ func build() -> void:
 	for axis in Content.axes():
 		var id := String(axis["id"])
 		counts.add_child(HJUI.chip(String(axis["name"]), str(int(Meta.axis_tasks.get(id, 0))),
-			"accent" if Meta.axis_ring(id) > 0 else "muted"))
+			"accent" if Meta.axis_ring(id) > 0 else "muted", id))
 	body.add_child(counts)
 
 	var ready: Array = []

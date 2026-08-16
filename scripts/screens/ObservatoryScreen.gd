@@ -3,6 +3,10 @@ extends HJScreen
 ## and how far.
 
 
+func register() -> String:
+	return "palace"
+
+
 func build() -> void:
 	var v := page(12)
 	v.add_child(HJUI.header("The Observatory", "%d loops on the log" % Meta.history.size(),

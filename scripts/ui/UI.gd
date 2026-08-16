@@ -126,6 +126,30 @@ static func button(text: String, kind: String = "ghost", enabled: bool = true) -
 	return b
 
 
+## A pixel icon from assets/icons, tinted by the palette.
+##
+## Snapped to a multiple of 16 and filtered NEAREST: these are authored on a
+## 16-grid, and any other size turns them to mush.
+static func icon(id: String, px: int = 32, role: String = "text") -> TextureRect:
+	var t := TextureRect.new()
+	var path := "res://assets/icons/%s.png" % id
+	if ResourceLoader.exists(path):
+		t.texture = load(path)
+	var snapped := maxi(16, int(round(px / 16.0)) * 16)
+	t.custom_minimum_size = Vector2(snapped, snapped)
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	t.modulate = tint(Palette.c(role), "text")
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return t
+
+
+static func has_icon(id: String) -> bool:
+	return id != "" and ResourceLoader.exists("res://assets/icons/%s.png" % id)
+
+
 static func vbox(separation: int = 12) -> VBoxContainer:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", separation)
@@ -184,18 +208,26 @@ static func set_bar(p: ProgressBar, value: float, maximum: float, role: String) 
 	p.add_theme_stylebox_override("fill", flat(Palette.c(role), 8, Color(0, 0, 0, 0), 0, "button"))
 
 
-static func chip(caption: String, value: String, role: String = "accent") -> PanelContainer:
+static func chip(caption: String, value: String, role: String = "accent", icon_id: String = "") -> PanelContainer:
 	var p := panel("panel_alt")
 	var sb: StyleBoxFlat = p.get_theme_stylebox("panel")
 	sb.content_margin_top = 8
 	sb.content_margin_bottom = 8
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
 	var v := vbox(0)
 	v.add_child(label(caption.to_upper(), FS_TINY, "muted"))
 	var value_label := label(value, FS_BODY, role)
 	v.add_child(value_label)
-	p.add_child(v)
+
+	# The mark carries the meaning; the caption is there until the mark is learned.
+	if has_icon(icon_id):
+		var row := hbox(8)
+		row.add_child(icon(icon_id, 32, role))
+		row.add_child(v)
+		p.add_child(row)
+	else:
+		p.add_child(v)
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	p.set_meta("value_label", value_label)
 	return p

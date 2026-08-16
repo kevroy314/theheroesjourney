@@ -6,6 +6,13 @@ extends VBoxContainer
 
 signal node_tapped(id: String)
 
+## Node type -> icon in assets/icons. A node with no mark falls back to the
+## theme's glyph, so a theme can still ship its own vocabulary.
+const NODE_ICONS := {
+	"task": "task", "threshold": "threshold", "echo": "echo", "cache": "cache",
+	"mirror": "mirror", "trinket": "charm", "spite": "spite", "warden": "warden",
+}
+
 var run: HJRun
 var _rows: Array = []       ## Array of Array[Control], top to bottom
 var _cards: Dictionary = {} ## node id -> card
@@ -128,9 +135,18 @@ func _make_card(id: String) -> Control:
 
 	var v := HJUI.vbox(2)
 	var top := HJUI.hbox(8)
-	var glyph_label := HJUI.label(glyph, HJUI.FS_BODY, "accent" if available else "muted")
-	glyph_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	top.add_child(glyph_label)
+	var mark_role := "accent" if available else "muted"
+	var mark_id := "done" if done else String(NODE_ICONS.get(type_id, ""))
+	if not visible_now:
+		mark_id = ""
+	if HJUI.has_icon(mark_id):
+		if done:
+			mark_role = "good"
+		top.add_child(HJUI.icon(mark_id, 32, mark_role))
+	else:
+		var glyph_label := HJUI.label(glyph, HJUI.FS_BODY, mark_role)
+		glyph_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		top.add_child(glyph_label)
 	top.add_child(HJUI.label(title, HJUI.FS_SMALL, title_role))
 	v.add_child(top)
 	if sub != "":

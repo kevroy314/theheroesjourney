@@ -20,9 +20,9 @@ func _init(title_text: String, subtitle_text: String) -> void:
 	v.add_child(_subtitle)
 
 	var chips := HJUI.hbox(10)
-	_grit = HJUI.chip(Palette.word("grit"), "0", "accent")
-	_streak = HJUI.chip(Palette.word("streak"), "0", "accent_2")
-	_clock = HJUI.chip("Left", "—", "good")
+	_grit = HJUI.chip(Palette.word("grit"), "0", "accent", "grit")
+	_streak = HJUI.chip(Palette.word("streak"), "0", "accent_2", "streak")
+	_clock = HJUI.chip("Left", "—", "good", "deadline")
 	chips.add_child(_grit)
 	chips.add_child(_streak)
 	chips.add_child(_clock)
