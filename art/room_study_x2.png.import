@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://fsypu4xhoh50"
-path="res://.godot/imported/gym.png-10a6133ae717aa171f07e485ed8f3d62.ctex"
+uid="uid://6odnmggib8v5"
+path="res://.godot/imported/room_study_x2.png-c96ec685729935b968c20723f987d9d8.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/backdrops/gym.png"
-dest_files=["res://.godot/imported/gym.png-10a6133ae717aa171f07e485ed8f3d62.ctex"]
+source_file="res://art/room_study_x2.png"
+dest_files=["res://.godot/imported/room_study_x2.png-c96ec685729935b968c20723f987d9d8.ctex"]
 
 [params]
 

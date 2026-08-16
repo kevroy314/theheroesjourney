@@ -98,6 +98,16 @@ func backdrop_id() -> String:
 	return screen_id if screen_id != "" else Game.screen
 
 
+## The place the run is standing in right now. Anything that happens *inside* an
+## area — the boon, the event, opening the bag — happens in that area, not in
+## some generic room, so they all key off this rather than off their own name.
+func run_area_id() -> String:
+	var run: HJRun = Game.run
+	if run == null:
+		return "default"
+	return String(run.chapter_def().get("area", "default"))
+
+
 ## The place this screen is standing in, named by the active theme and dialled
 ## in with the `backdrop` debug knob. Added before build() so it sits under
 ## everything, and filtered NEAREST because the default linear filter turns

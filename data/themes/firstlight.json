@@ -55,9 +55,15 @@
     "summit": "res://assets/backdrops/areas/summit.png"
   },
   "palace_backdrops": {
-    "default": "res://assets/backdrops/palace.png",
-    "gym": "res://assets/backdrops/gym.png",
-    "observatory": "res://assets/backdrops/observatory.png"
+    "default": "res://assets/backdrops/rooms/palace.png",
+    "palace": "res://assets/backdrops/rooms/palace.png",
+    "gym": "res://assets/backdrops/rooms/gym.png",
+    "observatory": "res://assets/backdrops/rooms/observatory.png",
+    "stores": "res://assets/backdrops/rooms/stores.png",
+    "workshop": "res://assets/backdrops/rooms/workshop.png",
+    "hearth": "res://assets/backdrops/rooms/hearth.png",
+    "codex": "res://assets/backdrops/rooms/study.png",
+    "wheel": "res://assets/backdrops/rooms/identity.png"
   },
   "palace_colors": {
     "bg": "#241B12",

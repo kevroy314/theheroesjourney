@@ -1,0 +1,31 @@
+Please generate one image. Portrait, 9:16 aspect ratio. No text, no labels, no captions, no lettering, no numbers, no writing of any kind anywhere in the image. No watermark, no border, no UI elements. No people, no faces, no figures.
+
+SUBJECT — a background plate for a mobile game, one room in a set that all share the same building. A small room with a fireplace. A stone hearth with a low fire sits in the upper middle of the frame, its mantel carrying a few plain objects. One worn high-backed armchair stands at the left, angled toward the fire, with a folded blanket over its arm. A side table with a cup on it at the right. A rug lies in front of the hearth. This is the only room in the building with somewhere to sit.
+
+CONTINUITY — this room is part of the same interior as the rest of the set: heavy dark timber beams across the ceiling, plank or plaster walls, worn stone or board floor, and one hanging or wall-mounted oil lamp as the only light. It should read as another door off the same hall, built by the same hands, not as a different game.
+
+COMPOSITION — this is a strict requirement.
+The picture is read through interface panels that occupy the upper two thirds of the frame, and a narrow column down the middle.
+- Put the interesting content in a BAND ACROSS THE UPPER THIRD and down the LEFT and RIGHT EDGES. Frame the view like a vignette: the furniture and the objects stand at the left and right margins, the depth of the room visible between them.
+- The LOWER HALF is floor and must be a QUIET BAND: even, low contrast, one continuous surface, no fine detail, no bright highlights, no clutter.
+- The very bottom edge stays lit by the lamp rather than falling away into black.
+
+LIGHTING
+- One warm oil lamp is the only light source, the fire in the hearth itself, low and steady, with a small oil lamp on the mantel beside it. It casts a soft pool across the floor.
+- This room is WARM and LIT — noticeably brighter and more golden than a night exterior. It is the one place that is kept. Nothing is crushed to pure black.
+- The lamp flame itself is the most saturated point in the picture.
+
+STYLE — limited-palette pixel art, as if authored at 180x320 pixels and displayed large, so the pixels are clearly visible and square. About 16 colours total. Ordered/Bayer dithering in the lamp's falloff across the floor and walls. Crisp flat silhouettes. No black outlines.
+
+PALETTE — use these closely and do not introduce unrelated hues. This is a warm interior; do not introduce blues or greys.
+#241B12 darkest, only the deepest corners
+#33271A dark timber
+#413320 mid wood
+#5E4828 lit wood edge
+#8A6B3C worn warm surface
+#BFA987 muted warm grey, for stone and plaster
+#F8ECD4 the brightest warm white, used sparingly
+#F2B84B the lamp flame, the most saturated point
+#D9A05B the warm pool the lamp casts
+
+MOOD — warm, quiet, forgiving. Rest is not the opposite of the work, and this room knows it.

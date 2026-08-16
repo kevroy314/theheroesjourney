@@ -60,6 +60,24 @@ Palace screen with no plate of its own falls back to the Palace default, never
 to the cold bedroom. So a new screen is somewhere by default and has to opt out
 of being a place, rather than opting in.
 
+Plates live in two folders that mirror the two registers:
+
+| | Keyed on | Folder |
+|---|---|---|
+| Reality | the **area** for anything inside a run, the screen id otherwise | `assets/backdrops/areas/` |
+| Mind Palace | the screen id | `assets/backdrops/rooms/` |
+
+Screens that happen *inside* an area — the boon, the event, opening the bag —
+key off `run_area_id()` rather than their own name, because they are happening
+in that room, not in a lobby. The Bag is the one screen that lives in both
+worlds: your pack on the floor during a run, the Stores when you open it from
+the Palace, and it switches register to match.
+
+The two id spaces overlap on purpose — `observatory` is both a chapter and a
+Palace room — and the folders are what keep them apart. A cold stone chamber of
+instruments pointed down at the town is not the warm room where you read your
+own record, and nothing should ever be able to serve one for the other.
+
 ## Marks, not labels
 
 Screens should read at a glance, not be read. Resources, axes and node types all

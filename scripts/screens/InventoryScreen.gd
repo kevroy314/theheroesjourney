@@ -1,5 +1,17 @@
 extends HJScreen
 ## The bag. Items buy time, comfort or information — never a completed rep.
+##
+## The one screen that lives in both worlds. On a run it is your pack on the
+## floor of wherever you are standing; from the Mind Palace it is the Stores,
+## which is where those things are actually kept between loops.
+
+
+func register() -> String:
+	return "" if Game.has_active_run() else "palace"
+
+
+func backdrop_id() -> String:
+	return run_area_id() if Game.has_active_run() else "stores"
 
 
 func build() -> void:
