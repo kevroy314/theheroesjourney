@@ -8,11 +8,13 @@ const TAP := 92.0
 const PAD := 18
 const RADIUS := 14
 
-const FS_TITLE := 54
-const FS_HEAD := 34
-const FS_BODY := 27
-const FS_SMALL := 22
-const FS_TINY := 19
+# Pixelify's x-height is 0.45em against the system font's ~0.52, so the same
+# nominal size reads noticeably smaller. These are tuned for the pixel face.
+const FS_TITLE := 56
+const FS_HEAD := 36
+const FS_BODY := 29
+const FS_SMALL := 25
+const FS_TINY := 21
 
 
 ## Font sizes pass through the debug ui_scale knob so text size can be tuned on
@@ -74,19 +76,32 @@ static func panel(role: String = "panel", border_role: String = "") -> PanelCont
 	return p
 
 
-## Titles and numbers take the display face; running prose does not.
-static func wants_display(size: int) -> bool:
-	return size >= FS_HEAD and Debug.knob("pixel_font") > 0.5
+## The display face is now the default for everything, not just headings.
+##
+## The earlier split — pixel titles over system-font prose — was the safe call
+## and it read as two apps stapled together: a pixel-art room with a settings
+## screen laid over it. One face everywhere is the whole point. Knob to 0 to
+## compare against the system font.
+static func wants_display(_size: int = 0) -> bool:
+	return Debug.knob("pixel_font") > 0.5
+
+
+## Puts the display face on any control that draws text.
+static func face(control: Control) -> void:
+	if not wants_display():
+		return
+	var f := Palette.display_font()
+	if f != null:
+		control.add_theme_font_override("font", f)
 
 
 static func label(text: String, size: int = FS_BODY, role: String = "text", align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", fs(size))
-	if wants_display(size):
-		var f := Palette.display_font()
-		if f != null:
-			l.add_theme_font_override("font", f)
+	face(l)
+	# Pixel faces set tight by default; prose needs the line to breathe.
+	l.add_theme_constant_override("line_spacing", 6)
 	l.add_theme_color_override("font_color", tint(Palette.c(role), "text"))
 	l.horizontal_alignment = align
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -100,6 +115,7 @@ static func button(text: String, kind: String = "ghost", enabled: bool = true) -
 	b.text = text
 	b.custom_minimum_size.y = TAP
 	b.add_theme_font_size_override("font_size", fs(FS_BODY))
+	face(b)
 	b.focus_mode = Control.FOCUS_NONE
 	# STOP would swallow a drag that started on the button and leave lists of
 	# buttons unscrollable; PASS keeps the press and lets the scroller pan.
@@ -248,10 +264,6 @@ static func chip(caption: String, value: String, role: String = "accent", icon_i
 	var v := vbox(0)
 	v.add_child(label(caption.to_upper(), FS_TINY, "muted"))
 	var value_label := label(value, FS_BODY, role)
-	if Debug.knob("pixel_font") > 0.5:
-		var f := Palette.display_font()
-		if f != null:
-			value_label.add_theme_font_override("font", f)
 	v.add_child(value_label)
 
 	# The mark carries the meaning; the caption is there until the mark is learned.
@@ -282,7 +294,30 @@ static func scroll() -> ScrollContainer:
 	s.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	s.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	s.follow_focus = true
+	# follow_focus is for keyboard traversal, which this app does not have. Left
+	# on, any control that takes focus on touch yanks the list to it — you scroll,
+	# something under your thumb takes focus, and the list snaps back.
+	s.follow_focus = false
+	return s
+
+
+## A slider that can live inside a scrolling list.
+##
+## Godot's Slider grabs the mouse wheel to change its value and takes focus on
+## press. In a panel that is mostly sliders, both are fatal: the wheel adjusts
+## whatever it is over instead of scrolling, and the focus grab makes the
+## scroller jump. Same shape of bug as the cards that would not scroll — a child
+## eating the events the scroller needed.
+static func slider(min_value: float, max_value: float, step: float, value: float) -> HSlider:
+	var s := HSlider.new()
+	s.min_value = min_value
+	s.max_value = max_value
+	s.step = step
+	s.value = value
+	s.scrollable = false
+	s.focus_mode = Control.FOCUS_NONE
+	s.custom_minimum_size.y = 52
+	s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return s
 
 
@@ -335,6 +370,19 @@ class TapCard extends PanelContainer:
 	var _pressing := false
 	var _source := ""
 	var _travel := 0.0
+	var _rest_scale := Vector2.ONE
+
+	## Presses give under the thumb. The card may already be rotated and scaled
+	## by whoever built it, so the resting scale is captured rather than assumed.
+	func _squash(down: bool) -> void:
+		if Debug.knob("motion") <= 0.0:
+			return
+		if pivot_offset == Vector2.ZERO:
+			pivot_offset = size * 0.5
+		if down:
+			_rest_scale = scale
+		var target := _rest_scale * (0.965 if down else 1.0)
+		create_tween().tween_property(self, "scale", target, 0.07)
 
 	func _gui_input(event: InputEvent) -> void:
 		if event is InputEventScreenTouch:
@@ -353,11 +401,13 @@ class TapCard extends PanelContainer:
 			_pressing = true
 			_source = source
 			_travel = 0.0
+			_squash(true)
 			return
 		if not _pressing or _source != source:
 			return
 		_pressing = false
 		_source = ""
+		_squash(false)
 		if _travel < DRAG_SLOP:
 			# Only a real tap is consumed; a drag is left for the scroller.
 			accept_event()
