@@ -13,7 +13,6 @@ func build() -> void:
 		return
 
 	var chapter := run.chapter_def()
-	backdrop()
 	var v := page(12)
 
 	_header = HJUI.run_header(String(run.area.get("name", "Area")),

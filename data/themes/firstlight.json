@@ -40,7 +40,17 @@
     "done": "+"
   },
   "mountain_line": "Far off, past the window, a single light on the mountain. It has not gone out.",
-  "backdrop": "res://assets/backdrops/waking_room.png",
+  "backdrops": {
+    "default": "res://assets/backdrops/waking_room.png",
+    "title": "res://assets/backdrops/title.png",
+    "journey": "res://assets/backdrops/journey.png",
+    "summary": "res://assets/backdrops/summary.png"
+  },
+  "palace_backdrops": {
+    "default": "res://assets/backdrops/palace.png",
+    "gym": "res://assets/backdrops/gym.png",
+    "observatory": "res://assets/backdrops/observatory.png"
+  },
   "palace_colors": {
     "bg": "#241B12",
     "panel": "#33271A",

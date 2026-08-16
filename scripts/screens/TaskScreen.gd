@@ -6,6 +6,13 @@ extends HJScreen
 ## is a deliberate hold, and the hold stays disabled until enough time has
 ## plausibly passed. A speed bump for honesty, never an accusation.
 
+## The one screen that is deliberately nowhere. Everything else in the game is
+## a place you are standing; this is the moment you set the phone down and do
+## the thing, so the room falls away and only the commitment is left.
+func backdrop_id() -> String:
+	return ""
+
+
 var _movement: Dictionary = {}
 var _scale_index: int = -1        ## -1 = full movement, 0+ = index into scaling
 var _hold: float = 0.0

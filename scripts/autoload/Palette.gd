@@ -49,6 +49,21 @@ func ca(role: String, alpha: float) -> Color:
 	return col
 
 
+## The room plate a given screen stands in, by screen id.
+##
+## Unlike colours, the registers do NOT blend: a Mind Palace screen missing its
+## own plate falls back to the Palace's default, never to the cold bedroom.
+## Mixing the two would put a warm interior behind cold panels, or worse, tell
+## the player the Palace is somewhere it is not.
+func backdrop_path(id: String) -> String:
+	var plates: Dictionary = data.get("backdrops", {})
+	if register != "":
+		var overrides: Dictionary = data.get("%s_backdrops" % register, {})
+		if not overrides.is_empty():
+			plates = overrides
+	return String(plates.get(id, plates.get("default", "")))
+
+
 ## Themed vocabulary, e.g. word("grit") -> "Grit" / "Embers".
 func word(key: String, fallback: String = "") -> String:
 	return String(data.get("labels", {}).get(key, fallback if fallback != "" else key.capitalize()))
