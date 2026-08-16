@@ -81,6 +81,43 @@ Asking for a 2×2 grid forces square cells, which breaks a portrait composition 
 generate the still at 1024×1536 and the animated insert as a separate strip,
 compositing in Godot.
 
+## Composing a plate the UI has to sit on
+
+Sixteen plates in, this is the part that decides whether an asset is usable, and
+it is worth more prompt words than the subject is.
+
+**Brief the composition from where the panels actually are on that screen**, not
+from a house rule. The first set was briefed "content in the top third, quiet
+band below", which is right for a screen whose panels sit low — and wrong for
+the Journey screen, whose list starts at the very top. The sky, mountain and
+lantern all landed behind the list and only the road survived.
+
+The brief that has worked everywhere since is a **vignette**:
+
+> Put the interesting content in a band across the upper third and down the left
+> and right edges. Frame the view like a vignette: objects standing at the left
+> and right margins, the depth of the room visible between them. The centre
+> column and the lower half are one continuous quiet surface — floor, road,
+> ground — with no fine detail, no bright highlights and no busy texture.
+
+That survives contact with both layouts this game has: a narrow centred graph
+(sides stay open all the way down) and a full-width list (only the header band
+and the floor show). It is also just a better picture.
+
+Three more that hold:
+
+- **State the aspect the screen is, not the aspect you want.** Asking for 2:3
+  was ignored in every round; the model returns 9:16 regardless. Since the
+  screen is 9:16 that was luck. Ask for 9:16 and stop cropping 66px off each
+  side under `KEEP_ASPECT_COVERED`.
+- **"No text" needs saying explicitly, and then it holds.** Shop tags, wall
+  charts, ledger pages and pinboards all came back convincingly blank once the
+  prompt said "no lettering, no numbers, no writing of any kind".
+- **Continuity is a paragraph, not a hope.** A short CONTINUITY block naming the
+  shared materials — "heavy dark timber beams, plank walls, one oil lamp as the
+  only light, another door off the same hall" — kept five separately generated
+  rooms reading as one building.
+
 ## Post-processing traps
 
 - The render is **not** pixel art (20k+ unique colours, soft edges). To get
@@ -89,7 +126,15 @@ compositing in Godot.
   whole palette on shadow and silently deletes the one warm accent — the most
   important pixel in the picture. Quantize in gamma-lifted space and *force-pin*
   the theme's key colours (read them from `data/themes/*.json`) into the palette.
+- **Pin the register's own accents, not the default list.** `KEEP_DEFAULT` is the
+  cold reality palette. Quantising a warm Mind Palace interior against it throws
+  away the flame, which is the one thing in the picture that must survive:
+  `--keep "#F2B84B" "#D9A05B" "#F8ECD4"` for `palace_colors`.
 - Always compare before/after at 1:1 and confirm the accent survived.
+- Quantising at `--colors 32` posterizes smooth gradients into blotches, visible
+  in skies and lamp pools. It is consistent across the whole set, so it now reads
+  as house style; fixing it means an ordered dither on the remap and re-running
+  *every* existing plate, not just the new one.
 
 ## Wiring into Godot
 

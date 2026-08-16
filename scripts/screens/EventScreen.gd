@@ -3,6 +3,11 @@ extends HJScreen
 ## quiet — a full screen with one piece of text on it and nothing else to do.
 
 
+## Whatever is happening, it is happening here, in this room, on this run.
+func backdrop_id() -> String:
+	return run_area_id()
+
+
 func build() -> void:
 	var event: Dictionary = Game.event
 	if event.is_empty():

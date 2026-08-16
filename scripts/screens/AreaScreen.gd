@@ -11,10 +11,7 @@ var _graph: HJAreaGraph
 ## "observatory" is both — but they are looked up in different registers, so the
 ## cold stone chamber and the warm room of instruments never get confused.
 func backdrop_id() -> String:
-	var run: HJRun = Game.run
-	if run == null:
-		return "default"
-	return String(run.chapter_def().get("area", "default"))
+	return run_area_id()
 
 
 func build() -> void:

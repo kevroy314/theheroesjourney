@@ -3,6 +3,11 @@ extends HJScreen
 ## anything a ruleset can change, a charm can change mid-run.
 
 
+## It is offered to you in the room you are standing in, not in a lobby.
+func backdrop_id() -> String:
+	return run_area_id()
+
+
 func build() -> void:
 	var run: HJRun = Game.run
 	if run == null or run.pending_boons.is_empty():

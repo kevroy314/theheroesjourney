@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c26m8v2g6rlam"
-path="res://.godot/imported/palace.png-2d80d318b949efd5eebaa9b43c2bb546.ctex"
+uid="uid://crti0dn2ks7je"
+path="res://.godot/imported/room_identity_x2.png-661507cd67897a231e60e3a5b9307229.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/backdrops/palace.png"
-dest_files=["res://.godot/imported/palace.png-2d80d318b949efd5eebaa9b43c2bb546.ctex"]
+source_file="res://art/room_identity_x2.png"
+dest_files=["res://.godot/imported/room_identity_x2.png-661507cd67897a231e60e3a5b9307229.ctex"]
 
 [params]
 
