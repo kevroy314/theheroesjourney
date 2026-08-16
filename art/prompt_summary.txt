@@ -1,0 +1,35 @@
+Please generate one image. Portrait, 2:3 aspect ratio. No text, no labels, no captions, no watermark, no border, no UI elements anywhere in the image.
+
+This is the SAME SCENE as the ceiling image you just made — the view from the pillow, looking up at the bedroom ceiling. Reproduce it as closely as you can: same room, same camera at pillow height tilted slightly up, same ceiling planks and beams, same cropped top of the window, same band of cold pre-dawn sky, same distant black mountain ridge with its ONE small amber light, same oil lamp on the windowsill, same blanket ridge filling the lower half. Same palette, same style, same lighting, same composition.
+
+THE POINT OF THIS IMAGE IS THAT NOTHING HAS CHANGED. It appears in the game when a loop closes and you wake up in the same bed again. It should read as a deliberate repeat, almost the same picture, and the sameness is the content.
+
+The ONE permitted difference: the oil lamp on the sill has burned down. Its flame is lower and smaller, so the warm pool it throws on the ceiling planks is slightly smaller and slightly dimmer. Everything else is identical. Do not move the camera, do not change the furniture, do not redraw the mountain somewhere else.
+
+THE LIGHTING — do not underexpose this image.
+1. The oil lamp on the sill is still a PRACTICAL LIGHT SOURCE INSIDE THE SCENE, throwing warm light up onto the ceiling planks and beams and a softer spill down across the blanket.
+2. The ceiling planks stay CLEARLY VISIBLE — around 20 percent brightness near the lamp, around 12 percent in the far corners. Plank seams and grain plainly read. Nothing anywhere is crushed to pure black.
+3. The blanket in the lower half sits at an even 15 to 20 percent brightness — dark, but plainly a blanket, plainly lit.
+4. The strip of dawn sky in the window is the brightest area.
+5. The one amber light on the mountain is the most SATURATED point in the picture; the lamp flame is warm but duller, so the eye still travels to the mountain.
+
+COMPOSITION — strict, and the same as before.
+- Everything interesting lives in the TOP THIRD: the ceiling beams, the top of the window, the sky band, the mountain, its light, the lamp on the sill.
+- The MIDDLE AND LOWER THIRDS are the blanket and the near wall, and they must be a QUIET BAND: even, low contrast, softly lit, no fine detail, no bright highlights, no busy folds or pattern. Interface panels sit over this area and must stay readable. One continuous, calm surface with only the gentlest gradient.
+- The very bottom edge stays softly lit rather than falling away into black.
+
+MOOD — flat, tired, unsurprised. You have woken here before. Nothing you did out there stayed. Not frightening. Just again.
+
+STYLE — limited-palette pixel art, as if authored at 180x320 pixels and displayed large, so the pixels are clearly visible and square. About 16 colours total. Ordered/Bayer dithering in the sky band, in the lamp's falloff across the ceiling, and across the blanket. Crisp flat silhouettes. No black outlines.
+
+PALETTE — use these closely and do not introduce unrelated hues:
+#12131C darkest, used sparingly — only the deepest corners
+#1B1D28 dark
+#242737 mid dark
+#2E3242 the lit ceiling planks and the blanket — one of the most common colours in the picture
+#333749 cool line
+#EFE7DA bone white, for the brightest part of the sky band only
+#948E9E muted grey-violet
+#E9A94E amber — the light on the mountain, the single most saturated point
+#C98F49 a duller warm — the lamp flame and the warm spill it casts
+#8FBFD8 cold dawn sky blue

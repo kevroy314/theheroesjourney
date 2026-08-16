@@ -1,0 +1,42 @@
+Please generate one image. Portrait, 2:3 aspect ratio. No text, no labels, no captions, no watermark, no border, no UI elements anywhere in the image.
+
+This is a NEW plate for the SAME game and the SAME production as the cold bedroom plates you have been making. Keep the rendering style EXACTLY the same — same limited-palette pixel art, same dithering, same flat silhouettes, same authored-at-low-resolution feel.
+
+BUT THE PALETTE AND THE MOOD ARE THE OPPOSITE. The bedroom is the cold world, which resets and keeps nothing. This place is inside the character's head, it is warm, lamplit and physical, and everything in it is kept. Do not use any of the cold blue-violet colours from the bedroom. Use only the warm brown-and-amber palette listed at the bottom.
+
+SUBJECT — a background plate for a mobile game: the Mind Palace, the player's home base.
+The interior of a small hall someone has built inside their own mind. We stand at one end and look down it.
+
+What is in frame, from top to bottom:
+- Top: heavy dark wooden ceiling beams running away in perspective, and hanging from the central beam, a brass oil lamp with a steady warm flame — the main light in the room.
+- Below the beams: the far end wall of the hall, made of fitted stone and warm timber panelling, with TWO OR THREE plain wooden doorways leading off to other rooms. The doorways are dark openings, each with a small warm glow spilling out of it, so you can tell each one is a lit room. No doors, no signs, no writing, no numbers on any of them.
+- Along the side walls: simple built shelves with a few kept objects on them — stacked books, a folded cloth, a wooden box, a jar. Sparse, not cluttered. Objects are simplified into flat silhouettes, and NOTHING has writing on it.
+- The lower half: the stone-flagged floor of the hall, lit evenly by the hanging lamp, running toward the viewer and out of the bottom of the frame.
+
+THIS IS NOT A GRAND HALL. It is small, low-ceilinged, hand-built, patient and lived in — a room someone made themselves, over a long time, out of what they had. Honest carpentry, not a palace. Warm and safe.
+
+THE LIGHTING — this is the important part. Do not underexpose this image.
+1. The hanging brass lamp is a PRACTICAL LIGHT SOURCE INSIDE THE SCENE, near the top of the frame. It lights the whole hall from above.
+2. Because of it, THE FLOOR AND WALLS ARE CLEARLY, WARMLY LIT — the floor sits around 30 to 40 percent brightness, plainly readable as warm stone. This picture is the LIGHT one. Nothing anywhere is crushed to pure black; even the deepest corners keep a warm brown value.
+3. The lamp flame itself and the glow immediately around it are the brightest area.
+4. The lamp amber is the most SATURATED colour in the picture.
+5. Overall: "a warm room at night with one good lamp in it". Snug, not gloomy.
+
+COMPOSITION — strict.
+- Everything interesting lives in the TOP THIRD: the beams, the hanging lamp, the far wall, the doorways and their glow.
+- The MIDDLE AND LOWER THIRDS are the flagged floor, and they must be a QUIET BAND: even, low contrast, warmly and uniformly lit, no fine detail, no bright highlights, no strong flagstone joints, no rug pattern, no scattered objects. Interface panels sit over this area and must stay readable. Let the floor read as one continuous, calm warm surface with only the gentlest gradient.
+- The very bottom edge stays lit.
+
+MOOD — warm, safe, built. This is the one place that survives. Patient, occult in a homely way, like a workshop kept by someone careful.
+
+STYLE — limited-palette pixel art, as if authored at 180x320 pixels and displayed large, so the pixels are clearly visible and square. About 16 colours total. Ordered/Bayer dithering in the lamp's falloff down the walls and across the floor and in the glow from the doorways. Crisp flat silhouettes. No black outlines.
+
+PALETTE — use these closely and do not introduce unrelated hues. NO BLUES, NO VIOLETS, NO GREYS.
+#241B12 darkest, used sparingly — only the deepest corners
+#33271A dark
+#413320 mid
+#5E4828 warm line
+#F8ECD4 bone white, for the flame and the brightest highlight only
+#BFA987 muted warm grey — distant stone, cloth
+#F2B84B lamp amber, the single most saturated point in the picture
+#D9A05B secondary warm — the lit floor and the glow spilling from the doorways

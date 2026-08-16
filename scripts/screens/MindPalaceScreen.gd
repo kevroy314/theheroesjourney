@@ -119,8 +119,9 @@ func _cell(x: int, y: int, cell_size: float) -> Control:
 	elif holding != "":
 		border = Palette.c("accent_2")
 
-	var sb := HJUI.flat(fill, 12, border, 3 if (id != "" or holding != "") else 2)
+	var sb := HJUI.flat(Color(fill.r, fill.g, fill.b, fill.a * 0.5), 4)
 	card.add_theme_stylebox_override("panel", sb)
+	card.add_child(HJUI.nine("plate" if id != "" else "chalk", border))
 
 	# A VBox that fills the cell and centres its own children — nesting this in a
 	# CenterContainer instead shrink-wraps the labels to nothing.

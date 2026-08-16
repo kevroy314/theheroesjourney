@@ -1,0 +1,42 @@
+Please generate one image. Portrait, 2:3 aspect ratio. No text, no labels, no captions, no watermark, no border, no UI elements anywhere in the image.
+
+This is a NEW plate for the SAME game and the SAME bedroom as the last image you made. Identical rendering style, identical palette, identical mood. Only the camera has moved.
+
+SUBJECT — a background plate for a mobile game: the title screen.
+The same small bedroom, but now we are lying IN the bed and have not opened our eyes properly yet. The camera is at pillow height, very low, tilted slightly UP. We see the ceiling and the very top of the window; we do not see the floor at all.
+
+What is in frame, from top to bottom:
+- The plank ceiling, running away from us in perspective, with two plain beams.
+- The TOP of the window on the far wall, cropped so we only get its upper sash: a narrow band of cold pale pre-dawn sky, and in it, far off, the black silhouette of a mountain ridge with ONE small warm amber light burning on it.
+- On the windowsill, a small oil lamp with a low flame, still burning from the night before.
+- Below and nearer: the soft grey ridge of a blanket and the near edge of a pillow, out of focus in the sense of being simplified, filling the bottom of the frame as one long calm shape.
+
+THE LIGHTING — this is the important part. Do not underexpose this image.
+
+1. The oil lamp on the sill is a PRACTICAL LIGHT SOURCE INSIDE THE SCENE. It throws warm light UP onto the ceiling planks and beams above it, and a softer, wider spill down across the blanket.
+2. Because of that lamp the ceiling planks are CLEARLY VISIBLE — around 20 to 25 percent brightness near the lamp, falling to maybe 12 percent in the far corners. The plank seams and grain must plainly read. Nothing anywhere in this picture is crushed to pure black.
+3. The blanket in the lower half sits at an even 15 to 20 percent brightness — dark, but plainly a blanket, plainly lit.
+4. The strip of dawn sky in the window is the brightest area.
+5. The one amber light on the mountain is the most SATURATED point in the picture. The lamp flame is warm but duller and less saturated, so the eye still travels to the mountain.
+6. Overall: "a dim room at the very last minute before dawn", never "an unlit room". On a phone screen in daylight the ceiling and the blanket must both read.
+
+COMPOSITION — strict.
+- Everything interesting lives in the TOP THIRD: the ceiling beams, the top of the window, the sky band, the mountain, its light, and the lamp on the sill.
+- The MIDDLE AND LOWER THIRDS are the blanket and the near wall, and they must be a QUIET BAND: even, low contrast, softly lit, no fine detail, no bright highlights, no busy folds or pattern. Interface panels will be laid over this area and must stay readable. Let it read as one continuous, calm surface with only the gentlest gradient.
+- The very bottom edge stays softly lit rather than falling away into black.
+
+MOOD — bleak, pre-dawn, almost nothing happening. Held breath. This is the first thing anyone sees when they open the game, and it should feel like the instant before waking, in a room someone has woken in more times than they can remember. Not frightening. Waiting.
+
+STYLE — limited-palette pixel art, as if authored at 180x320 pixels and displayed large, so the pixels are clearly visible and square. About 16 colours total. Ordered/Bayer dithering in the sky band, in the lamp's falloff across the ceiling, and across the blanket. Crisp flat silhouettes. No black outlines.
+
+PALETTE — use these closely and do not introduce unrelated hues:
+#12131C darkest, used sparingly — only the deepest corners
+#1B1D28 dark
+#242737 mid dark
+#2E3242 the lit ceiling planks and the blanket — one of the most common colours in the picture
+#333749 cool line
+#EFE7DA bone white, for the brightest part of the sky band only
+#948E9E muted grey-violet
+#E9A94E amber — the light on the mountain, the single most saturated point
+#C98F49 a duller warm — the lamp flame and the warm spill it casts
+#8FBFD8 cold dawn sky blue

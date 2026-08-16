@@ -132,6 +132,7 @@ func _build_panel_inner() -> void:
 	v.add_child(scroll)
 
 	_knobs()
+	_god()
 	_actions()
 	_report()
 
@@ -185,6 +186,47 @@ func _knob_row(def: Dictionary) -> PanelContainer:
 
 	card.add_child(cv)
 	return card
+
+
+func _god() -> void:
+	_body.add_child(HJUI.label("GOD MODE", HJUI.FS_TINY, "muted"))
+	var card := HJUI.panel("panel_alt", "warn" if Debug.god else "")
+	var cv := HJUI.vbox(8)
+	cv.add_child(HJUI.label(
+		"Nothing costs anything, everything is unlocked, every Wheel node is claimable."
+		if Debug.god else
+		"Free purchases, everything unlocked, any screen reachable.",
+		HJUI.FS_TINY, "warn" if Debug.god else "muted"))
+	var toggle := HJUI.button("Turn god mode off" if Debug.god else "Turn god mode on",
+		"primary" if Debug.god else "ghost")
+	toggle.custom_minimum_size.y = 66
+	toggle.pressed.connect(func() -> void:
+		Debug.set_god(not Debug.god)
+		_build_panel())
+	cv.add_child(toggle)
+	card.add_child(cv)
+	_body.add_child(card)
+
+	if Debug.god:
+		_body.add_child(HJUI.label("JUMP TO SCREEN", HJUI.FS_TINY, "muted"))
+		var grid := GridContainer.new()
+		grid.columns = 3
+		grid.add_theme_constant_override("h_separation", 6)
+		grid.add_theme_constant_override("v_separation", 6)
+		for name in Debug.SCREENS:
+			var b := HJUI.button(String(name), "primary" if Game.screen == name else "ghost")
+			b.custom_minimum_size.y = 54
+			b.add_theme_font_size_override("font_size", HJUI.FS_TINY)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var target := String(name)
+			b.pressed.connect(func() -> void:
+				# Some screens need run state to exist at all; make one first.
+				if target in ["area", "task", "boon", "journey"] and not Game.has_active_run():
+					Game.start_run()
+				Debug.set_open(false)
+				Game.goto(target))
+			grid.add_child(b)
+		_body.add_child(grid)
 
 
 func _actions() -> void:

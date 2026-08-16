@@ -1,0 +1,41 @@
+Please generate one image. Portrait, 2:3 aspect ratio. No text, no labels, no captions, no watermark, no border, no UI elements anywhere in the image.
+
+This is a NEW plate for the SAME game as the bedroom plates you have been making. Identical rendering style, identical palette, identical mood. We have left the room and gone outside.
+
+SUBJECT — a background plate for a mobile game: the journey screen.
+The road out of town, seen from where you are standing on it, looking along it. A first-person view down at and along the road.
+
+What is in frame, from top to bottom:
+- Top: a cold pale pre-dawn sky, and on the horizon, far away and small, the black silhouette of a mountain with ONE small warm amber light burning near its peak. The mountain is distant — it reads as a long way to go.
+- Just below the horizon on the left, the last low rooftops and a fence of the town falling away behind, small and flat, almost pure silhouette.
+- At the left side of the road, standing in the upper-middle of the frame, a weathered wooden signpost with a small hooded lantern hung on it, lit, burning low. The signpost board is BLANK — bare wood, no writing, no letters, no numbers, no arrows.
+- The rest of the frame: the road itself, a pale packed-dirt track, widening as it comes toward the viewer, running out of the bottom of the picture. Low cold grass and scrub on either side, simplified to flat shapes.
+
+THE LIGHTING — this is the important part. Do not underexpose this image.
+
+1. The lantern on the signpost is a PRACTICAL LIGHT SOURCE INSIDE THE SCENE. It throws a soft, wide, gently-falling pool of warm light down onto the road and the near verge. Its falloff is broad and even, not a hard bright hotspot.
+2. Because of that lantern and the sky, the ROAD IS CLEARLY VISIBLE for its whole length — around 20 to 25 percent brightness, dark but plainly readable as a road surface. It must NOT be near-black. Nothing anywhere in this picture is crushed to pure black.
+3. The sky is the brightest area of the picture.
+4. The one amber light on the mountain is the most SATURATED point in the picture. The lantern is warm but duller and less saturated by comparison, so the eye still travels to the mountain.
+5. Overall: "a cold road at first light", never "an unlit road".
+
+COMPOSITION — strict.
+- Everything interesting lives in the TOP THIRD: the sky, the horizon, the mountain, its one light, the town falling away, and the lantern on its post.
+- The MIDDLE AND LOWER THIRDS are road surface and verge, and they must be a QUIET BAND: even, low contrast, softly lit, no fine detail, no bright highlights, no ruts, no stones, no busy texture. Interface panels will be laid over this area and must stay readable. Let the road read as one continuous, calm surface with only the gentlest gradient toward the viewer.
+- The very bottom edge stays softly lit rather than falling away into black.
+
+MOOD — wide, cold, empty, patient. A long way to go and no one else on the road. Not frightening. Setting out.
+
+STYLE — limited-palette pixel art, as if authored at 180x320 pixels and displayed large, so the pixels are clearly visible and square. About 16 colours total. Ordered/Bayer dithering in the sky gradient, in the lantern's falloff across the road, and in the far haze at the horizon. Crisp flat silhouettes. No black outlines around the landscape.
+
+PALETTE — use these closely and do not introduce unrelated hues:
+#12131C darkest, used sparingly — only the deepest shadow under the verge
+#1B1D28 dark
+#242737 mid dark
+#2E3242 the lit road surface — this should be one of the most common colours in the picture
+#333749 cool line
+#EFE7DA bone white, for the brightest part of the sky only
+#948E9E muted grey-violet
+#E9A94E amber — the light on the mountain, the single most saturated point
+#C98F49 a duller warm — the lantern flame and the warm pool it casts on the road
+#8FBFD8 cold dawn sky blue
