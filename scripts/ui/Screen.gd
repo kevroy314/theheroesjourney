@@ -47,6 +47,7 @@ func _rebuild() -> void:
 		remove_child(child)
 		child.queue_free()
 	Palette.register = register()
+	backdrop()
 	build()
 	Palette.register = ""
 
@@ -69,12 +70,26 @@ func sync() -> void:
 	refresh()
 
 
-## Optional art behind the screen, named by the active theme and dialled in with
-## the `backdrop` debug knob. Added before page() so it sits underneath, and
-## filtered NEAREST because the default linear filter turns pixel art to mush.
+## Which room plate this screen stands in. Set by Main at swap time; the
+## fallback covers screens built directly, as the self-test does.
+var screen_id := ""
+
+
+## Override to return "" on a screen that is deliberately nowhere. The task
+## screen is the only one: it is the moment you actually do the push-up, the
+## one place the real world touches the game, and it must not pretend to be a
+## location.
+func backdrop_id() -> String:
+	return screen_id if screen_id != "" else Game.screen
+
+
+## The place this screen is standing in, named by the active theme and dialled
+## in with the `backdrop` debug knob. Added before build() so it sits under
+## everything, and filtered NEAREST because the default linear filter turns
+## pixel art to mush.
 func backdrop() -> void:
 	var alpha := Debug.knob("backdrop")
-	var path := String(Palette.data.get("backdrop", ""))
+	var path := Palette.backdrop_path(backdrop_id())
 	if alpha <= 0.0 or path == "" or not ResourceLoader.exists(path):
 		return
 	var art := TextureRect.new()

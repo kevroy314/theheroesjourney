@@ -42,15 +42,23 @@ Palace's ledger is a thing you built to outlast the reset.
 
 Every screen is somewhere you are standing:
 
-- **Area** — the room, the town, the tall grass. The backdrop is the place.
+- **Title** — in the bed, before you have moved. The window and the one light.
+- **Area** — the room, the town, the tall grass.
 - **Journey** — the road seen from where you are on it.
 - **Mind Palace** — an interior you built, and each room inside it is its own place.
-- **Summary** — waking up again. Same bed, same ceiling.
+- **Summary** — waking up again. Same bed, same ceiling, the lamp burned lower.
 
 The one deliberate exception is the **task screen** — the moment you actually do
 the push-up. That is where the real world touches the game, and it should not
 pretend to be a location. It can be ambiguous, abstract, or empty. Everything
-else falls away and there is only the thing you said you would do.
+else falls away and there is only the thing you said you would do. It is the
+only screen that overrides `backdrop_id()` to return `""`.
+
+Every other screen gets a plate for free: `HJScreen._rebuild()` looks the active
+screen id up in the theme's `backdrops`, and the two registers never blend — a
+Palace screen with no plate of its own falls back to the Palace default, never
+to the cold bedroom. So a new screen is somewhere by default and has to opt out
+of being a place, rather than opting in.
 
 ## Marks, not labels
 

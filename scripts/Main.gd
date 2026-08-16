@@ -138,6 +138,9 @@ func _on_screen_changed(screen_name: String) -> void:
 		_swapping = false
 		return
 	current = script.new()
+	# Before add_child: _ready() builds the screen, and the build needs to know
+	# which room it is standing in.
+	current.screen_id = screen_name
 	host.add_child(current)
 	_swapping = false
 
