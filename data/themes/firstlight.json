@@ -53,5 +53,6 @@
     "danger": "#D9675C",
     "good": "#A8C47C",
     "warn": "#EBC96A"
-  }
+  },
+  "font_display": "res://assets/fonts/PixelifySans.ttf"
 }

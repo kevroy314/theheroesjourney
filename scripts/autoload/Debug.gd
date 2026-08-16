@@ -26,6 +26,8 @@ const KNOBS := [
 	  "rebuild": true, "hint": "Scales every font. Rebuilds the screen when you let go." },
 	{ "id": "backdrop", "name": "Backdrop", "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.55,
 	  "rebuild": true, "hint": "Generated art behind the area screen. 0 hides it. Unfinished — see issue #1." },
+	{ "id": "pixel_font", "name": "Pixel headings", "min": 0.0, "max": 1.0, "step": 1.0, "default": 1.0,
+	  "rebuild": true, "hint": "Display face for titles and numbers. Body text stays legible either way." },
 	{ "id": "ui_opacity", "name": "All UI", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
 	  "rebuild": true, "hint": "Master. Multiplies every layer below — drag this first." },
 	{ "id": "panel_opacity", "name": "Panel fills", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,

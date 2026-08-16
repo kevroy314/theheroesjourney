@@ -24,6 +24,7 @@ func use(id: String) -> void:
 		return
 	theme_id = id
 	data = Content.theme(id)
+	_display_font = null
 	Events.theme_changed.emit()
 
 
@@ -51,6 +52,28 @@ func ca(role: String, alpha: float) -> Color:
 ## Themed vocabulary, e.g. word("grit") -> "Grit" / "Embers".
 func word(key: String, fallback: String = "") -> String:
 	return String(data.get("labels", {}).get(key, fallback if fallback != "" else key.capitalize()))
+
+
+## The theme's display face, loaded once and stripped of antialiasing so it
+## lands on whole pixels. Body text deliberately keeps the system font: a habit
+## app is mostly prose, and prose in a pixel face at 22px is a legibility tax
+## nobody agreed to pay.
+var _display_font: FontFile = null
+
+func display_font() -> FontFile:
+	if _display_font != null:
+		return _display_font
+	var path := String(data.get("font_display", ""))
+	if path == "" or not ResourceLoader.exists(path):
+		return null
+	var f: Variant = load(path)
+	if not (f is FontFile):
+		return null
+	_display_font = f
+	_display_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	_display_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	_display_font.hinting = TextServer.HINTING_NONE
+	return _display_font
 
 
 func glyph(key: String) -> String:

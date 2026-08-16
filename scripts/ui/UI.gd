@@ -74,10 +74,19 @@ static func panel(role: String = "panel", border_role: String = "") -> PanelCont
 	return p
 
 
+## Titles and numbers take the display face; running prose does not.
+static func wants_display(size: int) -> bool:
+	return size >= FS_HEAD and Debug.knob("pixel_font") > 0.5
+
+
 static func label(text: String, size: int = FS_BODY, role: String = "text", align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_font_size_override("font_size", fs(size))
+	if wants_display(size):
+		var f := Palette.display_font()
+		if f != null:
+			l.add_theme_font_override("font", f)
 	l.add_theme_color_override("font_color", tint(Palette.c(role), "text"))
 	l.horizontal_alignment = align
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -239,6 +248,10 @@ static func chip(caption: String, value: String, role: String = "accent", icon_i
 	var v := vbox(0)
 	v.add_child(label(caption.to_upper(), FS_TINY, "muted"))
 	var value_label := label(value, FS_BODY, role)
+	if Debug.knob("pixel_font") > 0.5:
+		var f := Palette.display_font()
+		if f != null:
+			value_label.add_theme_font_override("font", f)
 	v.add_child(value_label)
 
 	# The mark carries the meaning; the caption is there until the mark is learned.
