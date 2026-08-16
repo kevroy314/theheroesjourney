@@ -46,7 +46,16 @@ func _rebuild() -> void:
 	for child in get_children():
 		remove_child(child)
 		child.queue_free()
+	Palette.register = register()
 	build()
+	Palette.register = ""
+
+
+## Which palette register this screen paints in: "" for reality, "palace" for
+## the Mind Palace. Set for the whole of build(), so every widget it makes picks
+## the right world up without being told.
+func register() -> String:
+	return ""
 
 
 ## Override: construct the screen's widgets as children of `self`.

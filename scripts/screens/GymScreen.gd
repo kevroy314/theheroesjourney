@@ -6,6 +6,10 @@ extends HJScreen
 static var axis_filter := ""
 
 
+func register() -> String:
+	return "palace"
+
+
 func build() -> void:
 	var v := page(12)
 	v.add_child(HJUI.header("The Gym",

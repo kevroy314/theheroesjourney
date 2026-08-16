@@ -2,6 +2,10 @@ extends HJScreen
 ## The Workshop: permanent traits, filed down over many loops.
 
 
+func register() -> String:
+	return "palace"
+
+
 func build() -> void:
 	var v := page(12)
 	v.add_child(HJUI.header("The Workshop", "%d %s banked" % [Meta.resolve, Palette.word("resolve")],

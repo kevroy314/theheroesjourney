@@ -3,6 +3,10 @@ extends HJScreen
 ## fragments are listed but blank — the gap is the point.
 
 
+func register() -> String:
+	return "palace"
+
+
 func build() -> void:
 	var v := page(12)
 	v.add_child(HJUI.header("Codex",

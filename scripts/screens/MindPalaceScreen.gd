@@ -13,6 +13,10 @@ static var arranging := false
 static var holding := ""      ## room id picked up, waiting for a cell
 
 
+func register() -> String:
+	return "palace"
+
+
 func build() -> void:
 	Meta.ensure_palace()
 	var v := page(12)
@@ -29,8 +33,8 @@ func build() -> void:
 	hv.add_child(top)
 
 	var chips := HJUI.hbox(10)
-	chips.add_child(HJUI.chip(Palette.word("resolve"), str(Meta.resolve), "accent"))
-	chips.add_child(HJUI.chip(Palette.word("streak"), "%d d" % Meta.streak, "accent_2"))
+	chips.add_child(HJUI.chip(Palette.word("resolve"), str(Meta.resolve), "accent", "resolve"))
+	chips.add_child(HJUI.chip(Palette.word("streak"), "%d d" % Meta.streak, "accent_2", "streak"))
 	chips.add_child(HJUI.chip("Rooms", "%d/%d" % [Meta.room_grid.size(), Content.rooms.size()], "muted"))
 	hv.add_child(chips)
 	head.add_child(hv)

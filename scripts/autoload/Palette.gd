@@ -5,6 +5,13 @@ extends Node
 var theme_id: String = ""
 var data: Dictionary = {}
 
+## Which world we are painting.
+##
+## "" is reality: cold, dark, and everything in it is erased by the loop.
+## "palace" is the Mind Palace: warm, lit, and the only place anything written
+## down survives a reset. The split is canon, not decoration — see docs/DESIGN.md.
+var register: String = ""
+
 const FALLBACK_COLORS := {
 	"bg": "#12131C", "panel": "#1B1D28", "panel_alt": "#242737", "line": "#333749",
 	"text": "#EFE7DA", "muted": "#948E9E", "accent": "#E9A94E", "accent_2": "#8FBFD8",
@@ -28,6 +35,10 @@ func ensure_loaded() -> void:
 ## Colour by role name, e.g. c("accent").
 func c(role: String) -> Color:
 	var colors: Dictionary = data.get("colors", {})
+	if register != "":
+		var overrides: Dictionary = data.get("%s_colors" % register, {})
+		if overrides.has(role):
+			return Color.html(String(overrides[role]))
 	return Color.html(String(colors.get(role, FALLBACK_COLORS.get(role, "#ff00ff"))))
 
 

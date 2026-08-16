@@ -3,6 +3,10 @@ extends HJScreen
 ## illness and grief are not failures of discipline.
 
 
+func register() -> String:
+	return "palace"
+
+
 func build() -> void:
 	var v := page(12)
 	v.add_child(HJUI.header("The Hearth", "How the world looks, and when the clock runs",

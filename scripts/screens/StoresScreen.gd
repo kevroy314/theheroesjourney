@@ -3,6 +3,10 @@ extends HJScreen
 ## shelves will do a rep for you.
 
 
+func register() -> String:
+	return "palace"
+
+
 func build() -> void:
 	var v := page(12)
 	var discount := clampf(Rules.value("shop.discount", {}, 0.0), 0.0, 0.6)

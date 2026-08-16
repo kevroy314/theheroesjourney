@@ -31,9 +31,9 @@ func build() -> void:
 	v.add_child(HJUI.spacer())
 
 	var chips := HJUI.hbox(10)
-	chips.add_child(HJUI.chip(Palette.word("resolve"), str(Meta.resolve), "accent"))
-	chips.add_child(HJUI.chip(Palette.word("streak"), "%d d" % Meta.streak, "accent_2"))
-	chips.add_child(HJUI.chip("Loops", str(Meta.loops), "muted"))
+	chips.add_child(HJUI.chip(Palette.word("resolve"), str(Meta.resolve), "accent", "resolve"))
+	chips.add_child(HJUI.chip(Palette.word("streak"), "%d d" % Meta.streak, "accent_2", "streak"))
+	chips.add_child(HJUI.chip("Loops", str(Meta.loops), "muted", "loop"))
 	v.add_child(chips)
 
 	if active:
