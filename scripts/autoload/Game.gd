@@ -89,6 +89,11 @@ func start_run(run_seed: int = 0, from_chapter: int = 1) -> void:
 
 	Palette.use(run.theme_id)
 	rebuild_rules()
+	# New run, new legs. The stipend exists so the first room is reachable
+	# without having walked anywhere yet — you should never open the game to a
+	# world you cannot move in.
+	Steps.reset_run()
+	Steps.grant(int(Rules.value("steps.starting_grant", run.ctx())))
 	apply_effects(Rules.hook("on_run_start", run.ctx()))
 	enter_chapter(from_chapter)
 
@@ -234,6 +239,13 @@ func tap_node(id: String) -> void:
 func _finish_node(id: String) -> void:
 	if not run.completed.has(id):
 		run.completed.append(id)
+		# Doing the thing is what buys you more world. A task pays a flat stipend
+		# and nudges the rate at which real steps convert, so a run where you do
+		# the work opens up further than one where you do not — and the reward
+		# for exercising is more room to explore, which is the whole thesis.
+		Steps.grant(int(Rules.value("steps.reward_per_node", run.ctx())))
+		Steps.set_multiplier(Steps.multiplier
+			+ float(Rules.value("steps.multiplier_per_node", run.ctx())))
 	# An exclusive fork closes its siblings the moment one is taken.
 	for other_id in run.area.get("nodes", {}).keys():
 		var other: Dictionary = run.area["nodes"][other_id]

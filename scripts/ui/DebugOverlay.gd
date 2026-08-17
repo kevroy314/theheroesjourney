@@ -254,6 +254,7 @@ func _actions() -> void:
 
 	var actions := [
 		["+100 Resolve", func(): Debug.give_resolve(100)],
+		["+200 steps", func(): Steps.grant(200)],
 		["Unlock all", func(): Debug.unlock_everything()],
 		["Open task gate", func(): Debug.finish_task()],
 		["Reveal area", func(): Debug.reveal_area()],

@@ -6,25 +6,22 @@
     "run.loop_keep": 0.5,
     "run.clear_bonus": 40,
     "run.repeat_falloff": 0.5,
-
     "streak.per_day": 0.05,
     "streak.cap_days": 20,
-
     "area.slot_bonus": 0,
     "area.reveal_sides": 0,
     "area.deadline_bonus_hours": 0,
-
     "task.partial_grit": 0.6,
     "task.min_seconds": 3,
     "task.hold_seconds": 1.2,
-
     "loot.cache_mult": 1.0,
     "loot.echo_weight": 1.0,
     "loot.trinket_weight": 1.0,
-
     "shop.discount": 0.0,
-
     "spite.chance": 0.22,
-    "spite.kind_weight": 1.0
+    "spite.kind_weight": 1.0,
+    "steps.reward_per_node": 45,
+    "steps.multiplier_per_node": 0.12,
+    "steps.starting_grant": 120
   }
 }
