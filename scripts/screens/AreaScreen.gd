@@ -62,6 +62,13 @@ func build() -> void:
 		stuck.add_child(sv)
 		body.add_child(stuck)
 
+	# The same area, walked instead of listed. Both views drive the same graph,
+	# so you can switch at any point without losing anything.
+	var walk := HJUI.button("Walk it", "primary")
+	walk.custom_minimum_size.y = 74
+	walk.pressed.connect(func(): Game.goto("overworld"))
+	body.add_child(walk)
+
 	var actions := HJUI.hbox(10)
 	var map := HJUI.button("Journey", "ghost")
 	map.custom_minimum_size.y = 70

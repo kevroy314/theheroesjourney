@@ -13,8 +13,34 @@ const RUNS := 6
 const MAX_ACTIONS := 3000
 
 
+## Where the snapshot is parked while the run is in flight.
+##
+## Holding it only in memory was a promise the harness could not keep: a crash
+## or a parse error mid-run skips the restore and leaves the player's save
+## carrying whatever the test had done to it — cleared journeys, claimed Wheel
+## nodes, a Warden already met. That state then makes the *next* run fail for
+## reasons nothing in the working tree explains, which is an expensive hour.
+const BACKUP := "user://selftest_backup.json"
+
+
 static func run_all(host: Node) -> int:
+	# A backup still on disk means the last run died before it could restore.
+	# Put the player's save back before doing anything else.
+	if FileAccess.file_exists(BACKUP):
+		var f := FileAccess.open(BACKUP, FileAccess.READ)
+		if f != null:
+			var parsed = JSON.parse_string(f.get_as_text())
+			f.close()
+			if parsed is Dictionary:
+				print("selftest: restoring a save left behind by a crashed run")
+				_restore(parsed)
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(BACKUP))
+
 	var saved_meta := _snapshot()
+	var backup := FileAccess.open(BACKUP, FileAccess.WRITE)
+	if backup != null:
+		backup.store_string(JSON.stringify(saved_meta))
+		backup.close()
 	var failures: Array = []
 
 	_content_checks(failures)
@@ -51,6 +77,9 @@ static func run_all(host: Node) -> int:
 	await _screen_checks(host, failures)
 
 	_restore(saved_meta)
+	# The run finished, so the on-disk copy has done its job. Leaving it would
+	# make the next run think this one crashed.
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(BACKUP))
 
 	if failures.is_empty():
 		print("PASS — all checks green\n")
@@ -468,8 +497,8 @@ static func _palace_checks(failures: Array) -> void:
 ## all, and a typo in it would first surface in front of the player.
 static func _screen_checks(host: Node, failures: Array) -> void:
 	var names: Array = ["title", "palace", "gym", "workshop", "stores", "hearth",
-		"observatory", "codex", "wheel", "inventory", "journey", "area", "task",
-		"boon", "event", "summary"]
+		"observatory", "codex", "wheel", "inventory", "journey", "area", "overworld",
+		"task", "boon", "event", "summary"]
 
 	Game.run = null
 	Game.clear_saved_run()

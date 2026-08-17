@@ -14,7 +14,7 @@ const REPORT_DIR := "user://reports"
 
 ## Every screen, for the god-mode jump list.
 const SCREENS := [
-	"title", "palace", "journey", "area", "task", "boon", "event", "summary",
+	"title", "palace", "journey", "area", "overworld", "task", "boon", "event", "summary",
 	"gym", "workshop", "stores", "hearth", "observatory", "codex", "wheel", "inventory",
 ]
 

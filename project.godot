@@ -21,6 +21,7 @@ Meta="*res://scripts/autoload/Meta.gd"
 Palette="*res://scripts/autoload/Palette.gd"
 Notify="*res://scripts/autoload/Notify.gd"
 Game="*res://scripts/autoload/Game.gd"
+Steps="*res://scripts/autoload/Steps.gd"
 
 [display]
 
