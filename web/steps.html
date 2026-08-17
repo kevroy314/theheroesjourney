@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Step probe</title>
+<style>
+  :root {
+    --bg: #12131c; --panel: #1b1d28; --panel2: #242737; --line: #333749;
+    --text: #efe7da; --muted: #948e9e; --accent: #e9a94e; --good: #7fc08a;
+    --bad: #d9675c; --warn: #e0c15f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px 14px 48px; background: var(--bg); color: var(--text);
+    font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  h1 { font-size: 19px; margin: 0 0 4px; letter-spacing: .04em; }
+  p.sub { color: var(--muted); margin: 0 0 18px; font-size: 13px; }
+  section {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 12px;
+  }
+  h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+       color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .row { display: flex; justify-content: space-between; gap: 12px;
+         padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .row:last-child { border-bottom: 0; }
+  .row span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .ok { color: var(--good); } .no { color: var(--bad); } .maybe { color: var(--warn); }
+  .big { font-size: 46px; line-height: 1.1; color: var(--accent);
+         font-variant-numeric: tabular-nums; }
+  button {
+    width: 100%; padding: 14px; margin-top: 8px; font: inherit; font-size: 15px;
+    background: var(--accent); color: var(--bg); border: 0; border-radius: 8px;
+  }
+  button.ghost { background: transparent; color: var(--text);
+                 border: 1px solid var(--line); }
+  #log { white-space: pre-wrap; font-size: 12px; color: var(--muted);
+         max-height: 240px; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<h1>Step probe</h1>
+<p class="sub">What this device will actually give a web page. Open it on the phone, press Start, put it in your pocket and walk.</p>
+
+<section>
+  <h2>What exists here</h2>
+  <div id="caps"></div>
+</section>
+
+<section>
+  <h2>Counted this session</h2>
+  <div class="big"><span id="steps">0</span></div>
+  <div class="row"><span>source</span><span id="src">—</span></div>
+  <div class="row"><span>samples</span><span id="samples">0</span></div>
+  <div class="row"><span>rate</span><span id="rate">—</span></div>
+  <div class="row"><span>last magnitude</span><span id="mag">—</span></div>
+  <button id="start">Start</button>
+  <button id="wake" class="ghost">Hold the screen awake</button>
+  <button id="reset" class="ghost">Reset count</button>
+</section>
+
+<section>
+  <h2>Does it survive backgrounding?</h2>
+  <p class="sub" style="margin:0 0 8px">Start counting, then switch apps or lock the screen for ~20s and come back. If the gap is roughly the time you were away, the page was frozen and background counting is not possible.</p>
+  <div class="row"><span>page hidden</span><span id="hidden">no</span></div>
+  <div class="row"><span>longest gap in readings</span><span id="gap">—</span></div>
+  <div class="row"><span>steps while hidden</span><span id="hidsteps">0</span></div>
+</section>
+
+<section>
+  <h2>Log</h2>
+  <div id="log"></div>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = m => {
+  const t = new Date().toTimeString().slice(0, 8);
+  $('log').textContent = `${t}  ${m}\n` + $('log').textContent;
+};
+
+// ---- capability probe -------------------------------------------------------
+
+function line(label, state, detail) {
+  const cls = state === true ? 'ok' : state === false ? 'no' : 'maybe';
+  const mark = state === true ? 'yes' : state === false ? 'no' : '?';
+  return `<div class="row"><span>${label}</span><span class="${cls}">${detail || mark}</span></div>`;
+}
+
+async function probe() {
+  let html = '';
+  html += line('secure context', isSecureContext);
+  html += line('Accelerometer (Generic Sensor)', 'Accelerometer' in window);
+  html += line('LinearAccelerationSensor', 'LinearAccelerationSensor' in window);
+  html += line('DeviceMotionEvent', 'DeviceMotionEvent' in window);
+  // Present on iOS, absent on Android. Absent is the better outcome — it means
+  // no permission gate — so this line is never red.
+  const gated = typeof DeviceMotionEvent !== 'undefined'
+    && typeof DeviceMotionEvent.requestPermission === 'function';
+  html += line('motion permission gate', null,
+    gated ? 'yes, iOS-style' : 'none needed');
+  html += line('Screen Wake Lock', 'wakeLock' in navigator);
+  html += line('Web Bluetooth', 'bluetooth' in navigator);
+  html += line('Periodic Background Sync', 'serviceWorker' in navigator
+    && 'PeriodicSyncManager' in window);
+
+  // There is no step API on the web. Prove it rather than assert it.
+  const stepish = ['Pedometer', 'StepCounter', 'HealthConnect', 'health']
+    .filter(k => k in navigator || k in window);
+  html += line('any step/health API on window or navigator', stepish.length > 0,
+    stepish.length ? stepish.join(', ') : 'none');
+
+  if (navigator.permissions) {
+    for (const name of ['accelerometer', 'gyroscope']) {
+      try {
+        const st = await navigator.permissions.query({ name });
+        html += line(`permission: ${name}`, st.state === 'granted' ? true
+          : st.state === 'denied' ? false : null, st.state);
+      } catch (e) {
+        html += line(`permission: ${name}`, null, 'not queryable');
+      }
+    }
+  }
+  const ua = navigator.userAgent;
+  const chrome = (ua.match(/Chrome\/[\d.]+/) || ['?'])[0];
+  const android = (ua.match(/Android [\d.]+/) || ['not Android'])[0];
+  html += line('platform', null, `${android} · ${chrome}`);
+  $('caps').innerHTML = html;
+}
+probe();
+
+// ---- step detection ---------------------------------------------------------
+//
+// Peak detection on the magnitude of acceleration with gravity removed by a
+// high-pass filter. A step is a peak above a threshold that is at least
+// MIN_GAP_MS after the previous one — that gap is what rejects the double-count
+// you otherwise get from the heel strike and the toe-off of the same footfall.
+
+const MIN_GAP_MS = 260;      // ~230 steps/min ceiling; faster than anyone walks
+const THRESHOLD = 1.4;       // m/s^2 above the filtered baseline
+let steps = 0, samples = 0, lastStep = 0, lastReading = 0, maxGap = 0;
+let hiddenSteps = 0, running = false;
+let lp = 0;                  // low-pass estimate of gravity magnitude
+let armed = true;
+
+function onSample(x, y, z, t) {
+  samples++;
+  const now = t || performance.now();
+  if (lastReading) maxGap = Math.max(maxGap, now - lastReading);
+  lastReading = now;
+
+  const mag = Math.sqrt(x * x + y * y + z * z);
+  lp = lp === 0 ? mag : lp * 0.9 + mag * 0.1;   // gravity + slow drift
+  const dyn = mag - lp;
+
+  if (armed && dyn > THRESHOLD && now - lastStep > MIN_GAP_MS) {
+    steps++;
+    if (document.hidden) hiddenSteps++;
+    lastStep = now;
+    armed = false;
+  } else if (!armed && dyn < THRESHOLD * 0.4) {
+    armed = true;                                // hysteresis: one peak, one step
+  }
+
+  if (samples % 10 === 0) {
+    $('steps').textContent = steps;
+    $('samples').textContent = samples;
+    $('mag').textContent = dyn.toFixed(2);
+    $('gap').textContent = maxGap > 0 ? (maxGap / 1000).toFixed(1) + ' s' : '—';
+    $('hidsteps').textContent = hiddenSteps;
+  }
+}
+
+let rateT0 = 0, rateN = 0;
+setInterval(() => {
+  if (!running) return;
+  const n = samples - rateN;
+  rateN = samples;
+  $('rate').textContent = n + ' Hz';
+}, 1000);
+
+async function start() {
+  if (running) return;
+  running = true;
+  $('start').textContent = 'Counting…';
+
+  // Preferred: LinearAccelerationSensor already has gravity removed by the
+  // platform, which is strictly better than filtering it out ourselves.
+  if ('LinearAccelerationSensor' in window) {
+    try {
+      const s = new LinearAccelerationSensor({ frequency: 50 });
+      s.addEventListener('reading', () => onSample(s.x, s.y, s.z));
+      s.addEventListener('error', e => log('sensor error: ' + e.error.name + ' — ' + e.error.message));
+      s.start();
+      $('src').textContent = 'LinearAccelerationSensor';
+      log('started LinearAccelerationSensor @50Hz');
+      return;
+    } catch (e) { log('LinearAccelerationSensor failed: ' + e.message); }
+  }
+  if ('Accelerometer' in window) {
+    try {
+      const s = new Accelerometer({ frequency: 50 });
+      s.addEventListener('reading', () => onSample(s.x, s.y, s.z));
+      s.addEventListener('error', e => log('sensor error: ' + e.error.name + ' — ' + e.error.message));
+      s.start();
+      $('src').textContent = 'Accelerometer';
+      log('started Accelerometer @50Hz');
+      return;
+    } catch (e) { log('Accelerometer failed: ' + e.message); }
+  }
+  if (typeof DeviceMotionEvent !== 'undefined') {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const res = await DeviceMotionEvent.requestPermission();
+      log('DeviceMotionEvent.requestPermission -> ' + res);
+      if (res !== 'granted') { $('src').textContent = 'denied'; return; }
+    }
+    window.addEventListener('devicemotion', e => {
+      const a = e.accelerationIncludingGravity || e.acceleration;
+      if (a && a.x !== null) onSample(a.x, a.y, a.z);
+    });
+    $('src').textContent = 'devicemotion';
+    log('listening to devicemotion');
+    return;
+  }
+  $('src').textContent = 'nothing available';
+  log('no motion source on this device');
+}
+
+$('start').onclick = start;
+$('reset').onclick = () => {
+  steps = samples = hiddenSteps = 0; maxGap = 0; lastReading = 0;
+  $('steps').textContent = 0; log('reset');
+};
+
+let lock = null;
+$('wake').onclick = async () => {
+  try {
+    lock = await navigator.wakeLock.request('screen');
+    log('wake lock held — screen will stay on');
+    $('wake').textContent = 'Screen held awake';
+    lock.addEventListener('release', () => log('wake lock released'));
+  } catch (e) { log('wake lock failed: ' + e.message); }
+};
+
+document.addEventListener('visibilitychange', () => {
+  $('hidden').textContent = document.hidden ? 'YES' : 'no';
+  log('visibility -> ' + (document.hidden ? 'hidden' : 'visible')
+    + ' (steps ' + steps + ', samples ' + samples + ')');
+});
+</script>
+</body>
+</html>
