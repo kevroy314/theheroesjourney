@@ -14,6 +14,7 @@ const SCREENS := {
 	"journey": preload("res://scripts/screens/JourneyScreen.gd"),
 	"area": preload("res://scripts/screens/AreaScreen.gd"),
 	"overworld": preload("res://scripts/screens/OverworldScreen.gd"),
+	"worldmap": preload("res://scripts/screens/WorldMapScreen.gd"),
 	"task": preload("res://scripts/screens/TaskScreen.gd"),
 	"boon": preload("res://scripts/screens/BoonScreen.gd"),
 	"event": preload("res://scripts/screens/EventScreen.gd"),
@@ -192,5 +193,6 @@ func _go_back() -> void:
 		"palace": Game.goto("title")
 		"codex", "wheel", "gym", "workshop", "stores", "hearth", "observatory": Game.goto("palace")
 		"inventory": Game.goto("area") if Game.has_active_run() else Game.goto("palace")
-		"overworld": Game.goto("area")
+		"overworld": Game.goto("worldmap")
+		"worldmap": Game.goto("area")
 		"task": Game.skip_task()
