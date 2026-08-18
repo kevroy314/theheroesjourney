@@ -53,6 +53,12 @@ WALKABLE = {
     "water": False,
     "rock": False,
     "void": False,
+    "forest": False,
+    "scree": True,
+    "snow": True,
+    "sand": True,
+    "roof": False,
+    "bridge": True,
 }
 
 # Standard 8x8 ordered (Bayer) matrix. Values 0..63.
@@ -415,6 +421,148 @@ def void():
     return img
 
 
+
+def forest():
+    """Canopy seen from above. Solid — you walk round a wood, not through it.
+
+    Drawn as crowns rather than as trees: at 32px a trunk is one pixel and reads
+    as dirt. What says "wood" from above is overlapping rounded masses with the
+    light on the same side of every one."""
+    # Pulled well down toward the ground colour. A canopy lit the way a real one
+    # is would be the brightest thing on the map and the character would vanish
+    # every time he walked past a wood.
+    floor = mix(C["good"], C["bg"], 0.90)
+    crown = mix(C["good"], C["bg"], 0.79)
+    lit = mix(C["good"], C["bg"], 0.70)
+    dim = mix(C["good"], C["bg"], 0.87)
+
+    img = canvas(floor)
+    rng = random.Random(9311)
+    speckle(img, rng, 90, dim)
+    # Packed until almost no floor shows. Gaps between crowns are what would
+    # otherwise read as clearings you ought to be able to walk into.
+    crowns = [(5, 5, 6), (18, 4, 7), (28, 8, 6), (10, 15, 7),
+              (23, 18, 6), (3, 24, 6), (15, 27, 7), (29, 27, 5)]
+    for cx, cy, r in crowns:
+        fill = mix(crown, lit, rng.uniform(0.0, 0.28))
+        blob(img, rng, cx, cy, r, fill, lit, dim)
+    speckle(img, rng, 40, dim)
+    return img
+
+
+def scree():
+    """Loose stone on a slope. Walkable, and the ground the foothills are made
+    of. Reads as rock's cousin: same hue, less mass, more ground showing."""
+    base = mix(C["line"], C["bg"], 0.42)
+    chip = mix(C["line"], C["muted"], 0.18)
+    dark = mix(C["line"], C["bg"], 0.60)
+
+    img = canvas(base)
+    rng = random.Random(6421)
+    dither(img, dark, base, lambda x, y: 0.4)
+    # Chips, not lumps. Two or three pixels each, angled the same way, so the
+    # whole tile reads as material that has slid downhill.
+    for _ in range(46):
+        x = rng.randrange(N)
+        y = rng.randrange(N)
+        n = rng.randint(2, 3)
+        for i in range(n):
+            px(img, x + i, y + (i >> 1), chip if rng.random() < 0.6 else dark)
+    speckle(img, rng, 40, dark)
+    return img
+
+
+def snow():
+    """The summit. The brightest ground in the game, and still narrow-range —
+    a white tile would blow out the character standing on it."""
+    # Snow at anything like real snow's value is a white hole in a dark game.
+    # This is snow at dawn, before the sun is on it: the brightest *ground* in
+    # the world and still darker than the character's hood.
+    base = mix(C["muted"], C["bg"], 0.42)
+    lit = mix(C["muted"], C["bg"], 0.22)
+    dim = mix(C["muted"], C["bg"], 0.60)
+
+    img = canvas(base)
+    rng = random.Random(7717)
+    dither(img, dim, base, lambda x, y: 0.30)
+    # Wind-scour: shallow drifts running one way. Without direction, snow reads
+    # as noise; with it, as a surface weather has been across.
+    for _ in range(14):
+        y = rng.randrange(N)
+        x = rng.randrange(N)
+        run = rng.randint(5, 11)
+        for i in range(run):
+            px(img, x + i, y + (1 if i > run // 2 else 0), lit)
+    speckle(img, rng, 26, dim)
+    return img
+
+
+def sand():
+    """Shore. Warm like the road but paler and finer, so a beach never reads as
+    a path you are meant to follow."""
+    base = mix(mix(C["bg"], C["accent"], 0.26), C["muted"], 0.24)
+    dark = mix(base, C["bg"], 0.22)
+    grain = mix(base, C["text"], 0.14)
+
+    img = canvas(base)
+    rng = random.Random(5591)
+    dither(img, dark, base, lambda x, y: 0.35)
+    # Ripples, low amplitude, horizontal. Sand with no ripple is a flat fill.
+    for y in range(2, N, 5):
+        wob = 0
+        for x in range(N):
+            wob += rng.choice((-1, 0, 0, 0, 1))
+            wob = max(-1, min(1, wob))
+            px(img, x, y + wob, dark)
+    speckle(img, rng, 70, grain)
+    return img
+
+
+def roof():
+    """A building seen from above. Solid. Shingle courses run across, and the
+    course spacing is what separates a roof from a wall at a glance."""
+    base = mix(C["accent"], C["bg"], 0.74)
+    dark = mix(C["accent"], C["bg"], 0.86)
+    lit = mix(C["accent"], C["bg"], 0.62)
+
+    img = canvas(base)
+    rng = random.Random(3313)
+    speckle(img, rng, 60, dark)
+    for y in range(3, N, 6):
+        hline(img, y, 0, N - 1, dark)
+        hline(img, y - 1, 0, N - 1, lit)
+        # Stagger the butt joints course to course, or the shingles line up into
+        # columns and the roof reads as tiling rather than as covering.
+        offset = 0 if (y // 6) % 2 == 0 else 5
+        for x in range(offset, N + offset, 10):
+            for i in range(5):
+                px(img, x, y - i, dark)
+    return img
+
+
+def bridge():
+    """Planks over water. Walkable — the one way across, so it has to read as
+    deliberate construction rather than as debris."""
+    base = mix(C["accent"], C["bg"], 0.78)
+    dark = mix(C["accent"], C["bg"], 0.88)
+    lit = mix(C["accent"], C["bg"], 0.66)
+    rail = mix(C["line"], C["bg"], 0.24)
+
+    img = canvas(base)
+    rng = random.Random(2287)
+    speckle(img, rng, 40, dark)
+    # Planks across the direction of travel, which is what a walking surface
+    # looks like, plus a rail at each edge so the crossing has sides.
+    for y in range(0, N, 5):
+        hline(img, y, 0, N - 1, dark)
+        hline(img, y + 1, 0, N - 1, lit)
+    vline(img, 0, 0, N - 1, rail)
+    vline(img, 1, 0, N - 1, rail)
+    vline(img, N - 2, 0, N - 1, rail)
+    vline(img, N - 1, 0, N - 1, rail)
+    return img
+
+
 TILES = {
     "floor_boards": floor_boards,
     "floor_stone": floor_stone,
@@ -427,13 +575,22 @@ TILES = {
     "rock": rock,
     "door": door,
     "void": void,
+    "forest": forest,
+    "scree": scree,
+    "snow": snow,
+    "sand": sand,
+    "roof": roof,
+    "bridge": bridge,
 }
 
-# Sheet order — materials grouped, solids after walkables, void last.
+
+# Sheet index IS the id stored in the world grid, so this order is load-bearing:
+# appending is safe, reordering silently rewrites every map ever generated.
 ORDER = [
     "floor_boards", "floor_stone", "grass_short", "grass_tall",
     "path_dirt", "door", "wall_plaster", "wall_stone",
     "water", "rock", "void",
+    "sand", "scree", "snow", "bridge", "forest", "roof",
 ]
 
 

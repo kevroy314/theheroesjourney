@@ -112,3 +112,38 @@ only.
 - `export_presets.cfg` excludes `art/*` but not `assets/*`, so these ship in the
   pck as soon as they exist. The whole set is ~53 KB including the two debug
   previews.
+
+## The world
+
+There is one map, not eight. `tools/make_world.py` builds a single 150x320-tile
+landscape and writes two things from the same source:
+
+```
+data/world/overworld.json      the grid the game walks on
+assets/world/worldmap.png      the drawn map, rendered from that same grid
+```
+
+**The drawn map is a rendering of the tile grid, not a separate picture of it.**
+A hand-painted map beside a hand-built tilemap is two descriptions of one place
+that will disagree within a week, and the player is who finds out. Flat biome
+colour plus a hillshade taken from the elevation field's own gradient — the way
+a paper relief map is made — because the 32px tile detail is only noise at 4px.
+
+Everything derives from two noise fields, elevation and moisture. Biomes are
+thresholds on those fields, which is what buys "no zone boundaries" for free: a
+shore is wherever elevation crosses sea level, not a line somebody drew.
+
+Chapters are **regions**, not zones. Each has an anchor cell and a `CHARACTER`
+entry — a soft radial nudge to the two fields, so the Tall Grass is wetter than
+its surroundings and the Long Road drier. The change happens over thirty tiles
+and nobody can point at where it starts. Nothing stops you walking to the summit
+on day one; you will simply find the door shut.
+
+`tiles_b64_deflate` is base64 of **plain `zlib.compress`**. Godot's
+`FileAccess.COMPRESSION_DEFLATE` is zlib-wrapped despite the name — verified by
+round-tripping every pairing. Raw deflate (`wbits=-15`) decompresses to zero
+bytes and does not error. If you change the encoding, re-test it.
+
+Tile ids are indices into `ORDER` in `tools/make_tiles.py`, which
+`make_world.py` reads rather than copies. **Appending a tile is safe; reordering
+silently rewrites every world ever generated.**

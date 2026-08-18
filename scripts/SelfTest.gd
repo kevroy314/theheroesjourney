@@ -497,7 +497,7 @@ static func _palace_checks(failures: Array) -> void:
 ## all, and a typo in it would first surface in front of the player.
 static func _screen_checks(host: Node, failures: Array) -> void:
 	var names: Array = ["title", "palace", "gym", "workshop", "stores", "hearth",
-		"observatory", "codex", "wheel", "inventory", "journey", "area", "overworld",
+		"observatory", "codex", "wheel", "inventory", "journey", "area", "overworld", "worldmap",
 		"task", "boon", "event", "summary"]
 
 	Game.run = null

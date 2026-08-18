@@ -9,6 +9,7 @@ extends Control
 ## interactive except the character.
 
 signal node_entered(id: String)
+signal moved(cell: Vector2i)
 signal blocked                      ## tried to move with nothing left to spend
 
 const TILE := 32
@@ -25,8 +26,9 @@ const FACINGS := {
 	Vector2i.DOWN: 0, Vector2i.UP: 1, Vector2i.LEFT: 2, Vector2i.RIGHT: 3,
 }
 
-var map: HJMapGen
+var world: HJWorld
 var run: HJRun
+var node_at: Dictionary = {}         ## Vector2i -> node id, this chapter's beats
 
 var _tiles: Texture2D
 var _player: Texture2D
@@ -39,10 +41,14 @@ var _cycle := 0                      ## which entry of CYCLE this step is using
 var _held := Vector2i.ZERO           ## direction the player is holding
 
 
-func _init(run_ref: HJRun) -> void:
+func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
 	run = run_ref
-	map = HJMapGen.build(run_ref)
-	_cell = map.spawn
+	world = HJWorld.shared()
+	node_at = world.place_nodes(run_ref)
+	# Carry the player's position between visits. The world does not reset when
+	# you close a screen — it is the same world, and you are still standing in it.
+	_cell = start if start.x >= 0 else world.spawn
+	_cell = world.nearest_walkable(_cell)
 	_from = _cell
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -63,7 +69,11 @@ func hold(direction: Vector2i) -> void:
 
 
 func here() -> String:
-	return String(map.node_at.get(_cell, ""))
+	return String(node_at.get(_cell, ""))
+
+
+func cell() -> Vector2i:
+	return _cell
 
 
 func _process(delta: float) -> void:
@@ -75,6 +85,7 @@ func _process(delta: float) -> void:
 		_t = 0.0
 		_moving = false
 		_from = _cell
+		moved.emit(_cell)
 		var arrived := here()
 		if arrived != "":
 			node_entered.emit(arrived)
@@ -86,7 +97,7 @@ func _process(delta: float) -> void:
 func _try_move(direction: Vector2i) -> void:
 	_facing = direction
 	var target := _cell + direction
-	if not map.walkable(target.x, target.y):
+	if not world.walkable(target.x, target.y):
 		return
 	# The budget is spent on arrival at a new tile, never on turning on the spot
 	# and never on walking into a wall. You are charged for ground covered.
@@ -108,30 +119,30 @@ func _character_px() -> Vector2:
 
 
 func _draw() -> void:
-	if map == null or _tiles == null:
+	if world == null or not world.loaded or _tiles == null:
 		return
 	var scale := float(TILE * ZOOM)
 
 	# Camera: the character sits in the middle of the view, except near the edges
 	# of the map, where the view stops rather than showing void.
-	var world := Vector2(map.w, map.h) * scale
+	var extent := Vector2(world.w, world.h) * scale
 	var focus := (_character_px() + Vector2(TILE, TILE) * 0.5) * float(ZOOM)
 	var cam := focus - size * 0.5
-	cam.x = clampf(cam.x, 0.0, maxf(0.0, world.x - size.x))
-	cam.y = clampf(cam.y, 0.0, maxf(0.0, world.y - size.y))
-	if world.x < size.x:
-		cam.x = -(size.x - world.x) * 0.5
-	if world.y < size.y:
-		cam.y = -(size.y - world.y) * 0.5
+	cam.x = clampf(cam.x, 0.0, maxf(0.0, extent.x - size.x))
+	cam.y = clampf(cam.y, 0.0, maxf(0.0, extent.y - size.y))
+	if extent.x < size.x:
+		cam.x = -(size.x - extent.x) * 0.5
+	if extent.y < size.y:
+		cam.y = -(size.y - extent.y) * 0.5
 
 	# Only the cells actually on screen. Drawing the whole map would be fine at
 	# this size and wrong at any other.
 	var first := Vector2i(int(floor(cam.x / scale)), int(floor(cam.y / scale)))
 	var last := Vector2i(
 		int(ceil((cam.x + size.x) / scale)), int(ceil((cam.y + size.y) / scale)))
-	for y in range(maxi(0, first.y), mini(map.h, last.y + 1)):
-		for x in range(maxi(0, first.x), mini(map.w, last.x + 1)):
-			var index := map.at(x, y)
+	for y in range(maxi(0, first.y), mini(world.h, last.y + 1)):
+		for x in range(maxi(0, first.x), mini(world.w, last.x + 1)):
+			var index := world.at(x, y)
 			var dst := Rect2(Vector2(x, y) * scale - cam, Vector2(scale, scale))
 			draw_texture_rect_region(_tiles, dst,
 				Rect2(index * TILE, 0, TILE, TILE))
@@ -144,8 +155,8 @@ func _draw() -> void:
 ## for what you can do now, muted for what you cannot, and nothing at all for
 ## what you have not discovered.
 func _draw_markers(cam: Vector2, scale: float) -> void:
-	for cell in map.node_at:
-		var id := String(map.node_at[cell])
+	for cell in node_at:
+		var id := String(node_at[cell])
 		if not HJAreaGen.is_visible(run, id):
 			continue
 		var done := run.is_done(id)

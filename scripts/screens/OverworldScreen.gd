@@ -38,11 +38,11 @@ func build() -> void:
 	_where = HJUI.label(Steps.describe(), HJUI.FS_TINY, "muted")
 	titles.add_child(_where)
 	head.add_child(titles)
-	var back := HJUI.button("List", "quiet")
+	var back := HJUI.button("Map", "quiet")
 	back.custom_minimum_size = Vector2(120, 62)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_END
 	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	back.pressed.connect(func(): Game.goto("area"))
+	back.pressed.connect(func(): Game.goto("worldmap"))
 	head.add_child(back)
 	head_panel.add_child(head)
 	v.add_child(head_panel)
@@ -54,9 +54,11 @@ func build() -> void:
 	chips.add_child(HJUI.chip(Palette.word("grit"), str(run.grit), "accent", "grit"))
 	v.add_child(chips)
 
-	_world = HJTileWorld.new(run)
+	_world = HJTileWorld.new(run, run.world_pos)
 	_world.node_entered.connect(_on_node)
 	_world.blocked.connect(_on_blocked)
+	# The world does not reset when the screen does. Remember where he stopped.
+	_world.moved.connect(func(cell: Vector2i) -> void: run.world_pos = cell)
 	# The map is the screen. Everything else is a strip around it, so the world
 	# takes whatever the strips leave and never less than a usable window.
 	_world.custom_minimum_size.y = 300

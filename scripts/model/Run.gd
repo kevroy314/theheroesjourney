@@ -40,6 +40,7 @@ var pending_movement: String = ""    ## movement picked for the pending task
 var pending_event: Dictionary = {}   ## spite / mirror / echo popup
 
 # --- bookkeeping ---
+var world_pos := Vector2i(-1, -1)    ## where you are standing; -1 means "not yet"
 var axis_tasks: Dictionary = {}      ## axis -> count, this run
 var finished: bool = false
 var outcome: String = ""             ## "" | "cleared" | "loop" | "abandoned"
@@ -90,6 +91,7 @@ func to_dict() -> Dictionary:
 		"pending_boons": pending_boons, "pending_node": pending_node, "pending_event": pending_event,
 		"pending_started": pending_started, "pending_movement": pending_movement,
 		"axis_tasks": axis_tasks, "finished": finished, "outcome": outcome,
+		"world_x": world_pos.x, "world_y": world_pos.y,
 	}
 
 
@@ -107,6 +109,7 @@ static func from_dict(d: Dictionary) -> HJRun:
 	r.locked = d.get("locked", [])
 	r.deadline_unix = int(d.get("deadline_unix", 0))
 	r.grit = int(d.get("grit", 0))
+	r.world_pos = Vector2i(int(d.get("world_x", -1)), int(d.get("world_y", -1)))
 	r.trinkets = d.get("trinkets", [])
 	r.echoes = d.get("echoes", [])
 	r.tags = d.get("tags", [])
