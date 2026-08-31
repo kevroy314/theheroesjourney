@@ -1,18 +1,23 @@
 extends Node
 ## Real steps in, in-game steps out.
 ##
-## There is no step-counting API on the web and no browser route to Health
-## Connect, so this counts steps itself from the accelerometer. That has one
-## consequence which is not a limitation so much as a design constraint:
+## Two backends behind one interface, because the two platforms can do genuinely
+## different things:
 ##
-##   **readings only arrive while the page is visible.**
+##   android — the hardware step counter. Counts in silicon at negligible power
+##             and keeps counting while the app is closed and the screen is off,
+##             so a day's walking is already banked when you open the game.
+##             Reports a total since boot, which we diff against a baseline.
 ##
-## Backgrounded, or screen locked, the browser stops delivering sensor events.
-## So steps accrue only while the game is actually open and you are actually
-## walking — which is a better loop than a passive daily number anyway, and it
-## makes "I opened the app and inherited 8,000 free steps" impossible.
+##   web     — the accelerometer, and our own peak detection on it. There is no
+##             step API on the web and no browser route to Health Connect, and
+##             readings stop arriving the moment the page is hidden. So on the
+##             web, steps accrue only while you are looking at the game.
 ##
-## Off the web (editor, headless) there is no sensor at all and the budget comes
+## Everything above this line is the same to the rest of the game: `walked`,
+## `budget()`, `describe()`. Callers must not branch on platform.
+##
+## Anywhere else (editor, headless) there is no sensor and the budget comes
 ## entirely from the debug cheat.
 
 signal budget_changed
@@ -80,29 +85,131 @@ var live: bool = false
 var _started := false
 var _poll := 0.0
 
+## Native backend state. `_baseline` is the hardware total at the moment we
+## started counting for this install; `walked` is the difference. `_elapsed` is
+## the device's uptime at the last reading — see _sync_android for why.
+var _android: Object = null
+var _baseline: int = -1
+var _elapsed: int = 0
+var _carried: int = 0
+var _permission := false
+
+const SAVE_PATH := "user://steps.cfg"
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	if OS.has_feature("web"):
+	_load_baseline()
+	if Engine.has_singleton("HeroesSteps"):
+		_android = Engine.get_singleton("HeroesSteps")
+		_android.connect("permission_result", _on_permission)
+		_permission = bool(_android.call("has_permission"))
+		if _permission:
+			_android.call("start")
+		source = "step counter" if bool(_android.call("has_sensor")) else "none"
+		_started = true
+	elif OS.has_feature("web"):
 		JavaScriptBridge.eval(BRIDGE, true)
 		_started = true
+
+
+## Android only asks once; if it was refused, the player has to go to system
+## settings, so there is no point re-prompting on every launch.
+func ask_permission() -> void:
+	if _android != null and not _permission:
+		_android.call("request_permission")
+
+
+func _on_permission(granted: bool) -> void:
+	_permission = granted
+	if granted:
+		_android.call("start")
+	else:
+		source = "permission refused"
+	budget_changed.emit()
 
 
 func _process(delta: float) -> void:
 	if not _started:
 		return
 	# Once a second is plenty: a person cannot take enough steps in 16ms for the
-	# difference to be visible, and eval() across the JS boundary is not free.
+	# difference to be visible, and crossing a language boundary is not free.
 	_poll += delta
 	if _poll < 1.0:
 		return
 	_poll = 0.0
+	if _android != null:
+		_sync_android()
+	else:
+		_sync_web()
+
+
+func _sync_web() -> void:
 	var count := int(JavaScriptBridge.eval("window.__hjSteps ? window.__hjSteps.count : 0", true))
 	source = String(JavaScriptBridge.eval("window.__hjSteps ? window.__hjSteps.source : 'none'", true))
 	live = bool(JavaScriptBridge.eval("window.__hjSteps ? window.__hjSteps.live : false", true))
 	if count != walked:
 		walked = count
 		budget_changed.emit()
+
+
+## The hardware counter reports steps since the device last booted, so what we
+## want is the difference from a baseline we recorded earlier.
+##
+## Two things make that harder than a subtraction:
+##
+## 1. **A reboot zeroes the counter.** Subtracting a stale baseline then yields a
+##    large negative number, and the budget would silently collapse. The tell is
+##    the device's uptime going *backwards* — nothing else can do that — so when
+##    it does we bank what was already walked and re-baseline from zero.
+## 2. **The counter can also be lower than the baseline without a reboot** on
+##    some devices, after a sensor service restart. Same treatment: bank and
+##    re-baseline, rather than trust arithmetic that has already gone wrong.
+func _sync_android() -> void:
+	if not _permission:
+		return
+	var total := int(_android.call("steps_since_boot"))
+	var uptime := int(_android.call("elapsed_realtime_ms"))
+	if total < 0:
+		live = false
+		return
+	live = true
+
+	var rebooted := uptime < _elapsed
+	_elapsed = uptime
+	if _baseline < 0 or rebooted or total < _baseline:
+		# Bank the walking already credited so a reboot never costs the player
+		# steps they actually took, then start counting again from here.
+		_carried = walked
+		_baseline = total
+		_save_baseline()
+
+	var count := _carried + (total - _baseline)
+	if count != walked:
+		walked = count
+		_save_baseline()
+		budget_changed.emit()
+
+
+## The baseline has to outlive the process: the counter keeps running while the
+## game is closed, and that is the entire point of using it.
+func _save_baseline() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("steps", "baseline", _baseline)
+	cfg.set_value("steps", "carried", _carried)
+	cfg.set_value("steps", "walked", walked)
+	cfg.set_value("steps", "elapsed", _elapsed)
+	cfg.save(SAVE_PATH)
+
+
+func _load_baseline() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SAVE_PATH) != OK:
+		return
+	_baseline = int(cfg.get_value("steps", "baseline", -1))
+	_carried = int(cfg.get_value("steps", "carried", 0))
+	walked = int(cfg.get_value("steps", "walked", 0))
+	_elapsed = int(cfg.get_value("steps", "elapsed", 0))
 
 
 ## What is left to walk with. Real steps are multiplied; granted steps are not,
@@ -140,11 +247,23 @@ func reset_run() -> void:
 
 
 func describe() -> String:
+	if _android != null:
+		if source == "none":
+			return "no step counter on this device"
+		if not _permission:
+			return "tap to allow step counting"
+		return "counting all day · %d steps" % walked
 	if not OS.has_feature("web"):
-		return "no sensor off the web — use the debug cheat"
+		return "no sensor here — use the debug cheat"
 	match source:
 		"none": return "no motion sensor on this device"
 		"denied": return "motion permission refused"
 		"error": return "the sensor errored"
 		"": return "starting…"
-	return "%s · %d real steps" % [source, walked]
+	return "%s · %d steps while playing" % [source, walked]
+
+
+## Whether the player still has to grant something before this works. The
+## overworld shows a prompt when true rather than silently counting nothing.
+func needs_permission() -> bool:
+	return _android != null and source != "none" and not _permission

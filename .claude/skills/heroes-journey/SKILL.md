@@ -91,6 +91,22 @@ after the fork waits forever on a branch that can never complete.
 every autoload reference as "Identifier not found" because autoloads are not
 loaded in that mode. Only trust it for `Parse Error`, not `Compile Error`.
 
+**`_set` is taken.** `Object._set(StringName, Variant) -> bool` is a virtual, so
+a helper called `_set` fails with "The function signature doesn't match the
+parent" and takes every dependent script down with it. This has bitten twice
+(`HJMapGen`, `Updater`). Same applies to `_get`, `_notification`, `_init`.
+
+**`Compression.DEFLATE` is zlib-wrapped despite the name.** Python's
+`zlib.compress` round-trips with Godot's `COMPRESSION_DEFLATE`; raw deflate
+(`wbits=-15`) decompresses to **zero bytes and does not error**, which surfaces
+as a flood of out-of-bounds reads burying the one message that says why. Verified
+against every pairing; see `tools/make_world.py`.
+
+**A bind mount cannot nest inside a read-only bind mount.** `docker-compose`
+mounting `./releases` at a path *underneath* the read-only `./build` mount stops
+the container starting at all ("read-only file system" creating the mountpoint).
+Mount outside the html root and serve it with nginx `alias`.
+
 **Multi-line lambdas break the parser.** A `func(x): return a\n\tand b` inside a
 call argument fails with "Expected closing )". Use an explicit loop.
 

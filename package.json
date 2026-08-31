@@ -27,6 +27,9 @@
     "test": "./test.sh",
     "import": "$GODOT_BIN --headless --path . --import",
     "icons": "python3 tools/make_icons.py",
+    "android": "./build_android.sh",
+    "version": "python3 tools/version.py",
+    "bump": "python3 tools/version.py --bump",
     "export:linux": "mkdir -p build/linux && $GODOT_BIN --headless --path . --export-release Linux build/linux/heroes.x86_64",
     "selftest:build": "npm run export:linux && ./build/linux/heroes.x86_64 --headless -- --selftest",
     "fast": "BROTLI_QUALITY=5 ./run.sh"

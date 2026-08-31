@@ -1,0 +1,11 @@
+[config]
+
+name="HeroesSteps"
+binary_type="local"
+binary="steps/HeroesSteps.aar"
+
+[dependencies]
+
+local=[]
+remote=[]
+custom_maven_repos=[]

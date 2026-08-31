@@ -20,6 +20,15 @@ services:
       - "8070:8070"
     volumes:
       - ./build:/usr/share/nginx/html:ro
+      # Android OTA releases. A separate mount rather than a directory inside
+      # build/, because build/ is disposable output that gets deleted whenever
+      # an export goes wrong — and a signed APK cannot be rebuilt byte-for-byte.
+      #
+      # Mounted OUTSIDE the html root and served by `alias`, not nested inside
+      # it: /usr/share/nginx/html is itself a read-only bind mount, so Docker
+      # cannot create a mountpoint underneath it and the container refuses to
+      # start at all.
+      - ./releases:/srv/releases:ro
       # Alpine's nginx.conf includes /etc/nginx/http.d/*.conf inside `http`
       # (/etc/nginx/conf.d/*.conf is included at the *root* context here).
       - ./web.conf:/etc/nginx/http.d/default.conf:ro
