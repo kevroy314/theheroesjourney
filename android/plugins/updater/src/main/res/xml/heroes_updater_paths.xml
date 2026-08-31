@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+
+	<!-- Godot's user:// on Android is Context.getFilesDir() and nothing else:
+	     GodotIO.getDataDir() is literally `getContext().getFilesDir().getAbsolutePath()`,
+	     and OS_Android hands that to the C++ side as the user data dir (after a realpath
+	     to strip the /data/user/0 -> /data/data symlink). So the APK that GDScript
+	     downloads to user://update.apk lands at /data/data/<package>/files/update.apk.
+
+	     files-path is therefore the one correct root. Not cache-path (that is
+	     getCacheDir()), not external-files-path (getExternalFilesDir(), a different
+	     volume entirely), not external-path. Picking the wrong one does not fail the
+	     build; it fails on the phone, at the moment the player taps Install, with
+	     IllegalArgumentException: Failed to find configured root that contains ...
+
+	     path="." is the whole of files/, which is what user:// is. The symlink question
+	     takes care of itself: FileProvider canonicalises both the configured root and
+	     the file handed to getUriForFile, so /data/user/0/... and /data/data/... resolve
+	     to the same string whichever form Godot's globalize_path produced. -->
+	<files-path
+		name="godot_user"
+		path="." />
+
+</paths>

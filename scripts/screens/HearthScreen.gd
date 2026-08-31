@@ -7,6 +7,19 @@ func register() -> String:
 	return "palace"
 
 
+func _enter_tree() -> void:
+	super._enter_tree()
+	# The update card is a state machine — checking, downloading, ready — and it
+	# has to redraw as that state moves without the player touching anything.
+	Updater.state_changed.connect(refresh)
+
+
+func _exit_tree() -> void:
+	super._exit_tree()
+	if Updater.state_changed.is_connected(refresh):
+		Updater.state_changed.disconnect(refresh)
+
+
 func build() -> void:
 	var v := page(12)
 	v.add_child(HJUI.header("The Hearth", "How the world looks, and when the clock runs",
@@ -18,6 +31,7 @@ func build() -> void:
 	v.add_child(scroll)
 
 	_notifications(list)
+	_updates(list)
 
 	list.add_child(HJUI.label("WHEN LIFE HAPPENS", HJUI.FS_SMALL, "muted"))
 	var pause_card := HJUI.panel("panel", "accent_2" if Meta.paused else "")
@@ -178,3 +192,99 @@ func _selectable(entry: Dictionary, is_selected: bool, on_select: Callable) -> P
 
 	card.add_child(cv)
 	return card
+
+
+## Over-the-air updates, on the sideloaded Android build only.
+##
+## Hidden entirely on the web, and hidden on a build with no update server
+## configured — which is also what keeps a future Play Store build compliant,
+## since Play forbids an app it distributes from updating itself.
+func _updates(list: VBoxContainer) -> void:
+	if not OS.has_feature("android"):
+		return
+	list.add_child(HJUI.label("THIS APP", HJUI.FS_SMALL, "muted"))
+	var card := HJUI.panel("panel")
+	var cv := HJUI.vbox(8)
+
+	cv.add_child(HJUI.label("Version %s (build %d)" % [
+		ProjectSettings.get_setting("application/config/version", "?"),
+		Updater.current_code()], HJUI.FS_SMALL, "text"))
+
+	if not Updater.configured():
+		cv.add_child(HJUI.label(
+			"No update server. Set one and this app can fetch its own builds.",
+			HJUI.FS_TINY, "muted"))
+		cv.add_child(_server_fields())
+		card.add_child(cv)
+		list.add_child(card)
+		return
+
+	if Updater.message != "":
+		var role := "danger" if Updater.state == Updater.State.FAILED else "muted"
+		cv.add_child(HJUI.label(Updater.message, HJUI.FS_TINY, role))
+
+	match Updater.state:
+		Updater.State.DOWNLOADING:
+			cv.add_child(HJUI.bar(Updater.progress * 100.0, 100.0, "accent"))
+		Updater.State.AVAILABLE:
+			var notes := String(Updater.latest.get("notes", ""))
+			if notes != "":
+				cv.add_child(HJUI.label(notes, HJUI.FS_TINY, "muted"))
+			var get_it := HJUI.button("Download", "primary")
+			get_it.pressed.connect(func(): Updater.download())
+			cv.add_child(get_it)
+		Updater.State.READY:
+			# Android will not let an app install packages until the player has
+			# said so once, and the system dialog for that lives in Settings —
+			# so ask for it here rather than letting the install silently fail.
+			if Updater.can_install():
+				var go := HJUI.button("Install", "primary")
+				go.pressed.connect(func(): Updater.install())
+				cv.add_child(go)
+			else:
+				cv.add_child(HJUI.label(
+					"Android needs your permission for this app to install updates.",
+					HJUI.FS_TINY, "warn"))
+				var allow := HJUI.button("Allow installing", "primary")
+				allow.pressed.connect(func(): Updater.open_install_settings())
+				cv.add_child(allow)
+		_:
+			var check := HJUI.button("Check for updates", "ghost")
+			check.pressed.connect(func(): Updater.check())
+			cv.add_child(check)
+
+	var forget := HJUI.button("Change server", "quiet")
+	forget.custom_minimum_size.y = 62
+	forget.pressed.connect(func(): Updater.set_server("", ""))
+	cv.add_child(forget)
+
+	card.add_child(cv)
+	list.add_child(card)
+
+
+## Typed once, on the phone. The key rides in the URL as well as a header
+## because the very first install is typed into the phone's browser, before
+## there is an app to send headers at all.
+func _server_fields() -> Control:
+	var box := HJUI.vbox(6)
+	var url := LineEdit.new()
+	url.placeholder_text = "https://host:1403/releases"
+	url.text = Updater.base_url
+	HJUI.face(url)
+	url.add_theme_font_size_override("font_size", HJUI.fs(HJUI.FS_SMALL))
+	box.add_child(url)
+
+	var secret := LineEdit.new()
+	secret.placeholder_text = "release key"
+	secret.text = Updater.key
+	secret.secret = true
+	HJUI.face(secret)
+	secret.add_theme_font_size_override("font_size", HJUI.fs(HJUI.FS_SMALL))
+	box.add_child(secret)
+
+	var save := HJUI.button("Save", "primary")
+	save.pressed.connect(func() -> void:
+		Updater.set_server(url.text, secret.text)
+		Game.say("Update server saved.", "good"))
+	box.add_child(save)
+	return box

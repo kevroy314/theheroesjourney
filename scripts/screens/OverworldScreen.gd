@@ -37,6 +37,13 @@ func build() -> void:
 	titles.add_child(HJUI.label(String(run.area.get("name", "Area")), HJUI.FS_HEAD, "text"))
 	_where = HJUI.label(Steps.describe(), HJUI.FS_TINY, "muted")
 	titles.add_child(_where)
+	# On Android the counter is useless until ACTIVITY_RECOGNITION is granted,
+	# and a budget that silently never grows is worse than an obvious ask.
+	if Steps.needs_permission():
+		var allow := HJUI.button("Allow step counting", "primary")
+		allow.custom_minimum_size.y = 64
+		allow.pressed.connect(func() -> void: Steps.ask_permission())
+		titles.add_child(allow)
 	head.add_child(titles)
 	var back := HJUI.button("Map", "quiet")
 	back.custom_minimum_size = Vector2(120, 62)

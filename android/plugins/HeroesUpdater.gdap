@@ -1,0 +1,11 @@
+[config]
+
+name="HeroesUpdater"
+binary_type="local"
+binary="updater/HeroesUpdater.aar"
+
+[dependencies]
+
+local=[]
+remote=[]
+custom_maven_repos=[]

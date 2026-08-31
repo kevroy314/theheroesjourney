@@ -6,6 +6,30 @@
 # Web export output. Reproduced by ./run.sh.
 build/
 
+# Godot's Android build template plus everything Gradle leaves behind: 1.1 GB,
+# reproduced by unzipping android_source.zip from the export templates. It was
+# already excluded by the `build/` pattern above, which matches at any depth —
+# but only by accident, and a 1.1 GB commit should not be one rename away.
+# android/.build_version and android/plugins/ ARE tracked.
+android/build/
+
+# Android export output. Reproduced by ./build_android.sh. Separate from build/
+# because build/ is the nginx html root and an APK left there would be served
+# unauthenticated on the LAN, bypassing the keyed /releases/ path.
+dist/
+
+# Android release signing. The real keystore and its password live OUTSIDE this
+# repo (~/.config/heroesjourney/), because `git clean -xfd` deletes gitignored
+# files and a deleted release key strands every phone that has the app installed.
+# These patterns are belt-and-braces for a copy that lands here by accident.
+*.jks
+*.keystore
+android-keystore.env
+
+# Published Android builds (tools/publish_release.py). Signed APKs are not
+# reproducible byte-for-byte and are far too big for git — see docs/DEPLOY.md.
+releases/
+
 # Runtime and local scratch
 *.log
 .venv/
