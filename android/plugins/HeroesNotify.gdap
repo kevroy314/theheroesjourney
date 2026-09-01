@@ -1,0 +1,11 @@
+[config]
+
+name="HeroesNotify"
+binary_type="local"
+binary="notify/HeroesNotify.aar"
+
+[dependencies]
+
+local=[]
+remote=[]
+custom_maven_repos=[]

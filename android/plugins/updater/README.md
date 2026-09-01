@@ -28,9 +28,21 @@ Singleton name: `HeroesUpdater` (`Engine.get_singleton("HeroesUpdater")`).
 | `install_apk(path)` | `void` | `path` is an absolute filesystem path — GDScript passes `ProjectSettings.globalize_path("user://update.apk")`. Launches the system installer. |
 | `open_install_settings()` | `void` | Deep-links to this app's row on the "Install unknown apps" screen. Falls back to the app details page on ROMs that do not export it. |
 
-No signals. There is nothing to signal: once the installer has the intent it owns the
-outcome, and a *successful* install kills this process to replace it, so there is no
-callback to come home to.
+### Signals
+
+| Signal | Payload | When |
+|---|---|---|
+| `install_failed` | `String` | The install did not happen, with a reason fit to show a player. |
+
+**There is deliberately no success signal.** A successful install replaces this process
+to do it, so a signal announcing success could never be observed — an API that promises
+one would be lying. Failure is the case worth reporting, because it hands the player
+back to a game that otherwise still thinks the update is pending.
+
+This is why the plugin uses `PackageInstaller` rather than `ACTION_VIEW`: the latter is
+fire-and-forget, so a signature mismatch, a downgrade, a full disk or a Play Protect
+block all returned the player to an "Install" button that would fail again identically,
+with nothing on screen saying why.
 
 ### What it does on the failure paths
 

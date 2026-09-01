@@ -38,6 +38,7 @@ func _ready() -> void:
 	_load_settings()
 	if Engine.has_singleton("HeroesUpdater"):
 		_android = Engine.get_singleton("HeroesUpdater")
+		_android.connect("install_failed", _on_install_failed)
 	_http = HTTPRequest.new()
 	# Straight to disk for the APK: an 80MB response held in memory as a
 	# PackedByteArray is a needless spike on a phone.
@@ -195,6 +196,15 @@ func install() -> bool:
 		return false
 	_android.call("install_apk", ProjectSettings.globalize_path(TARGET))
 	return true
+
+
+## The installer refused. Without this the player was handed back to a screen
+## still in READY, offering an Install button that would fail again identically
+## and saying nothing about why — and the commonest reason (the update is signed
+## with a different key than the installed app) is not something anyone guesses.
+func _on_install_failed(reason: String) -> void:
+	_enter(State.FAILED, reason)
+	Events.logged.emit(reason, "bad")
 
 
 func can_install() -> bool:
