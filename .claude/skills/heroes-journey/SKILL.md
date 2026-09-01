@@ -56,6 +56,53 @@ weight or calorie tracking. Scaling a movement down always counts. Rewards fall
 off for repeat clears the same day. If a feature would punish someone for being
 ill, it is the wrong feature.
 
+## The Android build
+
+Two targets from one codebase. The web build is `./run.sh`; the native one is
+`./build_android.sh`, which signs, verifies and publishes an APK the installed
+phone can update itself from.
+
+```bash
+npm run bump patch        # package.json is the source of truth
+./build_android.sh        # -> dist/android/, published into releases/
+```
+
+The version code is **derived**, never authored (`major*10000 + minor*100 +
+patch`), so the name and the code cannot drift — they already had once.
+
+Three Godot Android plugins live in `android/plugins/`, all v2, all Kotlin, all
+built the same way:
+
+| Plugin | Gives GDScript |
+|---|---|
+| `HeroesSteps` | the hardware step counter, which runs while the app is closed |
+| `HeroesUpdater` | hands a downloaded APK to the system package installer |
+| `HeroesNotify` | local alarms, since a native build has no service worker |
+
+Each needs `plugins/<Name>=true` in `[preset.2.options]` or it is discovered and
+then silently skipped. The `.gdap` must sit at `android/plugins/<Name>.gdap` —
+Godot scans that directory **non-recursively and skips subdirectories**, so a
+`.gdap` inside the plugin's own folder is never found.
+
+**Android traps, all of which fail on the phone rather than in the build:**
+
+- Godot's engine AAR already declares a `<provider>` named
+  `androidx.core.content.FileProvider`. AGP's manifest merger matches components
+  by **class name, not attribute**, so a second one fails the merge whatever its
+  authority — and reusing the authority instead is
+  `INSTALL_FAILED_CONFLICTING_PROVIDER`, an app that will not install at all.
+  Subclass to get a distinct name.
+- `user://` on Android is `getFilesDir()`, so a FileProvider entry is
+  `<files-path>`. A wrong path type throws at runtime, not at build.
+- Godot signs **v2 only**. There is no v3, so there is no key rotation: the
+  release key is permanent and lives outside the repo, because `git clean -xfd`
+  deletes gitignored files.
+- Do not reach for exact alarms. `SCHEDULE_EXACT_ALARM` is restricted on API
+  31+; `setAndAllowWhileIdle` is permission-free and still Doze-exempt.
+- A permission dialog dismissed without an answer returns **empty** permissions
+  and grantResults arrays, so a by-name lookup finds nothing and a naive
+  implementation never emits its result signal at all.
+
 ## Traps this project has already hit
 
 **Input fires twice.** `pointing/emulate_touch_from_mouse=true` means one press

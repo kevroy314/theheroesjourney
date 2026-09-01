@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- API 33+ made posting a notification a runtime permission. It does not exist
+         below 33 and is harmless there (the platform ignores unknown permissions in the
+         manifest). Declared here rather than only in export_presets.cfg because it is
+         meaningless without this plugin, and because the preset is hand-edited often
+         enough that a self-contained AAR is the safer home. Same reasoning as
+         ACTIVITY_RECOGNITION in HeroesSteps.
+
+         Note what is deliberately absent: SCHEDULE_EXACT_ALARM and USE_EXACT_ALARM.
+         Reminders here are hours out, so an inexact alarm is correct, and asking for
+         the exact-alarm permission on API 31+ costs a Settings round trip and a Play
+         policy declaration for nothing. See HeroesNotifyAlarms.arm(). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Alarms are wiped by a reboot. This lets HeroesNotifyBootReceiver re-arm the
+         reminders that are still in the future, so a phone that reboots overnight still
+         nags in the morning without the player having opened the game. Normal
+         protection level: granted at install, nothing to request at runtime. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application>
+
+        <!-- Godot's v2 plugin discovery scans the merged manifest for this prefix at
+             runtime and instantiates the named class. The suffix after the prefix is
+             the singleton name GDScript sees via Engine.get_singleton(). -->
+        <meta-data
+            android:name="org.godotengine.plugin.v2.HeroesNotify"
+            android:value="com.kevinhorecka.heroesjourney.notify.HeroesNotifyPlugin" />
+
+        <!-- Both receivers carry names of their own rather than anything generic.
+             AGP's manifest merger matches components by class name, not by attribute,
+             and this app already merges components from godot-lib.aar and from
+             androidx.profileinstaller. A name collision there is a build failure at
+             best and a broken install at worst. See the updater plugin's FileProvider
+             for the version of this lesson that cost real time.
+
+             exported="false": the only sender is our own AlarmManager PendingIntent,
+             and an exported reminder receiver would let any app on the phone post a
+             fake deadline. There is no intent-filter, so the API 31 rule does not force
+             the attribute either; it is stated to be explicit. -->
+        <receiver
+            android:name="com.kevinhorecka.heroesjourney.notify.HeroesNotifyReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- exported="true" is mandatory here: BOOT_COMPLETED is delivered by the
+             system, from outside the app, and a non-exported receiver would simply
+             never run. The action is protected by the platform, so nothing else can
+             forge it. directBootAware stays false (the default): the reminder store
+             lives in ordinary credential-encrypted SharedPreferences, unreadable until
+             the user unlocks, which is exactly when ACTION_BOOT_COMPLETED arrives. -->
+        <receiver
+            android:name="com.kevinhorecka.heroesjourney.notify.HeroesNotifyBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- Some OEM ROMs use the quickboot variants instead of, or as well as,
+                     BOOT_COMPLETED. -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <!-- Fires after the app is updated in place; the alarms are gone then
+                     for the same reason they are gone after a boot. -->
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

@@ -81,7 +81,11 @@ func build() -> void:
 ## own — a health app that nags is a health app people delete.
 func _notifications(list: VBoxContainer) -> void:
 	var prefs: Dictionary = Meta.notify_prefs
-	var on: bool = bool(prefs.get("enabled", false)) and bool(Notify.status().get("subscribed", false))
+	# On Android there is no subscription to check — reminders are local alarms,
+	# so "on" is the preference plus the OS permission.
+	var on: bool = bool(prefs.get("enabled", false)) and (
+		Notify.granted() if Notify.native()
+		else bool(Notify.status().get("subscribed", false)))
 
 	list.add_child(HJUI.label("REMINDERS", HJUI.FS_SMALL, "muted"))
 	var card := HJUI.panel("panel", "accent_2" if on else "")
@@ -94,12 +98,19 @@ func _notifications(list: VBoxContainer) -> void:
 			HJUI.FS_TINY, "muted"))
 		var turn_on := HJUI.button("Turn on reminders", "primary")
 		turn_on.custom_minimum_size.y = 70
-		turn_on.pressed.connect(func() -> void:
-			Notify.enable()
-			# The browser prompt resolves asynchronously; give it a beat.
-			await get_tree().create_timer(1.2).timeout
-			Notify.sync()
-			refresh())
+		if Notify.native():
+			# The native path has no server to subscribe to and no prompt to wait
+			# on — Android answers on a signal, which rebuilds this screen.
+			turn_on.pressed.connect(func() -> void:
+				Notify.enable()
+				Notify.ask_permission())
+		else:
+			turn_on.pressed.connect(func() -> void:
+				Notify.enable()
+				# The browser prompt resolves asynchronously; give it a beat.
+				await get_tree().create_timer(1.2).timeout
+				Notify.sync()
+				refresh())
 		v.add_child(turn_on)
 	else:
 		v.add_child(_toggle("Deadline warnings", "deadline", prefs))

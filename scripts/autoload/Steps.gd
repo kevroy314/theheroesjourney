@@ -121,12 +121,41 @@ func ask_permission() -> void:
 
 
 func _on_permission(granted: bool) -> void:
+	_apply_permission(granted, true)
+
+
+## The permission state changed, or was found to have changed.
+##
+## `budget_changed` alone was not enough: it only refreshes the step chip, so
+## the "Allow step counting" button stayed on screen after the player had
+## granted it and there was nothing to say it had worked. `meta_changed` is the
+## signal screens rebuild on, which is what actually makes the button go.
+func _apply_permission(granted: bool, announce: bool) -> void:
+	if granted == _permission:
+		return
 	_permission = granted
 	if granted:
 		_android.call("start")
+		if source == "permission refused":
+			source = "step counter"
+		if announce:
+			Events.logged.emit("Step counting is on. Every step is somewhere to go.", "good")
 	else:
 		source = "permission refused"
+		if announce:
+			Events.logged.emit("Without this, the world stays where it is.", "warn")
+	Events.meta_changed.emit()
 	budget_changed.emit()
+
+
+## Android does not always deliver the dialog's result — and the player can grant
+## the permission from system settings, where there is no callback at all. So the
+## truth is re-read every time the app comes back to the foreground rather than
+## trusted from one callback that may never arrive.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_APPLICATION_RESUMED or _android == null:
+		return
+	_apply_permission(bool(_android.call("has_permission")), true)
 
 
 func _process(delta: float) -> void:
