@@ -45,6 +45,15 @@ func build() -> void:
 		begin.pressed.connect(func(): Game.start_run())
 		v.add_child(begin)
 
+	# Settings have to be reachable from a cold start. The Hearth is a Mind Palace
+	# room you buy for 40 Resolve, and app-level concerns — updates, reminders,
+	# the theme — cannot sit behind an in-game purchase: a player who has not
+	# bought a room still has to be able to update the app they are running.
+	var settings := HJUI.button("Settings & updates", "ghost")
+	settings.custom_minimum_size.y = 74
+	settings.pressed.connect(func(): Game.goto("hearth"))
+	v.add_child(settings)
+
 	var camp := HJUI.button("The Mind Palace", "ghost")
 	camp.pressed.connect(func(): Game.goto("palace"))
 	v.add_child(camp)

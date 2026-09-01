@@ -6,6 +6,9 @@ const RUN_PATH := "user://heroes_run.json"
 
 var run: HJRun = null
 var screen: String = "title"
+## The screen before this one, so a screen reachable from two places can send
+## the player back where they actually came from.
+var previous_screen: String = "title"
 var summary: Dictionary = {}
 var event: Dictionary = {}     ## popup currently on the event screen
 var rng := RandomNumberGenerator.new()
@@ -22,6 +25,8 @@ func boot() -> void:
 
 
 func goto(screen_name: String) -> void:
+	if screen_name != screen:
+		previous_screen = screen
 	screen = screen_name
 	Events.screen_changed.emit(screen_name)
 
