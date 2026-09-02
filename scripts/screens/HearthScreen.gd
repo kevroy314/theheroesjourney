@@ -9,12 +9,15 @@ func register() -> String:
 
 ## Remembered on entry: Game.screen has already moved on by the time build()
 ## runs, so the previous screen has to be captured before that.
-var _from_palace := true
+var _whence := "palace"
 
 
 func _enter_tree() -> void:
 	super._enter_tree()
-	_from_palace = Game.previous_screen != "title"
+	# Reachable from the title, the Palace and mid-run from the area screen, so
+	# Back has to return to whichever it actually was.
+	if Game.previous_screen in ["title", "area", "palace"]:
+		_whence = Game.previous_screen
 	# The update card is a state machine — checking, downloading, ready — and it
 	# has to redraw as that state moves without the player touching anything.
 	Updater.state_changed.connect(refresh)
@@ -30,7 +33,7 @@ func build() -> void:
 	var v := page(12)
 	# Reachable from the title as well as from the Palace, so Back has to go
 	# where the player actually came from.
-	var whence := "palace" if _from_palace else "title"
+	var whence := _whence
 	v.add_child(HJUI.header("The Hearth", "How the world looks, and when the clock runs",
 		func(): Game.goto(whence)))
 

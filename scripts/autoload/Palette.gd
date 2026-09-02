@@ -73,9 +73,9 @@ func word(key: String, fallback: String = "") -> String:
 ## lands on whole pixels. Body text deliberately keeps the system font: a habit
 ## app is mostly prose, and prose in a pixel face at 22px is a legibility tax
 ## nobody agreed to pay.
-var _display_font: FontFile = null
+var _display_font: Font = null
 
-func display_font() -> FontFile:
+func display_font() -> Font:
 	if _display_font != null:
 		return _display_font
 	var path := String(data.get("font_display", ""))
@@ -84,11 +84,40 @@ func display_font() -> FontFile:
 	var f: Variant = load(path)
 	if not (f is FontFile):
 		return null
-	_display_font = f
-	_display_font.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	_display_font.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
-	_display_font.hinting = TextServer.HINTING_NONE
+	var base: FontFile = f
+	base.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+	base.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	base.hinting = TextServer.HINTING_NONE
+
+	# Ligatures off, and this is not a nicety.
+	#
+	# Pixelify Sans ships a `liga` feature with an `fi` glyph, and Godot enables
+	# ligatures by default. At button size that glyph reads as a capital A, so
+	# the most important control in the game — the one you hold down to log a rep
+	# — has been rendering as "Hold to conArm". It also hit "ReAnery" and
+	# "ConArm unlocks in 38s".
+	#
+	# A ligature is a typographic nicety for continuous prose. In a pixel face at
+	# 25px it is a defect, so every optional substitution is turned off rather
+	# than just the one we happened to catch.
+	var styled := FontVariation.new()
+	styled.base_font = base
+	styled.opentype_features = {
+		_tag("liga"): 0, _tag("dlig"): 0, _tag("clig"): 0, _tag("calt"): 0,
+	}
+	_display_font = styled
 	return _display_font
+
+
+## An OpenType feature tag is its four characters packed big-endian into an int.
+## TextServer.name_to_tag does this, but it is an instance method on the text
+## server rather than a static, and reaching the primary interface from an
+## autoload to pack four bytes is more machinery than the four bytes deserve.
+static func _tag(name: String) -> int:
+	var packed := 0
+	for i in range(4):
+		packed = (packed << 8) | name.unicode_at(i)
+	return packed
 
 
 func glyph(key: String) -> String:
