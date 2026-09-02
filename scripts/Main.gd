@@ -5,6 +5,7 @@ extends Control
 
 const SCREENS := {
 	"title": preload("res://scripts/screens/TitleScreen.gd"),
+	"menu": preload("res://scripts/screens/MenuScreen.gd"),
 	"palace": preload("res://scripts/screens/MindPalaceScreen.gd"),
 	"gym": preload("res://scripts/screens/GymScreen.gd"),
 	"workshop": preload("res://scripts/screens/WorkshopScreen.gd"),
@@ -195,4 +196,5 @@ func _go_back() -> void:
 		"inventory": Game.goto("area") if Game.has_active_run() else Game.goto("palace")
 		"overworld": Game.goto("worldmap")
 		"worldmap": Game.goto("area")
+		"menu": Game.goto("title")
 		"task": Game.skip_task()

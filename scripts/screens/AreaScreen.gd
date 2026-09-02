@@ -84,11 +84,11 @@ func build() -> void:
 	# exactly the situation a player is in when they most need it, and until now
 	# a live run sealed it off. area/journey/bag/overworld/worldmap was a closed
 	# set whose only exit was Abandon.
-	var settings := HJUI.button("Settings", "ghost")
-	settings.custom_minimum_size.y = 70
-	settings.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	settings.pressed.connect(func(): Game.goto("hearth"))
-	actions.add_child(settings)
+	var menu := HJUI.button("Menu", "ghost")
+	menu.custom_minimum_size.y = 70
+	menu.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	menu.pressed.connect(func(): Game.goto("menu"))
+	actions.add_child(menu)
 
 	var bag := HJUI.button("Bag", "ghost")
 	bag.custom_minimum_size.y = 70
