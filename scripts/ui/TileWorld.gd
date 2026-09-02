@@ -9,6 +9,7 @@ extends Control
 ## interactive except the character.
 
 signal node_entered(id: String)
+signal anomaly_entered(cell: Vector2i)
 signal moved(cell: Vector2i)
 signal blocked                      ## tried to move with nothing left to spend
 
@@ -100,6 +101,8 @@ func _process(delta: float) -> void:
 		_moving = false
 		_from = _cell
 		moved.emit(_cell)
+		if not world.anomaly_at(_cell).is_empty():
+			anomaly_entered.emit(_cell)
 		var arrived := here()
 		if arrived != "":
 			node_entered.emit(arrived)

@@ -98,6 +98,11 @@ func load_world() -> void:
 	props = _plane(parsed, "props_b64_deflate")
 	blocked = _plane(parsed, "blocked_b64_deflate")
 	cliffs = _plane(parsed, "cliffs_b64_deflate")
+	anomalies = parsed.get("anomalies", [])
+	_anomaly_at.clear()
+	for a in anomalies:
+		var entry: Dictionary = a
+		_anomaly_at[Vector2i(int(entry.get("x", 0)), int(entry.get("y", 0)))] = entry
 	var s: Dictionary = parsed.get("spawn", {})
 	spawn = Vector2i(int(s.get("x", 0)), int(s.get("y", 0)))
 	_load_solid()
@@ -179,6 +184,15 @@ func walkable(x: int, y: int) -> bool:
 	if i >= 0 and i < blocked.size() and blocked[i] != 0:
 		return false
 	return not solid.has(at(x, y))
+
+
+## Every anomaly in the world, and the one on a given cell.
+var anomalies: Array = []
+var _anomaly_at: Dictionary = {}
+
+
+func anomaly_at(cell: Vector2i) -> Dictionary:
+	return _anomaly_at.get(cell, {})
 
 
 func anchor(area_id: String) -> Vector2i:

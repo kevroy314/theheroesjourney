@@ -21,6 +21,9 @@ var upgrades: Array = []
 var achievements: Dictionary = {}
 var spite: Dictionary = {}
 var rooms: Array = []
+## Anomaly templates, the roguelite content. Keyed by nothing — picked by tier
+## and weight at the moment you step into one.
+var anomalies: Array = []
 var palace: Dictionary = {}
 var config: Dictionary = {}
 
@@ -83,6 +86,8 @@ func load_all() -> void:
 			spite = doc["spite"]
 		if doc.has("rooms"):
 			rooms.append_array(doc["rooms"])
+		if doc.has("anomalies"):
+			anomalies.append_array(doc["anomalies"])
 		if doc.has("palace"):
 			palace.merge(doc["palace"], true)
 		if doc.has("axes"):
@@ -222,3 +227,34 @@ static func list_json(dir_path: String) -> Array:
 			out.append(entry)
 	out.sort()
 	return out
+
+
+## An anomaly template for a ring.
+##
+## Near town the distribution is narrow and easy; further out it widens as well
+## as hardens, because the owner's brief was that anomalies close to town are
+## "more predictable" — so variance is part of the difficulty, not just the mean.
+## A tier with no templates of its own borrows from the nearest band below it
+## rather than failing, so adding a tier to the world cannot strand a spawn.
+func anomaly_for(tier: int, rng: RandomNumberGenerator) -> Dictionary:
+	var spread := 0 if tier <= 1 else (1 if tier == 2 else 2)
+	var pool: Array = []
+	var total := 0
+	for entry in anomalies:
+		var t := int(entry.get("tier", 0))
+		if t > tier or t < tier - spread:
+			continue
+		var weight := maxi(1, int(entry.get("weight", 1)))
+		# Nearer the player's tier is likelier, so the spread widens the tail
+		# rather than flattening the whole distribution.
+		weight *= maxi(1, 3 - (tier - t))
+		pool.append({"entry": entry, "weight": weight})
+		total += weight
+	if pool.is_empty():
+		return anomalies[0] if anomalies.size() > 0 else {}
+	var roll := rng.randi_range(0, total - 1)
+	for option in pool:
+		roll -= int(option["weight"])
+		if roll < 0:
+			return option["entry"]
+	return pool[pool.size() - 1]["entry"]

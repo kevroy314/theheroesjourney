@@ -51,7 +51,9 @@ func resync_screen(from_screen: String = "") -> void:
 	elif run.pending_node != "":
 		goto("task")
 	elif run.area.is_empty():
-		goto("journey")
+		# No area means you are out in the world between anomalies, which is a
+		# place, not a gap. The Journey is somewhere you choose to go.
+		goto("overworld")
 	else:
 		goto("area")
 
@@ -237,7 +239,12 @@ func tap_node(id: String) -> void:
 			_warden(id)
 		"threshold":
 			_finish_node(id)
-			clear_area()
+			# Inside an anomaly the threshold is the way out of *it*, not the way
+			# on to the next chapter.
+			if not run.anomaly.is_empty():
+				leave_anomaly(true)
+			else:
+				clear_area()
 	changed()
 
 
@@ -595,7 +602,10 @@ func force_advance() -> void:
 		var node_id := String(id)
 		if String(run.node(node_id).get("type", "")) == "threshold" and not run.is_done(node_id):
 			_finish_node(node_id)
-			clear_area()
+			if not run.anomaly.is_empty():
+				leave_anomaly(true)
+			else:
+				clear_area()
 			return
 	clear_area()
 
@@ -808,3 +818,87 @@ func clear_saved_run() -> void:
 			if f != null:
 				f.store_string("{}")
 				f.close()
+
+
+# --- anomalies -----------------------------------------------------------------
+
+## Step into one.
+##
+## The chapter graph used to be the content of a *region*; it is now the content
+## of an anomaly. Same generator, same node schema, same screens — what changes
+## is that you chose this one by walking to it, and how hard it is was decided
+## by how far from town you were willing to go.
+func enter_anomaly(cell: Vector2i) -> void:
+	if not has_active_run() or check_deadline():
+		return
+	var spawn := HJWorld.shared().anomaly_at(cell)
+	if spawn.is_empty() or run.anomalies_cleared.has(_cell_key(cell)):
+		return
+
+	var tier := int(spawn.get("tier", 0))
+	rng.seed = run.seed ^ (cell.x * 73856093) ^ (cell.y * 19349663)
+	var template := Content.anomaly_for(tier, rng)
+	if template.is_empty():
+		push_error("Game: no anomaly template for tier %d" % tier)
+		return
+
+	run.anomaly = {"x": cell.x, "y": cell.y, "tier": tier,
+		"sector": String(spawn.get("sector", ""))}
+	run.completed = []
+	run.locked = []
+	run.revealed = false
+	run.chosen_movement = ""
+	run.pending_node = ""
+	run.pending_boons = []
+	run.area = HJAreaGen.build(template, rng, run.ctx())
+
+	# Every anomaly resets the clock. That is what they are *for*: the loop does
+	# not close while you keep finding them, so the pressure is on finding one
+	# rather than on any single deadline.
+	var hours := 24.0 + Rules.value("area.deadline_bonus_hours", run.ctx(), 0.0)
+	run.deadline_unix = HJClock.now() + HJClock.hours_to_seconds(maxf(1.0, hours))
+
+	Notify.sync()
+	apply_effects(Rules.hook("on_area_enter", run.ctx()))
+	changed()
+	goto("area")
+
+
+## Walk back out, finished or not.
+##
+## Leaving early is allowed and is not a failure state — it is priced. Every
+## tile of walking costs more until the next anomaly you actually finish, so
+## what a half-done anomaly takes from you is *reach*. Since difficulty is a
+## function of how far you can get, that is the whole difficulty curve, and it
+## needs no tuning knob: burn fast and the mountain is simply out of range.
+func leave_anomaly(finished: bool = false) -> void:
+	if not has_active_run() or run.anomaly.is_empty():
+		return
+	var total := int(run.area.get("order", []).size())
+	var done := int(run.completed.size())
+	var share := 1.0 if total <= 0 else clampf(float(done) / float(total), 0.0, 1.0)
+
+	# Reaching the threshold *is* a full clear, whatever the share says. Optional
+	# side nodes are counted in the total, so a player who walked the whole chain
+	# and skipped a cache would otherwise be penalised for a clean run — which
+	# would teach exactly the wrong lesson about what "finishing" means.
+	var penalty := float(Rules.value("steps.burn_penalty", run.ctx()))
+	Steps.set_burn(1.0 if finished else 1.0 + penalty * (1.0 - share))
+	if finished or share >= 0.999:
+		run.anomalies_cleared.append(_cell_key(Vector2i(
+			int(run.anomaly.get("x", 0)), int(run.anomaly.get("y", 0)))))
+		say("The anomaly closes. You walk at your own pace again.", "good")
+	elif share <= 0.0:
+		say("You back out. Nothing here is finished.", "warn")
+	else:
+		say("You leave it half-done. Every step costs more now.", "warn")
+
+	run.anomaly = {}
+	run.area = {}
+	run.completed = []
+	changed()
+	goto("overworld")
+
+
+static func _cell_key(cell: Vector2i) -> String:
+	return "%d,%d" % [cell.x, cell.y]

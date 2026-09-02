@@ -74,6 +74,7 @@ static func run_all(host: Node) -> int:
 	_streak_checks(failures)
 	_wheel_checks(failures)
 	_palace_checks(failures)
+	await _anomaly_checks(host, failures)
 	await _screen_checks(host, failures)
 
 	_restore(saved_meta)
@@ -515,6 +516,88 @@ static func _screen_checks(host: Node, failures: Array) -> void:
 	_check(failures, "every screen builds mid-run", Game.run != null, "")
 	Game.abandon_run()
 	Game.goto("title")
+	await host.get_tree().process_frame
+
+
+## Anomalies: the roguelite loop. Walking to one is the player's problem; this
+## checks that entering, finishing and walking out do what they claim, because
+## the burn multiplier is the difficulty curve and a silent failure there would
+## make the game either trivial or unplayable with nothing on screen to say so.
+static func _anomaly_checks(host: Node, failures: Array) -> void:
+	var world := HJWorld.shared()
+	_check(failures, "the world carries anomalies", world.anomalies.size() > 0,
+		"%d" % world.anomalies.size())
+	if world.anomalies.is_empty():
+		return
+
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(24680)
+	Steps.grant(5000)
+
+	# Every tier the world actually spawns must have a template, or a player who
+	# walks that far finds a hole where the content should be.
+	var tiers: Dictionary = {}
+	for a in world.anomalies:
+		tiers[int((a as Dictionary).get("tier", 0))] = true
+	for tier in tiers:
+		var template := Content.anomaly_for(int(tier), Game.rng)
+		_check(failures, "tier %d has an anomaly template" % tier,
+			not template.is_empty() and template.has("nodes"), "")
+
+	var first: Dictionary = world.anomalies[0]
+	var cell := Vector2i(int(first.get("x", 0)), int(first.get("y", 0)))
+
+	Steps.set_burn(1.0)
+	Game.enter_anomaly(cell)
+	await host.get_tree().process_frame
+	_check(failures, "stepping into an anomaly builds an area",
+		not Game.run.anomaly.is_empty() and not Game.run.area.is_empty(),
+		"screen=%s" % Game.screen)
+	var deadline := Game.run.deadline_unix
+
+	# Walk out having done nothing: the maximum penalty, and not a lost run.
+	Game.leave_anomaly(false)
+	await host.get_tree().process_frame
+	_check(failures, "leaving an anomaly early costs step burn, not the run",
+		Steps.burn > 1.0 and Game.has_active_run(), "burn=%.2f" % Steps.burn)
+	_check(failures, "an anomaly resets the deadline",
+		deadline > HJClock.now(), "")
+
+	# Now clear one properly and the penalty must lift.
+	Game.enter_anomaly(cell)
+	await host.get_tree().process_frame
+	var guard := 0
+	while Game.has_active_run() and not Game.run.anomaly.is_empty() and guard < 200:
+		guard += 1
+		if guard % 8 == 0:
+			await host.get_tree().process_frame
+		match Game.screen:
+			"area":
+				var available := HJAreaGen.available_ids(Game.run)
+				if available.is_empty():
+					break
+				Game.tap_node(String(available[0]))
+			"task":
+				var options := Game.movement_options(Game.run.node(Game.run.pending_node))
+				if options.is_empty():
+					Game.skip_task()
+				else:
+					Game.complete_task(String(options[0].get("id", "")), false)
+			"event": Game.dismiss_event()
+			"boon": Game.take_boon(String(Game.run.pending_boons[0]))
+			_: break
+	var stopped := Game.screen
+	_check(failures, "the anomaly loop reaches its threshold",
+		Game.run == null or Game.run.anomaly.is_empty(),
+		"stopped on %s after %d actions" % [stopped, guard])
+	_check(failures, "clearing an anomaly fully clears the burn",
+		is_equal_approx(Steps.burn, 1.0), "burn=%.2f after %d actions" % [Steps.burn, guard])
+	_check(failures, "a cleared anomaly is not offered again",
+		Game.run != null and Game.run.anomalies_cleared.size() > 0, "")
+
+	Game.abandon_run()
+	Steps.set_burn(1.0)
 	await host.get_tree().process_frame
 
 

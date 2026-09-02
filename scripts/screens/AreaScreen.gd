@@ -92,8 +92,16 @@ func build() -> void:
 	bag.pressed.connect(func(): Game.goto("inventory"))
 	actions.add_child(bag)
 
-	var give_up := HJUI.danger("Abandon", "Lose this loop",
-		func() -> void: Game.abandon_run())
+	# Inside an anomaly, leaving is a priced choice rather than the end of the
+	# run: you keep what you did, and every tile costs more until you finish one
+	# properly. Outside one, the only exit is still the loop itself.
+	var give_up: Button
+	if Game.has_active_run() and not run.anomaly.is_empty():
+		give_up = HJUI.danger("Walk out", "Leave it half-done",
+			func() -> void: Game.leave_anomaly(false))
+	else:
+		give_up = HJUI.danger("Abandon", "Lose this loop",
+			func() -> void: Game.abandon_run())
 	give_up.custom_minimum_size.y = 70
 	give_up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions.add_child(give_up)
