@@ -79,6 +79,20 @@ var spent: int = 0           ## in-game steps used walking the map
 var granted: int = 0         ## steps handed out by activities and the debug cheat
 var multiplier: float = 1.0  ## activities raise this; one real step buys more
 
+## How many steps of budget one tile of walking costs.
+##
+## This is the price of doing an anomaly badly, and it is deliberately not a
+## failure state. Clear one fully and you walk at 1:1. Walk out half-done and
+## every tile costs more, so what you lose is *reach* — and since difficulty is
+## a function of how far from town you can get, the map becomes the difficulty
+## selector. Burn fast and you are stuck near town doing easy anomalies until
+## you clear one properly.
+##
+## Fractional, accumulated rather than rounded per step, or a 1.3x burn would
+## round to 1 every time and cost nothing.
+var burn: float = 1.0
+var _burn_debt: float = 0.0
+
 var source: String = "none"
 var live: bool = false
 
@@ -248,11 +262,26 @@ func budget() -> int:
 
 
 func spend(n: int = 1) -> bool:
-	if budget() < n:
+	_burn_debt += float(n) * burn
+	var whole := int(floor(_burn_debt))
+	if whole <= 0:
+		budget_changed.emit()
+		return true
+	if budget() < whole:
+		# Refuse the whole move rather than half-charging for it: a step you were
+		# not allowed to take must not cost anything.
+		_burn_debt -= float(n) * burn
 		return false
-	spent += n
+	_burn_debt -= float(whole)
+	spent += whole
 	budget_changed.emit()
 	return true
+
+
+## Set by finishing — or failing to finish — an anomaly.
+func set_burn(value: float) -> void:
+	burn = clampf(value, 1.0, 4.0)
+	budget_changed.emit()
 
 
 func grant(n: int) -> void:
@@ -272,6 +301,8 @@ func reset_run() -> void:
 	spent = 0
 	granted = 0
 	multiplier = 1.0
+	burn = 1.0
+	_burn_debt = 0.0
 	budget_changed.emit()
 
 

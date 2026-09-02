@@ -22,7 +22,12 @@ func backdrop_id() -> String:
 
 func build() -> void:
 	var run: HJRun = Game.run
-	if run == null or run.finished or run.area.is_empty():
+	# Deliberately not requiring an area. The overworld is where you are when you
+	# are between anomalies, and an empty area is the normal state out here —
+	# this screen was written when the area *was* the chapter, and the leftover
+	# guard sent a player who had just walked out of an anomaly to the Journey,
+	# which advanced a chapter behind their back.
+	if run == null or run.finished:
 		Game.resync_screen.call_deferred("overworld")
 		return
 
@@ -59,11 +64,24 @@ func build() -> void:
 	_budget = _steps_chip.get_meta("value_label")
 	chips.add_child(_steps_chip)
 	chips.add_child(HJUI.chip(Palette.word("grit"), str(run.grit), "accent", "grit"))
+	# Only shown when it is costing you something. A rate of 1.0 is the absence
+	# of a penalty, and a chip reading "1.0x" every moment of a clean run is
+	# noise that teaches the player to stop reading chips.
+	if Steps.burn > 1.001:
+		chips.add_child(HJUI.chip("Burn", "%.1fx" % Steps.burn, "danger", "deadline"))
 	v.add_child(chips)
 
 	_world = HJTileWorld.new(run, run.world_pos)
 	_world.node_entered.connect(_on_node)
 	_world.blocked.connect(_on_blocked)
+	_world.anomaly_entered.connect(_on_anomaly)
+	# Just walked out of one you finished: play it closing, so the thing you did
+	# has a consequence you can see rather than only a number that stopped
+	# rising.
+	if not run.anomalies_cleared.is_empty() and run.world_pos.x >= 0:
+		var key := Game._cell_key(run.world_pos)
+		if run.anomalies_cleared.has(key):
+			_world.collapse_anomaly(run.world_pos)
 	# The world does not reset when the screen does. Remember where he stopped.
 	_world.moved.connect(func(cell: Vector2i) -> void: run.world_pos = cell)
 	# The map is the screen. Everything else is a strip around it, so the world
@@ -258,6 +276,40 @@ func _set_act(text: String, enabled: bool, id: String) -> void:
 	replacement.size_flags_vertical = Control.SIZE_SHRINK_END
 	if enabled:
 		replacement.pressed.connect(func() -> void: Game.tap_node(id))
+	var parent := _act.get_parent()
+	var index := _act.get_index()
+	parent.remove_child(_act)
+	_act.queue_free()
+	_act = replacement
+	parent.add_child(_act)
+	parent.move_child(_act, index)
+
+
+## Stepped onto one.
+##
+## Entering is not automatic. The anomaly resets the deadline and prices the
+## walk out, so walking over one by accident on the way somewhere else would be
+## a decision made for the player.
+func _on_anomaly(cell: Vector2i) -> void:
+	var spawn := HJWorld.shared().anomaly_at(cell)
+	if spawn.is_empty():
+		return
+	var run: HJRun = Game.run
+	if run != null and run.anomalies_cleared.has(Game._cell_key(cell)):
+		return
+	var tier := int(spawn.get("tier", 0))
+	_set_anomaly_act(tier, cell)
+
+
+func _set_anomaly_act(tier: int, cell: Vector2i) -> void:
+	if _act == null or not is_instance_valid(_act):
+		return
+	var names := ["a stall", "an eddy", "a seam", "a hollow", "a wound"]
+	var label := "Step into %s" % names[clampi(tier, 0, names.size() - 1)]
+	var replacement := HJUI.button(label, "primary")
+	replacement.custom_minimum_size.y = 84
+	replacement.size_flags_vertical = Control.SIZE_SHRINK_END
+	replacement.pressed.connect(func() -> void: Game.enter_anomaly(cell))
 	var parent := _act.get_parent()
 	var index := _act.get_index()
 	parent.remove_child(_act)

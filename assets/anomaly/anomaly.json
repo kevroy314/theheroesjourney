@@ -1,0 +1,32 @@
+{
+  "_comment": "Written by tools/make_anomaly.py. Read that file before changing anything here; these are its constants, not a second copy of them.",
+  "cell": 72,
+  "frames": 24,
+  "fps": 12,
+  "collapse_frames": 16,
+  "tiers": 5,
+  "anchor": "centre",
+  "loop": "anomaly.png",
+  "collapse": "anomaly_collapse.png",
+  "tier_hue": [
+    "#8FBFD8",
+    "#8582D8",
+    "#BC76D8",
+    "#D969AC",
+    "#D9675C"
+  ],
+  "mouth_px": [
+    17,
+    20,
+    23,
+    26,
+    29
+  ],
+  "stain_px": [
+    29,
+    35,
+    41,
+    46,
+    52
+  ]
+}

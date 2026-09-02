@@ -41,6 +41,8 @@ var pending_event: Dictionary = {}   ## spite / mirror / echo popup
 
 # --- bookkeeping ---
 var world_pos := Vector2i(-1, -1)    ## where you are standing; -1 means "not yet"
+var anomaly: Dictionary = {}         ## the one you are inside, {} when in the world
+var anomalies_cleared: Array = []    ## world cells resolved this run, as "x,y"
 var axis_tasks: Dictionary = {}      ## axis -> count, this run
 var finished: bool = false
 var outcome: String = ""             ## "" | "cleared" | "loop" | "abandoned"
@@ -92,6 +94,7 @@ func to_dict() -> Dictionary:
 		"pending_started": pending_started, "pending_movement": pending_movement,
 		"axis_tasks": axis_tasks, "finished": finished, "outcome": outcome,
 		"world_x": world_pos.x, "world_y": world_pos.y,
+		"anomaly": anomaly, "anomalies_cleared": anomalies_cleared,
 	}
 
 
@@ -110,6 +113,8 @@ static func from_dict(d: Dictionary) -> HJRun:
 	r.deadline_unix = int(d.get("deadline_unix", 0))
 	r.grit = int(d.get("grit", 0))
 	r.world_pos = Vector2i(int(d.get("world_x", -1)), int(d.get("world_y", -1)))
+	r.anomaly = d.get("anomaly", {})
+	r.anomalies_cleared = d.get("anomalies_cleared", [])
 	r.trinkets = d.get("trinkets", [])
 	r.echoes = d.get("echoes", [])
 	r.tags = d.get("tags", [])

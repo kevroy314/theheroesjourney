@@ -9,6 +9,7 @@ extends Control
 ## interactive except the character.
 
 signal node_entered(id: String)
+signal anomaly_entered(cell: Vector2i)
 signal moved(cell: Vector2i)
 signal blocked                      ## tried to move with nothing left to spend
 
@@ -27,6 +28,10 @@ const STEP_TIME := 0.17             ## seconds to cross one tile
 ## Column order of the walk cycle. Neutral sits between the two steps on
 ## purpose: 0,1,2 gives a limp, because there is no neutral to pass through.
 const CYCLE := [1, 0, 2, 0]
+
+## Preloaded rather than given a class_name: the art ships beside its own
+## helper, and nothing outside this renderer has any use for it.
+const AnomalyArt := preload("res://assets/anomaly/AnomalyArt.gd")
 
 const FACINGS := {
 	Vector2i.DOWN: 0, Vector2i.UP: 1, Vector2i.LEFT: 2, Vector2i.RIGHT: 3,
@@ -49,6 +54,7 @@ var _moving := false
 var _t := 0.0                        ## progress across the current tile, 0..1
 var _cycle := 0                      ## which entry of CYCLE this step is using
 var _held := Vector2i.ZERO           ## direction the player is holding
+var _anomalies := AnomalyArt.new()
 
 
 func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
@@ -60,6 +66,13 @@ func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
 	_cell = start if start.x >= 0 else world.spawn
 	_cell = world.nearest_walkable(_cell)
 	_from = _cell
+	# An anomaly this run has already resolved is gone, not dormant. Seeded from
+	# the run rather than tracked here, because the fact belongs to the run and
+	# only the animation belongs to the renderer.
+	for key in run_ref.anomalies_cleared:
+		var parts := String(key).split(",")
+		if parts.size() == 2:
+			_cleared[Vector2i(int(parts[0]), int(parts[1]))] = true
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clip_contents = true
@@ -100,11 +113,14 @@ func _process(delta: float) -> void:
 		_moving = false
 		_from = _cell
 		moved.emit(_cell)
+		if not world.anomaly_at(_cell).is_empty():
+			anomaly_entered.emit(_cell)
 		var arrived := here()
 		if arrived != "":
 			node_entered.emit(arrived)
 	if _held != Vector2i.ZERO:
 		_try_move(_held)
+	_anomalies.advance(delta)
 	queue_redraw()
 
 
@@ -323,6 +339,15 @@ const PROP_COLS := 8
 ##
 ## One row of overscan at each end, because a prop anchored a row below the
 ## viewport still has 64 pixels of itself inside it.
+## Anomalies this run has already resolved. They collapse once and then stop
+## being drawn at all; the run owns the fact, this owns the animation.
+var _cleared: Dictionary = {}
+
+
+func collapse_anomaly(cell: Vector2i) -> void:
+	_anomalies.collapse(cell)
+
+
 func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 	if _props == null:
 		return
@@ -333,6 +358,16 @@ func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 			_draw_character(cam)
 			drawn_character = true
 		for x in range(maxi(0, first.x - 1), mini(world.w, last.x + 2)):
+			# Drawn from inside the Y-sorted row loop rather than as a child node,
+			# which is the whole reason this is a sprite strip and not a shader: a
+			# Control's children draw after the parent's entire _draw, so a shaded
+			# quad would either hide under the ground or paint over the character's
+			# legs. Here a tear on his row is behind him and one to his south is in
+			# front, which is what a hole in the ground has to do.
+			var tier := world.anomaly_tier(x, y)
+			if tier >= 0 and not _cleared.has(Vector2i(x, y)):
+				_anomalies.draw_at(self, Vector2i(x, y), tier, cam, TILE, ZOOM)
+
 			var plane := world.prop_at(x, y)
 			if plane == 0:
 				continue
