@@ -27,6 +27,14 @@ const T_DOOR := 5
 ## with it; make_tiles.py publishes the truth and this reads it.
 var solid: Dictionary = {}
 
+## Draw order for the overlay stack, from the manifest. A material only bleeds
+## onto ones *below* it, so water laps over sand and the road lies over
+## everything — the rank is what decides which of two neighbours does the
+## intruding, and without it every boundary would be drawn twice.
+var rank: Dictionary = {}          ## tile id -> rank, 0 = lowest
+var overlay_slot: Dictionary = {}  ## tile id -> row block in overlays.png
+var variant_count := 0
+
 var w: int = 0
 var h: int = 0
 var tiles: PackedByteArray = PackedByteArray()
@@ -92,6 +100,22 @@ func _load_solid() -> void:
 		return
 	for id in parsed.get("solid_ids", []):
 		solid[int(id)] = true
+
+	var order: Array = parsed.get("order", [])
+	var index: Dictionary = {}
+	for i in range(order.size()):
+		index[String(order[i])] = i
+	var precedence: Array = parsed.get("precedence", [])
+	for r in range(precedence.size()):
+		var name := String(precedence[r])
+		if not index.has(name):
+			continue
+		rank[int(index[name])] = r
+		# Rank 0 owns no edge set — nothing is below it to bleed onto — so the
+		# atlas holds ranks 1 and up and the slot is one less than the rank.
+		if r > 0:
+			overlay_slot[int(index[name])] = r - 1
+	variant_count = int(parsed.get("variants", {}).get("count", 0))
 
 
 func at(x: int, y: int) -> int:
