@@ -173,8 +173,7 @@ func end_run(outcome: String) -> void:
 		"cleared": cleared,
 		"grit": run.grit,
 		"earned": earned,
-		"chapter": run.chapter,
-		"chapters": Content.chapter_count(),
+		"zone": run.zone,
 		"trinkets": run.trinkets.duplicate(),
 		"echoes": run.echoes.duplicate(),
 		"keep": keep,
@@ -206,7 +205,7 @@ func check_deadline() -> bool:
 
 
 func tick() -> void:
-	if has_active_run() and run.expired() and screen in ["area", "task", "journey", "boon", "event"]:
+	if has_active_run() and run.expired() and screen in ["area", "task", "worldmap", "boon", "event", "overworld"]:
 		check_deadline()
 
 
@@ -589,18 +588,6 @@ func clear_area() -> void:
 		"text": "%s\n\n%s" % [next_chapter.get("blurb", ""), next_chapter.get("scene", "")],
 		"footer": "%s — due %s" % [next_chapter.get("name", ""), HJClock.format_deadline(run.deadline_unix)],
 	})
-
-
-func continue_journey() -> void:
-	if not has_active_run():
-		return
-	# The journey map is a view, not a gate: it either returns you to the area
-	# you are in or opens the one you have not started.
-	var chapter := Content.chapter(run.chapter)
-	if run.area.get("id", "") == chapter.get("area", ""):
-		goto("area")
-	else:
-		enter_chapter(run.chapter)
 
 
 ## Last-resort way out of an area that has somehow run dry.

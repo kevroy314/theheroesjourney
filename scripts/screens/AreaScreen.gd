@@ -14,6 +14,18 @@ func backdrop_id() -> String:
 	return run_area_id()
 
 
+## Where you are, in the terms the game now uses: the ring you walked to and the
+## clock you are running against. "Chapter 1 of 8" counted toward a sequence
+## that no longer exists.
+func _subtitle(run: HJRun) -> String:
+	var due := HJClock.format_deadline(run.deadline_unix)
+	if run.anomaly.is_empty():
+		return "due %s" % due
+	var tier := int(run.anomaly.get("tier", 0))
+	var burn := "" if Steps.burn <= 1.001 else "  ·  %.1fx burn" % Steps.burn
+	return "Ring %d  ·  due %s%s" % [tier, due, burn]
+
+
 func build() -> void:
 	var run: HJRun = Game.run
 	if run == null or run.finished or run.area.is_empty():
@@ -24,7 +36,7 @@ func build() -> void:
 	var v := page(12)
 
 	_header = HJUI.run_header(String(run.area.get("name", "Area")),
-		"Chapter %d of %d — due %s" % [run.chapter, Content.chapter_count(), HJClock.format_deadline(run.deadline_unix)])
+		_subtitle(run))
 	v.add_child(_header)
 
 	var scroll := HJUI.scroll()
@@ -70,10 +82,10 @@ func build() -> void:
 	body.add_child(walk)
 
 	var actions := HJUI.hbox(10)
-	var map := HJUI.button("Journey", "ghost")
+	var map := HJUI.button("Map", "ghost")
 	map.custom_minimum_size.y = 70
 	map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	map.pressed.connect(func(): Game.goto("journey"))
+	map.pressed.connect(func(): Game.goto("worldmap"))
 	actions.add_child(map)
 
 	# The Hearth holds "Pause everything", which exists for injury and illness —

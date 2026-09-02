@@ -43,7 +43,7 @@ func build() -> void:
 
 	var card := HJUI.panel("panel", "accent")
 	var cv := HJUI.vbox(10)
-	cv.add_child(_row("Reached", "Chapter %d of %d" % [int(s.get("chapter", 1)), int(s.get("chapters", 1))], "text"))
+	cv.add_child(_row("Reached", "Ring %d" % int(s.get("zone", 0)), "text"))
 	cv.add_child(_row("%s gathered" % Palette.word("grit"), str(int(s.get("grit", 0))), "accent"))
 	if not cleared:
 		cv.add_child(_row("Kept through the reset", "%d%%" % int(round(float(s.get("keep", 0.0)) * 100.0)), "warn"))

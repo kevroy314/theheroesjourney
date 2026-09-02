@@ -42,7 +42,7 @@ func build() -> void:
 		list.add_child(HJUI.label("THE RUN", HJUI.FS_SMALL, "muted"))
 		list.add_child(_row("Where I am", "The room you are standing in", "area", "task", true, ""))
 		list.add_child(_row("Walk it", "The same place, on foot", "overworld", "move", true, ""))
-		list.add_child(_row("The Journey", "Every chapter, and how far you are", "journey", "threshold", true, ""))
+		list.add_child(_row("The Map", "Where you are, and what is still open", "worldmap", "threshold", true, ""))
 		list.add_child(_row("Bag", "What you are carrying", "inventory", "cache", true, ""))
 
 	list.add_child(HJUI.label("THE MIND PALACE", HJUI.FS_SMALL, "muted"))

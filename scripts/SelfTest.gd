@@ -196,8 +196,6 @@ static func _play_one(host: Node, seed_value: int, failures: Array) -> Dictionar
 				Game.dismiss_event()
 			"boon":
 				Game.take_boon(String(run.pending_boons[0]))
-			"journey":
-				Game.continue_journey()
 			"summary":
 				break
 			_:
@@ -297,7 +295,7 @@ static func _advance_checks(host: Node, failures: Array) -> void:
 			_next_anomaly(Game.run).x >= 0, "world exhausted")
 		# Whatever screen we land on, there must be a way forward from it.
 		_check(failures, "never parked on a dead screen",
-			Game.screen in ["area", "event", "boon", "task", "journey", "overworld"],
+			Game.screen in ["area", "event", "boon", "task", "overworld"],
 			Game.screen)
 	Game.abandon_run()
 
@@ -537,7 +535,7 @@ static func _palace_checks(failures: Array) -> void:
 ## all, and a typo in it would first surface in front of the player.
 static func _screen_checks(host: Node, failures: Array) -> void:
 	var names: Array = ["title", "menu", "palace", "gym", "workshop", "stores", "hearth",
-		"observatory", "codex", "wheel", "inventory", "journey", "area", "overworld", "worldmap",
+		"observatory", "codex", "wheel", "inventory", "area", "overworld", "worldmap",
 		"task", "boon", "event", "summary"]
 
 	Game.run = null

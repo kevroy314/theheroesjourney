@@ -237,7 +237,7 @@ func _god() -> void:
 			var target := String(name)
 			b.pressed.connect(func() -> void:
 				# Some screens need run state to exist at all; make one first.
-				if target in ["area", "task", "boon", "journey"] and not Game.has_active_run():
+				if target in ["area", "task", "boon", "overworld"] and not Game.has_active_run():
 					Game.start_run()
 				Debug.set_open(false)
 				Game.goto(target))

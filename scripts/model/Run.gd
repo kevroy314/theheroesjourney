@@ -3,7 +3,12 @@ extends RefCounted
 ## One attempt at the journey. Unlike the old prototype this is *persisted* —
 ## a run spans real days, so it has to survive the app being closed.
 
-const VERSION := 1
+## Bumped when chapters were retired. from_dict returns null on a mismatch, so a
+## run saved under the old model is dropped rather than resumed into a game that
+## no longer has the shape it assumes — a half-migrated run would put the player
+## in a chapter that cannot advance, with a header counting toward eight of
+## something that no longer exists.
+const VERSION := 2
 
 var seed: int = 0
 var started_unix: int = 0
