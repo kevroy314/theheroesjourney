@@ -46,6 +46,24 @@ func _ready() -> void:
 	add_child(_http)
 
 
+## Coming back from the Android settings screen.
+##
+## Granting this app permission to install packages restarts the process on most
+## Android builds, so the player returns to an Updater that is IDLE with nothing
+## staged — even though the APK they already downloaded is still sitting on
+## disk. Re-checking here puts them straight back at "Install" instead of asking
+## them to find and repeat a download they have already done.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_APPLICATION_RESUMED:
+		return
+	if not configured():
+		return
+	if state == State.CHECKING or state == State.DOWNLOADING:
+		return
+	if FileAccess.file_exists(TARGET) or state == State.IDLE:
+		check()
+
+
 func configured() -> bool:
 	return base_url != "" and OS.has_feature("android")
 
