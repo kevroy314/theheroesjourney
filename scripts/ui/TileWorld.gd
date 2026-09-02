@@ -13,8 +13,14 @@ signal moved(cell: Vector2i)
 signal blocked                      ## tried to move with nothing left to spend
 
 const TILE := 32
-const FRAME_W := 24
-const FRAME_H := 32
+## 32x48 — one tile wide, a tile and a half tall, which is the genre convention
+## and the reason the old 24x32 figure read as a bollard rather than a person.
+## 32 wide is deliberate rather than tight: it makes the horizontal placement
+## offset below exactly zero, so the sprite grid *is* the tile grid, and it
+## leaves room for the baked contact shadow, which the frame clips rather than
+## the tile.
+const FRAME_W := 32
+const FRAME_H := 48
 const ZOOM := 3                     ## the character is ~4mm tall at 1:1 on a phone
 const STEP_TIME := 0.17             ## seconds to cross one tile
 
@@ -352,8 +358,13 @@ func _draw_character(cam: Vector2) -> void:
 	# puts neutral there.
 	var col := int(CYCLE[_cycle]) if _moving else 0
 	var px := _character_px()
-	# The sprite is 24x32 against a 32x32 tile: centre it horizontally and stand
-	# it on the tile's bottom edge, which is where its feet are drawn.
+	# Centred horizontally and standing on the tile's bottom edge, which is where
+	# its feet are drawn. At 32 wide the centring term is zero; it is kept so the
+	# geometry still reads correctly if the frame ever changes width.
+	#
+	# The figure is taller than its tile, so its head overlaps the row above —
+	# exactly like a prop, which is why this is called from inside the Y-sorted
+	# scenery pass rather than after it.
 	var dst := Rect2(
 		(px + Vector2((TILE - FRAME_W) * 0.5, TILE - FRAME_H)) * float(ZOOM) - cam,
 		Vector2(FRAME_W, FRAME_H) * float(ZOOM))
