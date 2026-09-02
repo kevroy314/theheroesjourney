@@ -33,6 +33,8 @@ var node_at: Dictionary = {}         ## Vector2i -> node id, this chapter's beat
 var _tiles: Texture2D
 var _variants: Texture2D
 var _overlays: Texture2D
+var _props: Texture2D
+var _cliffs: Texture2D
 var _player: Texture2D
 var _cell := Vector2i.ZERO           ## the tile the character occupies
 var _from := Vector2i.ZERO           ## where the current move started
@@ -63,6 +65,8 @@ func _ready() -> void:
 	_tiles = load("res://assets/tiles/tileset.png")
 	_variants = load("res://assets/tiles/tileset_var.png")
 	_overlays = load("res://assets/tiles/overlays.png")
+	_props = load("res://assets/tiles/props.png")
+	_cliffs = load("res://assets/tiles/cliffs.png")
 	_player = load("res://assets/sprites/player.png")
 	set_process(true)
 
@@ -148,8 +152,12 @@ func _draw() -> void:
 		for x in range(maxi(0, first.x), mini(world.w, last.x + 1)):
 			_draw_cell(x, y, Rect2(Vector2(x, y) * scale - cam, Vector2(scale, scale)))
 
+	for y in range(maxi(0, first.y), mini(world.h, last.y + 2)):
+		for x in range(maxi(0, first.x), mini(world.w, last.x + 1)):
+			_draw_cliff(x, y, scale, cam)
+
 	_draw_markers(cam, scale)
-	_draw_character(cam)
+	_draw_scenery(cam, first, last)
 
 
 ## Deterministic per cell, so a tile keeps its variant. A cell that reshuffled
@@ -255,6 +263,85 @@ func _draw_markers(cam: Vector2, scale: float) -> void:
 			var pulse := 0.5 + 0.5 * sin(float(Time.get_ticks_msec()) * 0.004)
 			draw_arc(centre, radius + 4.0 + pulse * 4.0, 0.0, TAU, 20,
 				Color(colour.r, colour.g, colour.b, 0.30 * (1.0 - pulse)), 2.0, true)
+
+
+## Index into cliffs.png, which is a 4-wide grid in this order.
+const CLIFF := {
+	"lip_mid": 0, "lip_left": 1, "lip_right": 2, "lip_solo": 3,
+	"face_mid": 7, "face_left": 8, "face_right": 9,
+	"shadow_mid": 12, "shadow_left": 13, "shadow_right": 14, "shadow_solo": 15,
+}
+const CLIFF_COLS := 4
+
+
+## The wall of a terrace, wherever the ground steps down.
+##
+## Three cells deep: a lip on the upper terrace so the edge is not a bare cut, a
+## full face on the cell below it, and a cast shadow under that. Drawn after the
+## terrain and before the props, so a tree standing at the foot of a cliff is in
+## front of it.
+##
+## Which of the three horizontal pieces is used depends on whether the drop
+## continues either side — a face with nothing to its left needs a finished end,
+## or a bluff reads as a slab that was cut off by the tile grid.
+func _draw_cliff(x: int, y: int, scale: float, cam: Vector2) -> void:
+	if _cliffs == null:
+		return
+	var piece := world.cliff_at(x, y)
+	if piece == 0:
+		return
+	var kind: String = ["", "left", "mid", "right"][piece]
+	_blit_cliff(CLIFF["lip_%s" % kind], x, y - 1, scale, cam)
+	_blit_cliff(CLIFF["face_%s" % kind], x, y, scale, cam)
+	_blit_cliff(CLIFF["shadow_%s" % kind], x, y + 1, scale, cam)
+
+
+func _blit_cliff(index: int, x: int, y: int, scale: float, cam: Vector2) -> void:
+	draw_texture_rect_region(_cliffs,
+		Rect2(Vector2(x, y) * scale - cam, Vector2(scale, scale)),
+		Rect2((index % CLIFF_COLS) * TILE, (index / CLIFF_COLS) * TILE, TILE, TILE))
+
+
+const PROP_W := 64
+const PROP_H := 96
+const PROP_COLS := 8
+
+## Props and the character, drawn together in one Y-sorted pass.
+##
+## A prop is 64x96 standing on a 32x32 cell, so it reaches up and out of the
+## cell it belongs to. That means two things the terrain pass does not have to
+## care about: props must be drawn after all the ground, or a neighbour's fill
+## paints over the top of a tree; and they must be drawn in order of the row
+## they stand on, together with the character, or he walks in front of a trunk
+## he should be behind.
+##
+## One row of overscan at each end, because a prop anchored a row below the
+## viewport still has 64 pixels of itself inside it.
+func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
+	if _props == null:
+		return
+	var here := _cell.y
+	var drawn_character := false
+	for y in range(maxi(0, first.y - 1), mini(world.h, last.y + 3)):
+		if not drawn_character and y > here:
+			_draw_character(cam)
+			drawn_character = true
+		for x in range(maxi(0, first.x - 1), mini(world.w, last.x + 2)):
+			var plane := world.prop_at(x, y)
+			if plane == 0:
+				continue
+			var slot := plane - 1
+			# Anchored bottom-centre of the cell: the art grows upward from the
+			# ground the prop is standing on, which is what makes it sit in the
+			# world rather than float on the grid.
+			var origin := Vector2(x * TILE + TILE / 2 - PROP_W / 2,
+				y * TILE + TILE - PROP_H)
+			draw_texture_rect_region(_props,
+				Rect2(origin * float(ZOOM) - cam, Vector2(PROP_W, PROP_H) * float(ZOOM)),
+				Rect2((slot % PROP_COLS) * PROP_W, (slot / PROP_COLS) * PROP_H,
+					PROP_W, PROP_H))
+	if not drawn_character:
+		_draw_character(cam)
 
 
 func _draw_character(cam: Vector2) -> void:
