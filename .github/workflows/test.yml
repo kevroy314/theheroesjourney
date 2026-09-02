@@ -42,7 +42,7 @@ jobs:
         run: GODOT=~/godot/godot ./test.sh
 
   data:
-    name: data files parse
+    name: data files parse and validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,3 +63,16 @@ jobs:
               print("\n".join(bad))
               sys.exit(1)
           PY
+
+      # Parsing only proves the braces match. This checks the content against
+      # data/schema.json: required and unknown keys, every reference resolving,
+      # and the modifier vocabulary -- including whether any Rules.value() call
+      # actually reads each key, which needs the GDScript source and so cannot
+      # be done from inside the game. It needs no engine, so it fails a bad
+      # content edit in seconds rather than after the self-test downloads Godot.
+      #
+      # Warnings are not fatal here: they are the findings whose fix lives
+      # outside data/ (a verb no code implements, a prop on a biome the world
+      # generator never produces). Add --strict to make them fail the build.
+      - name: Validate data against data/schema.json
+        run: python3 tools/validate_data.py

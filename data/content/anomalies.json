@@ -7,7 +7,7 @@
       "outro": "It thins. Whatever it was, it is behind you.",
       "nodes": [
         { "id": "in", "type": "free", "label": "Step In", "text": "The sound of the world drops by half.", "next": ["one"] },
-        { "id": "one", "type": "task", "label": "One Rep", "text": "Small. Do it anyway.", "task": { "movement": "$choose:move", "units": "$one" }, "grit": 10, "loot": "common", "next": ["out"] },
+        { "id": "one", "type": "task", "label": "One Rep", "text": "Small. Do it anyway.", "task": { "movement": "$choose:move", "units": 1 }, "grit": 10, "loot": "common", "next": ["out"] },
         { "id": "out", "type": "threshold", "label": "Out", "text": "The air lets go.", "next": [] }
       ] },
 
@@ -31,7 +31,7 @@
         { "id": "c", "type": "cache", "label": "Caught In It", "text": "Something else was pulled in here first.", "grit": 16, "next": ["out"] },
         { "id": "out", "type": "threshold", "label": "Out", "text": "It lets you go.", "next": [] }
       ],
-      "slots": [{ "chance": 0.4, "of": ["echo", "cache"] }] },
+      "slots": [{ "chance": 0.4, "table": [{ "type": "echo", "w": 1 }, { "type": "cache", "w": 1 }] }] },
 
     { "id": "a_seam", "tier": 2, "weight": 3, "name": "A Seam",
       "intro": "Two versions of this place are trying to occupy it at once.",
@@ -43,33 +43,33 @@
         { "id": "c", "type": "task", "label": "And Again", "text": "It is not done with you.", "task": { "movement": "$same", "units": "$set" }, "grit": 24, "loot": "common", "next": ["out"] },
         { "id": "out", "type": "threshold", "label": "Out", "text": "The seam closes behind you.", "next": [] }
       ],
-      "slots": [{ "chance": 0.5, "of": ["echo", "cache", "trinket"] }] },
+      "slots": [{ "chance": 0.5, "table": [{ "type": "echo", "w": 1 }, { "type": "cache", "w": 1 }, { "type": "trinket", "w": 1 }] }] },
 
     { "id": "a_hollow", "tier": 3, "weight": 3, "name": "A Hollow",
       "intro": "Something was taken out of this place and the shape of it is still here.",
       "outro": "You leave it emptier than you found it, which is the point.",
       "nodes": [
         { "id": "in", "type": "free", "label": "The Absence", "text": "You can feel where it used to be.", "next": ["a"] },
-        { "id": "a", "type": "task", "label": "Fill It", "text": "Move until the shape goes.", "task": { "movement": "$choose:move", "units": "$set" }, "grit": 28, "loot": "good", "next": ["b"] },
+        { "id": "a", "type": "task", "label": "Fill It", "text": "Move until the shape goes.", "task": { "movement": "$choose:move", "units": "$set" }, "grit": 28, "loot": "uncommon", "next": ["b"] },
         { "id": "b", "type": "task", "label": "Keep Filling", "text": "It is deeper than it looked.", "task": { "movement": "$same", "units": "$set" }, "grit": 28, "next": ["c"] },
-        { "id": "c", "type": "task", "label": "Something Else", "text": "A different kind of effort.", "task": { "movement": "$other:move", "units": "$set" }, "grit": 26, "loot": "good", "next": ["d"] },
+        { "id": "c", "type": "task", "label": "Something Else", "text": "A different kind of effort.", "task": { "movement": "$other:move", "units": "$set" }, "grit": 26, "loot": "uncommon", "next": ["d"] },
         { "id": "d", "type": "mirror", "label": "What Was Taken", "text": "", "next": ["out"] },
         { "id": "out", "type": "threshold", "label": "Out", "text": "The hollow is a hollow again.", "next": [] }
       ],
-      "slots": [{ "chance": 0.6, "of": ["echo", "trinket"] }] },
+      "slots": [{ "chance": 0.6, "table": [{ "type": "echo", "w": 1 }, { "type": "trinket", "w": 1 }] }] },
 
     { "id": "a_wound", "tier": 4, "weight": 3, "name": "A Wound",
       "intro": "This is not a pocket of strange time. This is where it was cut.",
       "outro": "It is not closed. It is only closed for now.",
       "nodes": [
         { "id": "in", "type": "free", "label": "The Edge", "text": "Standing here costs something you cannot name.", "next": ["a"] },
-        { "id": "a", "type": "task", "label": "Brace", "text": "Everything you have.", "task": { "movement": "$choose:move", "units": "$set" }, "grit": 34, "loot": "good", "next": ["b"] },
+        { "id": "a", "type": "task", "label": "Brace", "text": "Everything you have.", "task": { "movement": "$choose:move", "units": "$set" }, "grit": 34, "loot": "rare", "next": ["b"] },
         { "id": "b", "type": "task", "label": "Hold", "text": "Breathe through it.", "task": { "movement": "$choose:mind", "units": "$set" }, "grit": 30, "next": ["c"] },
-        { "id": "c", "type": "task", "label": "Again", "text": "It has not moved.", "task": { "movement": "$same", "units": "$set" }, "grit": 34, "loot": "good", "next": ["d"] },
+        { "id": "c", "type": "task", "label": "Again", "text": "It has not moved.", "task": { "movement": "$same", "units": "$set" }, "grit": 34, "loot": "rare", "next": ["d"] },
         { "id": "d", "type": "task", "label": "And Once More", "text": "Now it moves.", "task": { "movement": "$other:move", "units": "$set" }, "grit": 34, "next": ["e"] },
         { "id": "e", "type": "spite", "label": "Someone Is Here", "text": "", "next": ["out"] },
         { "id": "out", "type": "threshold", "label": "Out", "text": "You step back out of the cut.", "next": [] }
       ],
-      "slots": [{ "chance": 0.7, "of": ["echo", "trinket", "cache"] }] }
+      "slots": [{ "chance": 0.7, "table": [{ "type": "echo", "w": 1 }, { "type": "trinket", "w": 1 }, { "type": "cache", "w": 1 }] }] }
   ]
 }

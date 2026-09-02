@@ -350,7 +350,7 @@
         "solid": true
       },
       {
-        "biome": "forest",
+        "biome": "grass_short",
         "density": 0.03,
         "foot": [
           1,
@@ -362,7 +362,7 @@
         "solid": true
       },
       {
-        "biome": "forest",
+        "biome": "grass_short",
         "density": 0.028,
         "foot": [
           1,
@@ -386,7 +386,7 @@
         "solid": true
       },
       {
-        "biome": "forest",
+        "biome": "grass_tall",
         "density": 0.014,
         "foot": [
           2,
@@ -398,7 +398,7 @@
         "solid": true
       },
       {
-        "biome": "forest",
+        "biome": "grass_tall",
         "density": 0.018,
         "foot": [
           1,
@@ -410,7 +410,7 @@
         "solid": false
       },
       {
-        "biome": "forest",
+        "biome": "grass_tall",
         "density": 0.03,
         "foot": [
           1,
@@ -482,7 +482,7 @@
         "solid": true
       },
       {
-        "biome": "water",
+        "biome": "sand",
         "density": 0.022,
         "foot": [
           1,

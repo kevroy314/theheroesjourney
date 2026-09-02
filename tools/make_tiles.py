@@ -2265,13 +2265,18 @@ PROPS = [
     _p("gate", "post", "grass_tall", 0.004, solid=True, h=24, rail=True, board=(9, 8)),
 
     # --- forest ---------------------------------------------------------------
-    _p("tree_pine", "pine", "forest", 0.030, solid=True, pal="pine", trunk=8, tiers=4, w=12, th=8),
-    _p("tree_broad", "tree", "forest", 0.028, solid=True, pal="leaf", trunk=15, crown=14, tw=3),
+    # These six sat on biomes scatter_props can never place them on, so none of
+    # them has ever appeared: forest and water are solid, and a prop needs a
+    # walkable cell. A tree does not stand *on* a forest tile — the forest tile
+    # IS canopy — it stands on the ground beside the wood, which is also what
+    # makes a treeline read as one.
+    _p("tree_pine", "pine", "grass_short", 0.030, solid=True, pal="pine", trunk=8, tiers=4, w=12, th=8),
+    _p("tree_broad", "tree", "grass_short", 0.028, solid=True, pal="leaf", trunk=15, crown=14, tw=3),
     _p("tree_dead", "deadtree", "scree", 0.014, solid=True, h=30,
        branches=[(11, -1, 8), (17, 1, 9), (23, -1, 6)]),
-    _p("log_mossy", "log", "forest", 0.014, solid=True, foot=(2, 1), pal="bark", w=17, r=6, moss=14),
-    _p("mushroom_ring", "mushroom", "forest", 0.018, shadow=False, n=7, spread=12, cap="fungus"),
-    _p("fern", "tuft", "forest", 0.030, shadow=False, outline=False, pal="pine", n=12, spread=12, h=9),
+    _p("log_mossy", "log", "grass_tall", 0.014, solid=True, foot=(2, 1), pal="bark", w=17, r=6, moss=14),
+    _p("mushroom_ring", "mushroom", "grass_tall", 0.018, shadow=False, n=7, spread=12, cap="fungus"),
+    _p("fern", "tuft", "grass_tall", 0.030, shadow=False, outline=False, pal="pine", n=12, spread=12, h=9),
 
     # --- shore and sea --------------------------------------------------------
     _p("driftwood", "log", "sand", 0.022, pal="pale", w=13, r=4),
@@ -2279,7 +2284,7 @@ PROPS = [
     _p("beach_weed", "tuft", "sand", 0.038, shadow=False, outline=False, pal="reed", n=9, spread=11, h=8),
     _p("tide_pool", "flat", "sand", 0.014, shadow=False, outline=False, pal="ice", w=13, h=10),
     _p("palm_shore", "palm", "sand", 0.016, solid=True, pal="palm", trunk=26, lean=6, fronds=6, flen=14),
-    _p("sea_rock", "boulder", "water", 0.022, solid=True, pal="stone", w=11, h=10, cracks=4),
+    _p("sea_rock", "boulder", "sand", 0.022, solid=True, pal="stone", w=11, h=10, cracks=4),
     _p("reed_bed", "reeds", "mud", 0.055, shadow=False, outline=False, n=15, spread=13, h=15, head=True),
 
     # --- desert ---------------------------------------------------------------

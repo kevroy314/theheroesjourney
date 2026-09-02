@@ -616,10 +616,23 @@ def scatter_props(world, elev, rng, reach):
                     return False
         return True
 
+    def beside_road(x, y):
+        return any(world.at(x + dx, y + dy) == T["path_dirt"]
+                   for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+
     for y in range(1, H - 1):
         for x in range(1, W - 1):
             material = ORDER[world.at(x, y)]
-            options = by_biome.get(material)
+            options = list(by_biome.get(material, []))
+
+            # Road furniture is authored for roads and the placement rule refuses
+            # roads — a signpost cannot stand in the lane the player walks down.
+            # A milestone was never *on* the road anyway; it was beside it. So
+            # props declared for path_dirt are offered to the walkable cells that
+            # touch a road, which is where they actually belong.
+            if beside_road(x, y) and world.at(x, y) != T["path_dirt"]:
+                options = options + by_biome.get("path_dirt", [])
+
             if not options or (x, y) not in reach:
                 continue
             for prop in options:

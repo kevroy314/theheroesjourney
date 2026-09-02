@@ -19,7 +19,7 @@
       "grit": 30, "loot": "uncommon", "next": ["warden"] },
 
     { "id": "warden", "type": "warden", "label": "The Warden of the Loop",
-      "text": "They turn around." },
+      "text": "They turn around.", "next": ["out"] },
 
     { "id": "out", "type": "threshold", "label": "The Way Out",
       "text": "The loop opens like a held breath finally let go." }
