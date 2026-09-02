@@ -1,6 +1,6 @@
 {
   "name": "theheroesjourney",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "description": "A life-balance habit app wearing a roguelike as a costume. Godot 4.7, mobile-first, installable as a PWA.",
   "homepage": "https://github.com/kevroy314/theheroesjourney",

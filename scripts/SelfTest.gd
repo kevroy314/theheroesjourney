@@ -496,7 +496,7 @@ static func _palace_checks(failures: Array) -> void:
 ## code, so a screen nobody navigates to in a test has never been constructed at
 ## all, and a typo in it would first surface in front of the player.
 static func _screen_checks(host: Node, failures: Array) -> void:
-	var names: Array = ["title", "palace", "gym", "workshop", "stores", "hearth",
+	var names: Array = ["title", "menu", "palace", "gym", "workshop", "stores", "hearth",
 		"observatory", "codex", "wheel", "inventory", "journey", "area", "overworld", "worldmap",
 		"task", "boon", "event", "summary"]
 

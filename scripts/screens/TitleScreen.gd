@@ -49,10 +49,10 @@ func build() -> void:
 	# room you buy for 40 Resolve, and app-level concerns — updates, reminders,
 	# the theme — cannot sit behind an in-game purchase: a player who has not
 	# bought a room still has to be able to update the app they are running.
-	var settings := HJUI.button("Settings & updates", "ghost")
-	settings.custom_minimum_size.y = 74
-	settings.pressed.connect(func(): Game.goto("hearth"))
-	v.add_child(settings)
+	var menu := HJUI.button("Menu", "ghost")
+	menu.custom_minimum_size.y = 74
+	menu.pressed.connect(func(): Game.goto("menu"))
+	v.add_child(menu)
 
 	var camp := HJUI.button("The Mind Palace", "ghost")
 	camp.pressed.connect(func(): Game.goto("palace"))
