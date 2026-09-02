@@ -79,15 +79,12 @@ func build() -> void:
 			Events.meta_changed.emit()))
 
 	list.add_child(HJUI.spacer(10))
-	var wipe := HJUI.button("Wipe save", "danger")
-	wipe.pressed.connect(func() -> void:
-		Game.run = null
-		Game.clear_saved_run()
-		Meta.wipe()
-		Meta.ensure_palace()
-		Palette.use(Meta.selected_theme)
-		Game.rebuild_rules()
-		Game.say("Wiped. Back to the first morning.", "warn"))
+	var wipe := HJUI.danger("Wipe save", "Erase everything",
+		func() -> void:
+			Game.clear_saved_run()
+			Meta.wipe()
+			Game.goto("title")
+			Game.say("Wiped. Back to the first morning.", "warn"))
 	list.add_child(wipe)
 
 
@@ -139,7 +136,11 @@ func _notifications(list: VBoxContainer) -> void:
 		test.pressed.connect(func(): Notify.send_test())
 		row.add_child(test)
 
-		var off := HJUI.button("Turn off", "danger")
+		# Not red: turning reminders off is reversible by the button that
+		# replaces it. Red has to mean "this cannot be undone" or it means
+		# nothing, and a player who has learned to tap through it will tap
+		# through the one that wipes their save.
+		var off := HJUI.button("Turn off", "quiet")
 		off.custom_minimum_size.y = 66
 		off.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		off.pressed.connect(func() -> void:

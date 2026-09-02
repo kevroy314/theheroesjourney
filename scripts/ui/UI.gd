@@ -151,6 +151,71 @@ static func button(text: String, kind: String = "ghost", enabled: bool = true) -
 	return b
 
 
+## A destructive action, which cannot be built without a confirmation.
+##
+## Three separate one-tap catastrophes have shipped in this UI — abandoning a
+## run, wiping the save, and erasing the update server — and each was fixed
+## individually only after it bit someone. The pattern is the bug: a plain
+## Button makes the dangerous thing exactly as easy to build as the safe one,
+## and relying on remembering demonstrably does not work.
+##
+## So there is no way to get a red button except through here, and this one arms
+## first. The armed caption must say what is destroyed, not "Are you sure?" —
+## the player already knows they tapped something, what they need is to be told
+## what it costs.
+##
+## `on_confirm` runs on the second tap. Arming is cleared by anything that
+## rebuilds the screen, so walking away disarms it rather than leaving a live
+## trigger under the thumb.
+class DangerButton extends Button:
+	signal armed
+
+	var _armed := false
+	var _resting := ""
+	var _confirming := ""
+
+	func _init(resting: String, confirming: String) -> void:
+		_resting = resting
+		_confirming = confirming
+
+	func arm_or_fire(on_confirm: Callable) -> void:
+		if _armed:
+			on_confirm.call()
+			return
+		_armed = true
+		text = _confirming
+		armed.emit()
+
+
+static func danger(resting: String, confirming: String, on_confirm: Callable) -> Button:
+	var b := DangerButton.new(resting, confirming)
+	b.text = resting
+	b.custom_minimum_size.y = TAP
+	b.add_theme_font_size_override("font_size", fs(FS_BODY))
+	face(b)
+	b.focus_mode = Control.FOCUS_NONE
+	b.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	var fill := Palette.ca("danger", 0.18)
+	var border := Palette.ca("danger", 0.7)
+	b.add_theme_stylebox_override("normal", stylebox(fill, RADIUS, border, 2, "button"))
+	b.add_theme_stylebox_override("hover", stylebox(fill, RADIUS, border, 2, "button"))
+	b.add_theme_stylebox_override("pressed", stylebox(fill.darkened(0.15), RADIUS, border, 2, "button"))
+	for role in ["font_color", "font_hover_color", "font_pressed_color"]:
+		b.add_theme_color_override(role, tint(Palette.c("danger"), "text"))
+
+	b.pressed.connect(func() -> void: b.arm_or_fire(on_confirm))
+	# Armed is a different button: solid, so it cannot be mistaken for the one
+	# that was there a moment ago and tapped through by muscle memory.
+	b.armed.connect(func() -> void:
+		var hot := Palette.c("danger")
+		b.add_theme_stylebox_override("normal", stylebox(hot, RADIUS, hot, 2, "button"))
+		b.add_theme_stylebox_override("hover", stylebox(hot, RADIUS, hot, 2, "button"))
+		for role in ["font_color", "font_hover_color", "font_pressed_color"]:
+			b.add_theme_color_override(role, tint(Palette.c("bg"), "text")))
+	return b
+
+
 ## A pixel icon from assets/icons, tinted by the palette.
 ##
 ## Snapped to a multiple of 16 and filtered NEAREST: these are authored on a

@@ -2,10 +2,6 @@ extends HJScreen
 ## One area, one sitting. The tree of what is left to do, the clock, and the
 ## items you can spend to change either.
 
-## Reset by every rebuild, so leaving the screen or doing anything else clears
-## the armed state rather than leaving a live trigger under the thumb.
-var _confirming_abandon := false
-
 var _header: HJRunHeader
 var _graph: HJAreaGraph
 
@@ -96,20 +92,10 @@ func build() -> void:
 	bag.pressed.connect(func(): Game.goto("inventory"))
 	actions.add_child(bag)
 
-	# Two taps, and the second one has to say what it destroys. This was a single
-	# unconfirmed tap on a full-width button in the thumb row, sitting beside
-	# "Bag" — one mis-tap ended the run and there was no way back.
-	var give_up := HJUI.button("Abandon" if not _confirming_abandon else "End the run?",
-		"danger")
+	var give_up := HJUI.danger("Abandon", "Lose this loop",
+		func() -> void: Game.abandon_run())
 	give_up.custom_minimum_size.y = 70
 	give_up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	give_up.pressed.connect(func() -> void:
-		if _confirming_abandon:
-			Game.abandon_run()
-			return
-		_confirming_abandon = true
-		Game.say("Tap again to abandon. Everything in this loop is lost.", "warn")
-		refresh())
 	actions.add_child(give_up)
 	v.add_child(actions)
 
