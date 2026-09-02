@@ -3,15 +3,29 @@
 A life-balance habit app wearing a roguelike as a costume. You wake in a bed you
 have woken in before. The way out of the room is one push-up wide.
 
-Built in Godot 4.7, mobile-first. Almost everything that defines what the game
-*is* — movements, chapters, story, items, palettes, vocabulary, every tunable
-number — lives in JSON under `data/`, so themes and rules can be reshaped
-without touching code.
+Built in Godot 4.7. **It ships on Android and iOS, and nowhere else** — the game
+counts your real steps and spends them walking a world, and only a native build
+can read a step counter. The browser cannot; that is not a gap to be closed, it
+is the reason the native build exists.
+
+Almost everything that defines what the game *is* — movements, story, items,
+anomalies, palettes, vocabulary, every tunable number — lives in JSON under
+`data/`, so themes and rules can be reshaped without touching code.
 
 ```bash
-npm run build       # export the web client + serve on :8070
-npm run serve       # serving only, skip the ~40s export
+npm run bump patch  # version: package.json is the source of truth
+./build_android.sh  # signed APK + AAB, published for over-the-air update
 npm test            # headless end-to-end check
+```
+
+**The web export is a development tool, not a target.** It is how a UI change is
+looked at in a browser in seconds instead of a two-minute APK cycle, and the
+self-test drives it. Nothing about it is shipped or supported: there is no step
+counter behind it, so the game it runs is missing its core input.
+
+```bash
+npm run build       # export the web preview + serve on :8070
+npm run serve       # serving only, skip the ~40s export
 npm run stop
 ```
 
@@ -21,10 +35,13 @@ for the shell scripts. You need Godot 4.7 and Docker.)
 Play it at **https://fitrogue.home.kevinhorecka.com:1403** (Google login), or
 locally at **http://0.0.0.0:8070** / `http://<lan-ip>:8070`.
 
-**It installs.** Open the HTTPS URL on a phone and add it to the home screen —
-it is a PWA with a manifest, icons and an offline-capable service worker. (Home
-screen install needs a secure context, so the plain-HTTP LAN address will not
-offer it.)
+**It installs as an app.** `./build_android.sh` produces a signed APK and
+publishes it; the phone then updates itself from **Settings & updates** inside
+the game. See [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+iOS is not built yet. It needs a Mac, a paid Apple developer account and a
+HealthKit bridge in place of the Android step counter — the same shape of work,
+none of it done.
 
 > The public hostname still says `fitrogue` from before the rename. Changing it
 > is one nginx block plus a force-recreate — say the word.
@@ -297,16 +314,18 @@ transition and strand the app somewhere it does not belong.
 
 ## Notifications
 
-`Notify.gd` records what it *would* schedule and prints it. That is deliberate:
-a habit app lives on the notification that says *your deadline is in three
-hours*, and a Godot web export cannot deliver one. The Android export templates
-are already installed on this machine; when that build happens, `Notify.gd` is
-the only file that needs a backend behind it.
+Local notifications on Android, scheduled through `AlarmManager` by the
+`HeroesNotify` plugin. Turn them on in **Settings & updates**.
 
-## Notifications
+Deliberately inexact alarms: `SCHEDULE_EXACT_ALARM` is restricted on API 31+ and
+gated to alarm-clock apps, while a plain `set()` is deferred to the next Doze
+window — which at 3am can be hours. `setAndAllowWhileIdle` is permission-free
+*and* Doze-exempt, and a few minutes of drift is invisible on a reminder six
+hours out. They survive a reboot via a boot receiver, because the whole point is
+reaching someone who is not in the game.
 
-Web Push, working on Android and on iPhone (iOS 16.4+, **home-screen install
-only** — Safari tabs cannot receive push). Turn them on in **The Hearth**.
+(A Web Push server still exists under `server/` for the browser preview. It is
+not part of the shipped app.)
 
 Defaults are off. One nudge before a deadline, one in the evening if you have
 not moved yet, nothing else. Every kind can be silenced on its own and quiet

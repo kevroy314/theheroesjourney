@@ -5,6 +5,12 @@ description: Build, cache, serve and deploy the Godot web export for The Heroes'
 
 # Skill: godot-web-deploy
 
+> **This is the development preview, not the shipped product.** The game ships
+> on Android (`./build_android.sh`); the web export exists so a UI change can be
+> looked at in a browser in seconds rather than through a two-minute APK cycle,
+> and because the self-test drives it. Do not treat anything here as a release
+> path.
+
 ## The shape of it
 
 ```
