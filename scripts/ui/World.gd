@@ -195,6 +195,14 @@ func anomaly_at(cell: Vector2i) -> Dictionary:
 	return _anomaly_at.get(cell, {})
 
 
+## The tier of the anomaly on a cell, or -1 for none. Separate from anomaly_at
+## because the renderer asks this per cell per frame and does not want a
+## dictionary lookup's worth of allocation to find out the answer is usually no.
+func anomaly_tier(x: int, y: int) -> int:
+	var entry: Dictionary = _anomaly_at.get(Vector2i(x, y), {})
+	return int(entry.get("tier", -1)) if not entry.is_empty() else -1
+
+
 func anchor(area_id: String) -> Vector2i:
 	return regions.get(area_id, spawn)
 

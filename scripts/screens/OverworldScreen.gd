@@ -75,6 +75,13 @@ func build() -> void:
 	_world.node_entered.connect(_on_node)
 	_world.blocked.connect(_on_blocked)
 	_world.anomaly_entered.connect(_on_anomaly)
+	# Just walked out of one you finished: play it closing, so the thing you did
+	# has a consequence you can see rather than only a number that stopped
+	# rising.
+	if not run.anomalies_cleared.is_empty() and run.world_pos.x >= 0:
+		var key := Game._cell_key(run.world_pos)
+		if run.anomalies_cleared.has(key):
+			_world.collapse_anomaly(run.world_pos)
 	# The world does not reset when the screen does. Remember where he stopped.
 	_world.moved.connect(func(cell: Vector2i) -> void: run.world_pos = cell)
 	# The map is the screen. Everything else is a strip around it, so the world
