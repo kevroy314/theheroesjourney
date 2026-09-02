@@ -1,0 +1,1090 @@
+{
+  "cliffs": {
+    "cols": 4,
+    "file": "cliffs.png",
+    "layout": "index = row*4 + col, in `order`",
+    "order": [
+      "lip_mid",
+      "lip_left",
+      "lip_right",
+      "lip_solo",
+      "face_a",
+      "face_b",
+      "face_c",
+      "face_mid",
+      "face_left",
+      "face_right",
+      "corner_left",
+      "corner_right",
+      "shadow_mid",
+      "shadow_left",
+      "shadow_right",
+      "shadow_solo"
+    ],
+    "rows": 4
+  },
+  "order": [
+    "floor_boards",
+    "floor_stone",
+    "grass_short",
+    "grass_tall",
+    "path_dirt",
+    "door",
+    "wall_plaster",
+    "wall_stone",
+    "water",
+    "rock",
+    "void",
+    "sand",
+    "scree",
+    "snow",
+    "bridge",
+    "forest",
+    "roof",
+    "ocean",
+    "dune",
+    "hardpan",
+    "jungle",
+    "undergrowth",
+    "mud",
+    "cliff",
+    "ice"
+  ],
+  "overlays": {
+    "cols": 16,
+    "corner_bits": [
+      "NE",
+      "SE",
+      "SW",
+      "NW"
+    ],
+    "file": "overlays.png",
+    "layout": "row = slot*6 + variant*2 + kind (kind 0 edge, 1 corner); col = mask; mask 0 is blank",
+    "materials": [
+      {
+        "name": "water",
+        "rank": 1,
+        "slot": 0
+      },
+      {
+        "name": "ice",
+        "rank": 2,
+        "slot": 1
+      },
+      {
+        "name": "mud",
+        "rank": 3,
+        "slot": 2
+      },
+      {
+        "name": "sand",
+        "rank": 4,
+        "slot": 3
+      },
+      {
+        "name": "dune",
+        "rank": 5,
+        "slot": 4
+      },
+      {
+        "name": "hardpan",
+        "rank": 6,
+        "slot": 5
+      },
+      {
+        "name": "snow",
+        "rank": 7,
+        "slot": 6
+      },
+      {
+        "name": "scree",
+        "rank": 8,
+        "slot": 7
+      },
+      {
+        "name": "grass_short",
+        "rank": 9,
+        "slot": 8
+      },
+      {
+        "name": "grass_tall",
+        "rank": 10,
+        "slot": 9
+      },
+      {
+        "name": "undergrowth",
+        "rank": 11,
+        "slot": 10
+      },
+      {
+        "name": "forest",
+        "rank": 12,
+        "slot": 11
+      },
+      {
+        "name": "jungle",
+        "rank": 13,
+        "slot": 12
+      },
+      {
+        "name": "rock",
+        "rank": 14,
+        "slot": 13
+      },
+      {
+        "name": "cliff",
+        "rank": 15,
+        "slot": 14
+      },
+      {
+        "name": "path_dirt",
+        "rank": 16,
+        "slot": 15
+      }
+    ],
+    "rows": 96,
+    "rule": "draw the cell's own fill, then for each DISTINCT higher-precedence material among its 8 neighbours, lowest rank first: the edge tile for the 4-bit side mask, then the corner tile for the diagonals whose two adjacent sides do not hold that material",
+    "side_bits": [
+      "N",
+      "E",
+      "S",
+      "W"
+    ],
+    "variants": 3
+  },
+  "precedence": [
+    "ocean",
+    "water",
+    "ice",
+    "mud",
+    "sand",
+    "dune",
+    "hardpan",
+    "snow",
+    "scree",
+    "grass_short",
+    "grass_tall",
+    "undergrowth",
+    "forest",
+    "jungle",
+    "rock",
+    "cliff",
+    "path_dirt"
+  ],
+  "props": {
+    "anchor": [
+      32,
+      96
+    ],
+    "cols": 8,
+    "draw": "dst = (cell.x*32 + 16 - 32, cell.y*32 + 32 - 96)",
+    "file": "props.png",
+    "layout": "slot i (0-based) at (64*(i%8), 96*(i//8)); plane value = i+1",
+    "list": [
+      {
+        "biome": "grass_short",
+        "density": 0.055,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_tuft",
+        "index": 0,
+        "plane": 1,
+        "solid": false
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.07,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_clump",
+        "index": 1,
+        "plane": 2,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.022,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "flowers_gold",
+        "index": 2,
+        "plane": 3,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.016,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "flowers_red",
+        "index": 3,
+        "plane": 4,
+        "solid": false
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.02,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "thistle",
+        "index": 4,
+        "plane": 5,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.024,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "stone_small",
+        "index": 5,
+        "plane": 6,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.012,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "boulder",
+        "index": 6,
+        "plane": 7,
+        "solid": true
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.026,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "bush",
+        "index": 7,
+        "plane": 8,
+        "solid": false
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.02,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "bramble",
+        "index": 8,
+        "plane": 9,
+        "solid": true
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.012,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "stump",
+        "index": 9,
+        "plane": 10,
+        "solid": true
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.01,
+        "foot": [
+          2,
+          1
+        ],
+        "id": "log_fallen",
+        "index": 10,
+        "plane": 11,
+        "solid": true
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.014,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "tree_lone",
+        "index": 11,
+        "plane": 12,
+        "solid": true
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.012,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "fencepost",
+        "index": 12,
+        "plane": 13,
+        "solid": false
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.004,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "gate",
+        "index": 13,
+        "plane": 14,
+        "solid": true
+      },
+      {
+        "biome": "forest",
+        "density": 0.03,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "tree_pine",
+        "index": 14,
+        "plane": 15,
+        "solid": true
+      },
+      {
+        "biome": "forest",
+        "density": 0.028,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "tree_broad",
+        "index": 15,
+        "plane": 16,
+        "solid": true
+      },
+      {
+        "biome": "scree",
+        "density": 0.014,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "tree_dead",
+        "index": 16,
+        "plane": 17,
+        "solid": true
+      },
+      {
+        "biome": "forest",
+        "density": 0.014,
+        "foot": [
+          2,
+          1
+        ],
+        "id": "log_mossy",
+        "index": 17,
+        "plane": 18,
+        "solid": true
+      },
+      {
+        "biome": "forest",
+        "density": 0.018,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "mushroom_ring",
+        "index": 18,
+        "plane": 19,
+        "solid": false
+      },
+      {
+        "biome": "forest",
+        "density": 0.03,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "fern",
+        "index": 19,
+        "plane": 20,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.022,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "driftwood",
+        "index": 20,
+        "plane": 21,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.026,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "shell",
+        "index": 21,
+        "plane": 22,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.038,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "beach_weed",
+        "index": 22,
+        "plane": 23,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.014,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "tide_pool",
+        "index": 23,
+        "plane": 24,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.016,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "palm_shore",
+        "index": 24,
+        "plane": 25,
+        "solid": true
+      },
+      {
+        "biome": "water",
+        "density": 0.022,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sea_rock",
+        "index": 25,
+        "plane": 26,
+        "solid": true
+      },
+      {
+        "biome": "mud",
+        "density": 0.055,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "reed_bed",
+        "index": 26,
+        "plane": 27,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.018,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "cactus_tall",
+        "index": 27,
+        "plane": 28,
+        "solid": true
+      },
+      {
+        "biome": "dune",
+        "density": 0.022,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "cactus_round",
+        "index": 28,
+        "plane": 29,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.028,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "dry_shrub",
+        "index": 29,
+        "plane": 30,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.045,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "dune_grass",
+        "index": 30,
+        "plane": 31,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.03,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sand_mound",
+        "index": 31,
+        "plane": 32,
+        "solid": false
+      },
+      {
+        "biome": "hardpan",
+        "density": 0.014,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "skull",
+        "index": 32,
+        "plane": 33,
+        "solid": false
+      },
+      {
+        "biome": "hardpan",
+        "density": 0.018,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "bones",
+        "index": 33,
+        "plane": 34,
+        "solid": false
+      },
+      {
+        "biome": "hardpan",
+        "density": 0.028,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "mesa_rock",
+        "index": 34,
+        "plane": 35,
+        "solid": true
+      },
+      {
+        "biome": "hardpan",
+        "density": 0.008,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "palm_oasis",
+        "index": 35,
+        "plane": 36,
+        "solid": true
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.075,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "jungle_fern",
+        "index": 36,
+        "plane": 37,
+        "solid": false
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.02,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "banana_palm",
+        "index": 37,
+        "plane": 38,
+        "solid": true
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.016,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "vine_pillar",
+        "index": 38,
+        "plane": 39,
+        "solid": true
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.014,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "giant_mushroom",
+        "index": 39,
+        "plane": 40,
+        "solid": false
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.004,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "idol",
+        "index": 40,
+        "plane": 41,
+        "solid": true
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.03,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "marsh_reeds",
+        "index": 41,
+        "plane": 42,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.045,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "scree_stone",
+        "index": 42,
+        "plane": 43,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.02,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "crag",
+        "index": 43,
+        "plane": 44,
+        "solid": true
+      },
+      {
+        "biome": "scree",
+        "density": 0.01,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "cairn",
+        "index": 44,
+        "plane": 45,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.026,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "scrub",
+        "index": 45,
+        "plane": 46,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.04,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "snow_drift",
+        "index": 46,
+        "plane": 47,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.018,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "ice_shard",
+        "index": 47,
+        "plane": 48,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.01,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "marker_pole",
+        "index": 48,
+        "plane": 49,
+        "solid": false
+      },
+      {
+        "biome": "ice",
+        "density": 0.014,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "crystal",
+        "index": 49,
+        "plane": 50,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.012,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "milestone",
+        "index": 50,
+        "plane": 51,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.008,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "signpost",
+        "index": 51,
+        "plane": 52,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.004,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "wayside_shrine",
+        "index": 52,
+        "plane": 53,
+        "solid": true
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.014,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "rut_stone",
+        "index": 53,
+        "plane": 54,
+        "solid": false
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "barrel",
+        "index": 54,
+        "plane": 55,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "crate",
+        "index": 55,
+        "plane": 56,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          2,
+          2
+        ],
+        "id": "well",
+        "index": 56,
+        "plane": 57,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          2,
+          1
+        ],
+        "id": "cart",
+        "index": 57,
+        "plane": 58,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          2,
+          1
+        ],
+        "id": "market_stall",
+        "index": 58,
+        "plane": 59,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "lamppost",
+        "index": 59,
+        "plane": 60,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          2,
+          1
+        ],
+        "id": "bench",
+        "index": 60,
+        "plane": 61,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "standing_stone",
+        "index": 61,
+        "plane": 62,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          2,
+          2
+        ],
+        "id": "bed",
+        "index": 62,
+        "plane": 63,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          2,
+          1
+        ],
+        "id": "table",
+        "index": 63,
+        "plane": 64,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "chair",
+        "index": 64,
+        "plane": 65,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "bookshelf",
+        "index": 65,
+        "plane": 66,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "chest",
+        "index": 66,
+        "plane": 67,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "floor_lamp",
+        "index": 67,
+        "plane": 68,
+        "solid": false
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "plant_pot",
+        "index": 68,
+        "plane": 69,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "rug",
+        "index": 69,
+        "plane": 70,
+        "solid": false
+      }
+    ],
+    "rows": 9,
+    "slot": [
+      64,
+      96
+    ]
+  },
+  "shadow": {
+    "alpha": 118,
+    "rgb": [
+      10,
+      10,
+      15
+    ]
+  },
+  "solid_ids": [
+    6,
+    7,
+    8,
+    9,
+    10,
+    15,
+    16,
+    17,
+    20,
+    23
+  ],
+  "tile": 32,
+  "tileset": {
+    "count": 25,
+    "file": "tileset.png",
+    "layout": "one row; tile i at x = 32*i"
+  },
+  "variants": {
+    "count": 3,
+    "file": "tileset_var.png",
+    "layout": "row v holds alternate fill v+1 of ORDER[i] at (32*i, 32*v)",
+    "select": "v = hash(x, y) % (1 + count); v == 0 means tileset.png"
+  },
+  "walkable": {
+    "bridge": true,
+    "cliff": false,
+    "door": true,
+    "dune": true,
+    "floor_boards": true,
+    "floor_stone": true,
+    "forest": false,
+    "grass_short": true,
+    "grass_tall": true,
+    "hardpan": true,
+    "ice": true,
+    "jungle": false,
+    "mud": true,
+    "ocean": false,
+    "path_dirt": true,
+    "rock": false,
+    "roof": false,
+    "sand": true,
+    "scree": true,
+    "snow": true,
+    "undergrowth": true,
+    "void": false,
+    "wall_plaster": false,
+    "wall_stone": false,
+    "water": false
+  }
+}

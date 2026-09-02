@@ -65,7 +65,7 @@ N = 32          # tile size, px
 BLACK = (0, 0, 0)
 
 VARIANTS = 3    # seeded alternates per overlay case
-BASE_VARIANTS = 2   # alternate fills per material, beyond the base
+BASE_VARIANTS = 3   # alternate fills per material, beyond the base
 
 # Standard 8x8 ordered (Bayer) matrix. Values 0..63. 32 % 8 == 0, so it tiles.
 BAYER8 = [
@@ -171,26 +171,26 @@ MATERIALS = {
     "grass_short":   dict(hue=_hue((C["good"], 1.0), (C["warn"], 0.22)), mean=42, spread=18, walk=True,  family="turf"),
     "grass_tall":    dict(hue=_hue((C["good"], 1.0), (C["accent_2"], 0.16)), mean=34, spread=20, walk=True,  family="blades"),
     "path_dirt":     dict(hue=_hue((C["accent"], 1.0), (C["muted"], 0.85)), mean=46, spread=18, walk=True,  family="trodden"),
-    "door":          dict(hue=_hue((C["accent"], 1.0), (C["warn"], 0.4)), mean=58, spread=52, walk=True,  family="doorway"),
+    "door":          dict(hue=_hue((C["accent"], 1.0), (C["warn"], 0.4)), mean=52, spread=52, walk=True,  family="doorway"),
     "wall_plaster":  dict(hue=_hue((C["panel_alt"], 1.0), (C["accent"], 0.30)), mean=26, spread=18, walk=False, family="plaster"),
     "wall_stone":    dict(hue=_hue((C["line"], 1.0), (C["accent_2"], 0.12)), mean=22, spread=20, walk=False, family="blocks"),
-    "water":         dict(hue=_hue((C["accent_2"], 1.0),), mean=26, spread=22, walk=False, family="swell"),
-    "rock":          dict(hue=_hue((C["line"], 1.0), (C["muted"], 0.30)), mean=26, spread=24, walk=False, family="rubble"),
+    "water":         dict(hue=_hue((C["accent_2"], 1.0),), mean=26, spread=26, walk=False, family="swell"),
+    "rock":          dict(hue=_hue((C["line"], 1.0), (C["muted"], 0.30)), mean=28, spread=24, walk=False, family="rubble"),
     "void":          dict(hue=_hue((C["bg"], 1.0),), mean=8,  spread=6,  walk=False, family="void"),
     "sand":          dict(hue=_hue((C["accent"], 1.0), (C["muted"], 0.55)), mean=62, spread=20, walk=True,  family="grain"),
-    "scree":         dict(hue=_hue((C["line"], 1.0), (C["muted"], 0.50)), mean=38, spread=22, walk=True,  family="chips"),
-    "snow":          dict(hue=_hue((C["muted"], 1.0), (C["accent_2"], 0.55)), mean=74, spread=22, walk=True,  family="drift"),
+    "scree":         dict(hue=_hue((C["line"], 1.0), (C["accent_2"], 0.70), (C["muted"], 0.30)), mean=44, spread=22, walk=True,  family="chips"),
+    "snow":          dict(hue=_hue((C["muted"], 1.0), (C["accent_2"], 0.55)), mean=72, spread=22, walk=True,  family="drift"),
     "bridge":        dict(hue=_hue((C["accent"], 1.0), (C["panel"], 0.7)), mean=44, spread=22, walk=True,  family="planks"),
-    "forest":        dict(hue=_hue((C["good"], 1.0), (C["accent_2"], 0.22)), mean=24, spread=22, walk=False, family="canopy"),
-    "roof":          dict(hue=_hue((C["accent"], 1.0), (C["danger"], 0.45)), mean=30, spread=22, walk=False, family="shingle"),
+    "forest":        dict(hue=_hue((C["good"], 1.0), (C["accent_2"], 0.22)), mean=21, spread=22, walk=False, family="canopy"),
+    "roof":          dict(hue=_hue((C["accent"], 1.0), (C["danger"], 0.45)), mean=28, spread=22, walk=False, family="shingle"),
     # --- appended for the concentric-biome world. Ids 17..24, nothing renumbered.
-    "ocean":         dict(hue=_hue((C["accent_2"], 1.0), (C["line"], 0.9)), mean=15, spread=16, walk=False, family="swell"),
+    "ocean":         dict(hue=_hue((C["accent_2"], 1.0), (C["line"], 0.9)), mean=15, spread=18, walk=False, family="swell"),
     "dune":          dict(hue=_hue((C["accent"], 1.0), (C["warn"], 0.8), (C["muted"], 0.25)), mean=68, spread=20, walk=True,  family="grain"),
     "hardpan":       dict(hue=_hue((C["accent"], 1.0), (C["danger"], 0.55)), mean=50, spread=20, walk=True,  family="cracked"),
-    "jungle":        dict(hue=_hue((C["good"], 1.0), (C["warn"], 0.55)), mean=20, spread=24, walk=False, family="canopy"),
+    "jungle":        dict(hue=_hue((C["good"], 1.0), (C["warn"], 0.55)), mean=18, spread=24, walk=False, family="canopy"),
     "undergrowth":   dict(hue=_hue((C["good"], 1.0), (C["warn"], 0.75)), mean=36, spread=22, walk=True,  family="blades"),
-    "mud":           dict(hue=_hue((C["accent"], 1.0), (C["line"], 1.3)), mean=30, spread=16, walk=True,  family="silt"),
-    "cliff":         dict(hue=_hue((C["line"], 1.0), (C["accent_2"], 0.18)), mean=22, spread=26, walk=False, family="strata"),
+    "mud":           dict(hue=_hue((C["accent"], 1.0), (C["line"], 1.3)), mean=39, spread=16, walk=True,  family="silt"),
+    "cliff":         dict(hue=_hue((C["line"], 1.0), (C["accent_2"], 0.18)), mean=29, spread=26, walk=False, family="strata"),
     "ice":           dict(hue=_hue((C["accent_2"], 1.0), (C["muted"], 0.45)), mean=66, spread=24, walk=True,  family="sheet"),
 }
 
@@ -255,6 +255,9 @@ def ramp(name):
     }
 
 
+# Provisional. Calibrated against the real fills once FAMILIES exists -- see
+# _calibrate(), which is what makes the `mean` column above literally true
+# rather than approximately true.
 R = {name: ramp(name) for name in MATERIALS}
 
 # One shadow colour for the whole game, at one alpha. Everything that stands on
@@ -334,6 +337,53 @@ def blob(img, rng, cx, cy, r, fill, lit, dim):
             hline(img, y, cx - span, cx + span, fill)
 
 
+def displaced(key, ends, amp, n, lo, hi, persistence=0.58, bias=0.0):
+    """1-D midpoint displacement, pinned at both ends. The fractal is what makes
+    the front read as a coastline rather than as a wave: big lobes carrying
+    smaller lobes carrying single-pixel roughness, all from one recursion.
+
+    `bias` pushes the coarsest displacement outward. Without it the recursion is
+    symmetric about the pinned ends and roughly half the seeds produce a run
+    whose mean depth is two or three pixels -- a transition too thin to read at
+    all. A material should intrude on average, and retreat as the exception."""
+    rng = rng_for(key)
+    f = [0.0] * (n + 1)
+    f[0] = f[n] = float(ends)
+    step, a, b = n, float(amp), float(bias)
+    while step > 1:
+        half = step // 2
+        for i in range(half, n, step):
+            f[i] = 0.5 * (f[i - half] + f[i + half]) + rng.uniform(-a, a) + b
+        step, a, b = half, a * persistence, b * 0.5
+    return [max(lo, min(hi, int(round(t)))) for t in f]
+
+
+def mottle(img, rng, n, r0, r1, colours):
+    """Irregular soft patches across the fill.
+
+    Uniform noise at 32px reads as a flat field the moment a screen contains
+    only one material -- which §1.1 measured at half of all screens. Patchiness
+    at a scale *larger* than the tile is what makes ground look like ground, and
+    it is why the fills get three variants selected by hash(x, y): between the
+    patches and the variants, a run of one material stops repeating."""
+    for _ in range(n):
+        cx, cy = rng.randrange(N), rng.randrange(N)
+        rr = rng.randint(r0, r1)
+        c = colours[rng.randrange(len(colours))]
+        prof = displaced(("mottle", cx, cy, rr, rng.random()), rr, rr * 0.55, 8, 2, rr + 3)
+        for dy in range(-rr - 3, rr + 4):
+            for dx in range(-rr - 3, rr + 4):
+                d = math.hypot(dx, dy)
+                if d > rr + 3:
+                    continue
+                a = (math.atan2(dy, dx) + math.pi) / math.tau * 8.0
+                i = min(7, int(a))
+                fr = a - i
+                lim = prof[i] * (1 - fr) + prof[i + 1] * fr
+                if d <= lim:
+                    px(img, cx + dx, cy + dy, c)
+
+
 def voronoi(rng, k, jitter=0.55):
     """Toroidal Voronoi labels over the tile. Toroidal, so the cells wrap and
     the tile stays seamless; irregular, because §1.4 measured that continuous
@@ -394,7 +444,7 @@ def f_boards(name, v, r, rng):
     long grain: dashes running the length of the plank, no verticals anywhere."""
     img = canvas(r["base"])
     speckle(img, rng, 60, r["dark"])
-    off = (0, 3, 6)[v]
+    off = (0, 3, 6, 9)[v % 4]
     for top, bot in ((5 + off, 14 + off), (16 + off, 25 + off), (27 + off, 36 + off)):
         hline(img, bot, 0, N - 1, r["deep"])
         hline(img, top, 0, N - 1, r["mid"])
@@ -440,6 +490,7 @@ def f_turf(name, v, r, rng):
     and the path is hue, not brightness, because brightness belongs to the
     character and to the things standing on the ground."""
     img = canvas(r["base"])
+    mottle(img, rng, 3, 5, 9, (r["dark"], r["mid"]))
     speckle(img, rng, 190, r["dark"])
     speckle(img, rng, 120, r["mid"])
     speckle(img, rng, 40, r["deep"])
@@ -456,6 +507,7 @@ def f_blades(name, v, r, rng):
     it. Blades sit on a jittered lattice rather than at random positions: pure
     random clumps, and a clump at this density looks like damage."""
     img = canvas(r["base"])
+    mottle(img, rng, 3, 5, 9, (r["dark"], r["mid"]))
     speckle(img, rng, 200, r["dark"])
     for gy in range(0, N, 4):
         for gx in range(0, N, 3):
@@ -538,9 +590,9 @@ def f_swell(name, v, r, rng):
             # would break the joint even though px() wraps, because the
             # *pattern* would not.
             if (x + phase) % 16 < 7:
-                px(img, x, y, r["lit"])
+                px(img, x, y, r["tip"])
             if (x + phase + 5) % 8 < 3:
-                px(img, x, y + 1, r["mid"])
+                px(img, x, y + 1, r["lit"])
     return img
 
 
@@ -564,6 +616,7 @@ def f_chips(name, v, r, rng):
     boundary between what you may climb and what you may not is legible."""
     img = canvas(r["base"])
     dither(img, r["dark"], r["base"], lambda x, y: 0.4)
+    mottle(img, rng, 3, 4, 8, (r["dark"], mix(r["dark"], r["deep"], 0.5)))
     for _ in range(46):
         x, y = rng.randrange(N), rng.randrange(N)
         n = rng.randint(2, 3)
@@ -580,6 +633,7 @@ def f_drift(name, v, r, rng):
     above whatever he is standing on."""
     img = canvas(r["base"])
     dither(img, r["dark"], r["base"], lambda x, y: 0.30)
+    mottle(img, rng, 3, 4, 8, (mix(r["base"], r["lit"], 0.55), r["dark"]))
     for _ in range(14):
         y, x = rng.randrange(N), rng.randrange(N)
         run = rng.randint(5, 11)
@@ -594,6 +648,7 @@ def f_grain(name, v, r, rng):
     reads as a path you are meant to follow."""
     img = canvas(r["base"])
     dither(img, r["dark"], r["base"], lambda x, y: 0.35)
+    mottle(img, rng, 2, 4, 7, (mix(r["base"], r["mid"], 0.5),))
     for y in range(2 + v, N, 5):
         wob = 0
         for x in range(N):
@@ -628,6 +683,7 @@ def f_silt(name, v, r, rng):
     """Swamp mud. Walkable, dark, and wet: the sheen is two or three short
     horizontal highlights, not a gradient."""
     img = canvas(r["base"])
+    mottle(img, rng, 3, 5, 9, (r["dark"], r["mid"]))
     speckle(img, rng, 220, r["dark"])
     speckle(img, rng, 60, r["deep"])
     for _ in range(9):
@@ -663,24 +719,30 @@ def f_sheet(name, v, r, rng):
 
 
 def f_strata(name, v, r, rng):
-    """Bare mountain rock. SOLID. Banded rather than lumpy, because a mountain
-    is bedding planes and scree is loose stone, and the two have to be
-    distinguishable at a glance from the top of a phone."""
+    """Bare mountain rock, seen from above. SOLID.
+
+    Drawn as large fractured plates, not as courses. The first pass of this was
+    banded, and banding plus the cross-joints that break it is exactly a course
+    of bricks -- which is the §1.4 failure that makes the summit read as a wall
+    the player is standing on. Bedrock from above is a few big irregular plates
+    with deep fractures between them and a mottled, weathered surface."""
     img = canvas(r["base"])
-    speckle(img, rng, 120, r["deep"])
-    y = -3 + v
-    while y < N:
-        h = rng.randint(4, 7)
-        wob = 0
+    lab, k = voronoi(rng, 4 + v, jitter=1.0)
+    tone = [rng.uniform(-0.55, 0.55) for _ in range(k)]
+    for y in range(N):
         for x in range(N):
-            wob += rng.choice((-1, 0, 0, 0, 1))
-            wob = max(-2, min(2, wob))
-            for i in range(h):
-                px(img, x, y + wob + i, r["dark"] if i < h - 1 else r["deep"])
-            px(img, x, y + wob, r["mid"])
-        y += h
-    speckle(img, rng, 50, r["deep"])
-    speckle(img, rng, 16, r["lit"])
+            t = tone[lab[y][x]]
+            px(img, x, y, mix(r["base"], r["lit"] if t > 0 else r["dark"], abs(t)))
+    mottle(img, rng, 4, 4, 8, (r["dark"], r["mid"]))
+    speckle(img, rng, 150, r["dark"])
+    speckle(img, rng, 60, r["deep"])
+    for (x, y) in edges_of(lab):
+        px(img, x, y, r["deep"])
+        # The plate's north-west shoulder catches the light; its south-east side
+        # falls away. One light source, again.
+        if lab[y][(x - 1) % N] != lab[y][x] or lab[(y - 1) % N][x] != lab[y][x]:
+            px(img, x + 1, y + 1, r["lit"])
+    speckle(img, rng, 26, r["tip"])
     return img
 
 
@@ -694,6 +756,7 @@ def f_canopy(name, v, r, rng):
     light on the same side of every one, packed until no floor shows -- a gap
     between crowns reads as a clearing you ought to be able to walk into."""
     img = canvas(r["deep"])
+    mottle(img, rng, 2, 6, 10, (r["dark"],))
     speckle(img, rng, 90, r["dark"])
     crowns = [(5, 5, 6), (18, 4, 7), (28, 8, 6), (10, 15, 7),
               (23, 18, 6), (3, 24, 6), (15, 27, 7), (29, 27, 5)]
@@ -772,6 +835,58 @@ FAMILIES = {
     "planks": f_planks, "void": f_void, "doorway": f_doorway,
 }
 
+def _mean_luma_rgba(img):
+    p = img.load()
+    tot = n = 0
+    for y in range(img.size[1]):
+        for x in range(img.size[0]):
+            c = p[x, y]
+            if c[3] == 0:
+                continue
+            tot += luma(c[:3])
+            n += 1
+    return tot / n if n else 0.0
+
+
+def normalise(img, target):
+    """Shift every colour in the tile by one constant in luma space until the
+    tile's mean is exactly its declared mean.
+
+    Without this the table above is a wish: speckle and dither both skew a fill
+    darker than the value it was built from, by as much as nine luma points for
+    the striated rock, and the solid-vs-walkable margins measured in the report
+    would be measuring something other than what the table says. With it, the
+    numbers in MATERIALS are the numbers verify_contrast() prints."""
+    d = target - _mean_luma_rgba(img)
+    if abs(d) < 0.05:
+        return img
+    lut = {}
+    p = img.load()
+    for y in range(img.size[1]):
+        for x in range(img.size[0]):
+            c = p[x, y]
+            if c[3] == 0:
+                continue
+            k = c[:3]
+            if k not in lut:
+                lut[k] = at_luma(k, luma(k) + d)
+            img.putpixel((x, y), tuple(lut[k]) + (c[3],))
+    return img
+
+
+def _calibrate():
+    """Shift each material's whole ramp so its fill lands on its declared mean.
+    Done once, before anything is drawn, so overlay lips and prop palettes are
+    graded against the same values the fills end up at."""
+    for name in MATERIALS:
+        raw = FAMILIES[MATERIALS[name]["family"]](
+            name, 0, R[name], rng_for("fill", name, 0))
+        d = MATERIALS[name]["mean"] - _mean_luma_rgba(raw)
+        R[name] = {k: at_luma(v, luma(v) + d) for k, v in R[name].items()}
+
+
+_calibrate()
+
 _FILL_CACHE = {}
 
 
@@ -783,7 +898,8 @@ def fill(name, v=0):
     key = (name, v)
     if key not in _FILL_CACHE:
         m = MATERIALS[name]
-        _FILL_CACHE[key] = FAMILIES[m["family"]](name, v, R[name], rng_for("fill", name, v))
+        _FILL_CACHE[key] = normalise(
+            FAMILIES[m["family"]](name, v, R[name], rng_for("fill", name, v)), m["mean"])
     return _FILL_CACHE[key]
 
 
@@ -863,25 +979,10 @@ OVERLAY_STYLE = {
 }
 
 
-def displaced(key, ends, amp, n, lo, hi, persistence=0.58):
-    """1-D midpoint displacement, pinned at both ends. The fractal is what makes
-    the front read as a coastline rather than as a wave: big lobes carrying
-    smaller lobes carrying single-pixel roughness, all from one recursion."""
-    rng = rng_for(key)
-    f = [0.0] * (n + 1)
-    f[0] = f[n] = float(ends)
-    step, a = n, float(amp)
-    while step > 1:
-        half = step // 2
-        for i in range(half, n, step):
-            f[i] = 0.5 * (f[i - half] + f[i + half]) + rng.uniform(-a, a)
-        step, a = half, a * persistence
-    return [max(lo, min(hi, int(round(t)))) for t in f]
-
-
 def side_profile(mat, side, variant):
     s = OVERLAY_STYLE[mat]
-    return displaced(("side", mat, side, variant), s["d0"], s["amp"], N, 1, s["dmax"])
+    return displaced(("side", mat, side, variant), s["d0"], s["amp"], N,
+                     max(2, s["d0"] - 3), s["dmax"], bias=s["amp"] * 0.45)
 
 
 def corner_profile(mat, corner, variant, scale=1.0):
@@ -889,7 +990,8 @@ def corner_profile(mat, corner, variant, scale=1.0):
     edge overlays the neighbouring cells draw along the same boundary."""
     s = OVERLAY_STYLE[mat]
     return displaced(("corner", mat, corner, variant, scale),
-                     s["d0"] * scale, s["amp"] * 0.7, 16, 1, s["dmax"])
+                     s["d0"] * scale, s["amp"] * 0.7, 16, max(2, s["d0"] - 2),
+                     s["dmax"], bias=s["amp"] * 0.35)
 
 
 def _side_cells(side, prof):
@@ -1108,17 +1210,19 @@ def overlay_tile(mat, kind, mask, variant):
             # water's edge, a second line of spray beyond it, and a band of wet
             # material behind -- which is three cheap pixels and the whole
             # difference between 'a beach' and 'where the sand region stops'.
-            pxa(img, x, y, r["tip"])
+            surf = at_luma(r["tip"], min(118.0, luma(r["tip"]) + 32.0))
+            pxa(img, x, y, surf)
             for dx, dy, _d in outs:
                 if rng.random() < 0.34:
-                    pxa(img, x + dx * 2, y + dy * 2, r["tip"])
+                    pxa(img, x + dx * 2, y + dy * 2, surf)
             if rng.random() < 0.5:
                 dx, dy, _d = outs[0]
                 pxa(img, x - dx * 2, y - dy * 2, r["dark"])
         elif lip == "grain":
             pxa(img, x, y, r["lit"] if lit_side else r["dark"])
         elif lip == "drift":
-            pxa(img, x, y, r["tip"] if lit_side else r["lit"])
+            pxa(img, x, y,
+                at_luma(r["tip"], min(140.0, luma(r["tip"]) + 22.0)) if lit_side else r["lit"])
         elif lip == "chip":
             pxa(img, x, y, r["mid"] if rng.random() < 0.55 else r["deep"])
         elif lip == "rag":
@@ -1128,8 +1232,12 @@ def overlay_tile(mat, kind, mask, variant):
         elif lip == "wet":
             pxa(img, x, y, r["mid"] if lit_side else r["deep"])
         elif lip == "verge":
-            if rng.random() < 0.45:
-                pxa(img, x, y, r["mid"] if lit_side else r["dark"])
+            # A road has no crisp edge; it has a swept verge and loose gravel.
+            # So the lip is broken on purpose and the scatter does the work.
+            pxa(img, x, y, r["mid"] if lit_side else r["dark"])
+            for dx, dy, _d in outs:
+                if rng.random() < 0.30:
+                    pxa(img, x + dx, y + dy, r["deep"])
         elif lip == "crack":
             pxa(img, x, y, r["deep"])
 
@@ -1317,13 +1425,13 @@ def mkramp(hue, mean, spread):
 # spent: a lit crown reaches 110-135 against a ground plane whose mean is 24-46,
 # so an object reads as an object at a glance and at arm's length.
 PP = {
-    "wood":    mkramp(_hue((C["accent"], 1.0), (C["line"], 1.2)), 40, 30),
-    "bark":    mkramp(_hue((C["accent"], 1.0), (C["line"], 2.0)), 30, 26),
-    "leaf":    mkramp(_hue((C["good"], 1.0), (C["accent_2"], 0.25)), 46, 44),
+    "wood":    mkramp(_hue((C["accent"], 1.0), (C["line"], 1.2)), 46, 36),
+    "bark":    mkramp(_hue((C["accent"], 1.0), (C["line"], 2.0)), 36, 32),
+    "leaf":    mkramp(_hue((C["good"], 1.0), (C["accent_2"], 0.25)), 52, 46),
     "leaf_dry": mkramp(_hue((C["good"], 1.0), (C["warn"], 1.1)), 46, 42),
-    "palm":    mkramp(_hue((C["good"], 1.0), (C["warn"], 0.5)), 44, 42),
-    "pine":    mkramp(_hue((C["good"], 1.0), (C["accent_2"], 0.5)), 38, 40),
-    "stone":   mkramp(_hue((C["line"], 1.0), (C["muted"], 0.6)), 42, 40),
+    "palm":    mkramp(_hue((C["good"], 1.0), (C["warn"], 0.5)), 50, 46),
+    "pine":    mkramp(_hue((C["good"], 1.0), (C["accent_2"], 0.5)), 44, 44),
+    "stone":   mkramp(_hue((C["line"], 1.0), (C["muted"], 0.6)), 46, 44),
     "pale":    mkramp(_hue((C["muted"], 1.0), (C["accent_2"], 0.3)), 62, 40),
     "cloth":   mkramp(_hue((C["danger"], 1.0), (C["accent"], 0.4)), 48, 40),
     "metal":   mkramp(_hue((C["muted"], 1.0), (C["accent_2"], 0.6)), 52, 44),
@@ -1332,7 +1440,11 @@ PP = {
     "flower":  mkramp(C["warn"], 78, 46),
     "bloom":   mkramp(C["danger"], 66, 44),
     "fungus":  mkramp(_hue((C["danger"], 1.0), (C["muted"], 0.5)), 58, 44),
-    "reed":    mkramp(_hue((C["good"], 1.0), (C["warn"], 1.6)), 42, 40),
+    "reed":    mkramp(_hue((C["good"], 1.0), (C["warn"], 1.6)), 48, 44),
+    # Piled ground: a drift has to be brighter than the snow it sits on, or it
+    # is a stain rather than a mound.
+    "snowpile": mkramp(_hue((C["muted"], 1.0), (C["accent_2"], 0.4)), 88, 26),
+    "dustpile": mkramp(_hue((C["accent"], 1.0), (C["warn"], 0.9), (C["muted"], 0.3)), 84, 24),
 }
 
 
@@ -1425,7 +1537,9 @@ def b_tree(img, rng, p):
         pdisc(img, ox, cy + oy, rr, leaf["base"], rng=rng)
     for (ox, oy, rr) in lumps[:p.get("lumps", 5)]:
         pdisc(img, ox - rr * 0.28, cy + oy + rr * 0.30, rr * 0.55, leaf["lit"], rng=rng)
-        pdisc(img, ox + rr * 0.45, cy + oy - rr * 0.45, rr * 0.34, leaf["deep"], rng=rng)
+        # `dark`, not `deep`: a deep-value disc inside a crown reads as a hole
+        # punched through the tree rather than as the shaded side of it.
+        pdisc(img, ox + rr * 0.48, cy + oy - rr * 0.50, rr * 0.28, leaf["dark"], rng=rng)
     for _ in range(p.get("tips", 10)):
         a = rng.uniform(0, math.tau)
         pp_(img, math.cos(a) * cr * 0.8, cy + math.sin(a) * cr * 0.8 + cr * 0.2, leaf["tip"])
@@ -1488,18 +1602,24 @@ def b_palm(img, rng, p):
 
 
 def b_bush(img, rng, p):
+    """A mass with a lit north-west shoulder and a couple of twigs at the base,
+    so it sits on the ground rather than hovering over it."""
     pal = PP[p["pal"]]
     r = p["r"]
-    pdisc(img, 0, r - 1, r, pal["base"], squash=0.85, rng=rng)
-    pdisc(img, -r * 0.35, r * 0.55, r * 0.5, pal["lit"], rng=rng)
-    pdisc(img, r * 0.4, r * 0.6, r * 0.38, pal["deep"], rng=rng)
+    for k in (-1, 0, 1):
+        for j in range(3):
+            pp_(img, k, j, PP["bark"]["base"] if k else PP["bark"]["lit"])
+    pdisc(img, 0, r, r, pal["base"], squash=0.88, rng=rng)
+    pdisc(img, -r * 0.42, r * 0.55, r * 0.52, pal["lit"], rng=rng)
+    pdisc(img, r * 0.45, r * 0.62, r * 0.40, pal["deep"], rng=rng)
+    pdisc(img, -r * 0.30, r * 1.25, r * 0.34, pal["mid"], rng=rng)
     for _ in range(p.get("tips", 8)):
         a = rng.uniform(0, math.tau)
-        pp_(img, math.cos(a) * r * 0.85, (r - 1) + math.sin(a) * r * 0.7, pal["tip"])
+        pp_(img, math.cos(a) * r * 0.9, r + math.sin(a) * r * 0.78, pal["tip"])
     for _ in range(p.get("berries", 0)):
         a = rng.uniform(0, math.tau)
-        pp_(img, math.cos(a) * r * 0.6, (r - 1) + math.sin(a) * r * 0.5, PP["bloom"]["lit"])
-    return int(r * 0.95)
+        pp_(img, math.cos(a) * r * 0.6, r + math.sin(a) * r * 0.55, PP["bloom"]["lit"])
+    return int(r * 1.05)
 
 
 def b_boulder(img, rng, p):
@@ -1509,16 +1629,22 @@ def b_boulder(img, rng, p):
     w, h = p["w"], p["h"]
     for dy in range(h):
         t = dy / float(h)
-        span = int(w * math.sqrt(max(0.0, 1.0 - (t * 0.85) ** 2))) + rng.choice((-1, 0, 0))
+        # A full dome, not a truncated one. Cutting the top at 85% leaves a flat
+        # lit plate that reads as a tent at 3x -- which is exactly what the
+        # first pass of these looked like on a real frame.
+        span = int(w * math.sqrt(max(0.0, 1.0 - t * t))) + rng.choice((-1, 0, 0))
+        if span <= 0:
+            continue
         for dx in range(-span, span + 1):
             u = (dx + span) / float(2 * span + 1)
             c = pal["base"]
-            if u < 0.30:
+            if u < 0.32:
                 c = pal["mid"]
-            elif u > 0.72:
+            elif u > 0.70:
                 c = pal["deep"]
-            if t > 0.80:
-                c = pal["lit"] if u < 0.55 else pal["mid"]
+            # The highlight is a crescent on the north-west shoulder, not a lid.
+            if t > 0.55 and u < 0.62:
+                c = pal["lit"] if t > 0.72 else pal["mid"]
             pp_(img, dx, dy, c)
     for _ in range(p.get("cracks", 3)):
         x, y = rng.randint(-w // 2, w // 2), rng.randint(1, h - 2)
@@ -1558,25 +1684,38 @@ def b_flowers(img, rng, p):
 
 
 def b_log(img, rng, p):
-    """Fallen. Lies along the ground, so it is wide and low and its shadow is
-    the widest thing about it."""
+    """Fallen. A horizontal cylinder: lit along the upper surface, dark under,
+    with a visible end grain. Lies along the ground, so it is wide and low and
+    its shadow is the widest thing about it."""
     pal = PP[p["pal"]]
     w, r = p["w"], p["r"]
+    top = 2 * r
     for dx in range(-w, w + 1):
-        for dy in range(r * 2):
-            c = pal["base"]
-            if dy > r + 1:
+        for dy in range(1, top + 1):
+            t = (dy - 1) / float(top - 1)
+            if t > 0.78:
                 c = pal["lit"]
-            elif dy < r - 1:
+            elif t > 0.52:
+                c = pal["mid"]
+            elif t > 0.24:
+                c = pal["base"]
+            else:
                 c = pal["deep"]
-            pp_(img, dx, dy + 1, c)
-    for dy in range(r * 2):
-        pp_(img, -w, dy + 1, pal["mid"])
-        pp_(img, -w + 1, dy + 1, pal["dark"] if dy % 3 else pal["deep"])
+            pp_(img, dx, dy, c)
+        if rng.random() < 0.4:
+            pp_(img, dx, rng.randint(2, top - 1), pal["dark"])
+    for dy in range(1, top + 1):
+        span = 2 if 2 < dy < top - 1 else 1
+        for k in range(span):
+            pp_(img, -w - k, dy, pal["mid"] if dy > top * 0.6 else pal["base"])
+    for dy in range(2, top):
+        pp_(img, -w + 1, dy, pal["tip"] if dy == top // 2 else pal["dark"])
     for _ in range(p.get("moss", 0)):
         x = rng.randint(-w + 2, w - 1)
-        pp_(img, x, r * 2, PP["leaf"]["dark"])
-        pp_(img, x + 1, r * 2, PP["leaf"]["base"])
+        pp_(img, x, top, PP["leaf"]["dark"])
+        pp_(img, x + 1, top, PP["leaf"]["base"])
+        if rng.random() < 0.5:
+            pp_(img, x, top + 1, PP["leaf"]["lit"])
     return w + 1
 
 
@@ -1597,62 +1736,110 @@ def b_stump(img, rng, p):
 
 def b_post(img, rng, p):
     """Fencepost, waymarker, signpost. Vertical, thin, and tall enough to break
-    the horizon of the tile it stands in."""
+    the horizon of the tile it stands in -- which is the whole reason a prop
+    stops a screen reading as wallpaper."""
     pal = PP[p.get("pal", "wood")]
-    h = p["h"]
+    h, ww = p["h"], p.get("w", 2)
     for dy in range(h):
-        pp_(img, -1, dy, pal["lit"])
-        pp_(img, 0, dy, pal["base"])
-        pp_(img, 1, dy, pal["deep"])
+        for dx in range(-ww, ww + 1):
+            c = pal["base"]
+            if dx <= -ww + 1:
+                c = pal["lit"]
+            elif dx >= ww:
+                c = pal["deep"]
+            pp_(img, dx, dy, c)
+        if dy % 4 == 1:
+            pp_(img, ww - 1, dy, pal["dark"])
+    for dx in range(-ww, ww + 1):
+        pp_(img, dx, h, pal["tip"] if dx < 0 else pal["mid"])
+    if p.get("rail"):
+        # Two rails, spanning the full tile, so a fence line joins up cell to
+        # cell instead of being a row of disconnected sticks.
+        for ry in (int(h * 0.42), int(h * 0.78)):
+            for dx in range(-16, 17):
+                pp_(img, dx, ry, pal["dark"])
+                pp_(img, dx, ry + 1, pal["mid"])
+                pp_(img, dx, ry + 2, pal["deep"])
     if p.get("board"):
         bw, bh = p["board"]
+        top = h
         for dy in range(bh):
             for dx in range(-bw, bw + 1):
-                c = pal["mid"] if dy > bh - 3 else pal["base"]
-                if dx < -bw + 1:
+                c = pal["base"]
+                if dy == bh - 1:
+                    c = pal["tip"]
+                elif dy == 0:
+                    c = pal["deep"]
+                elif dx <= -bw + 1:
                     c = pal["lit"]
-                elif dx > bw - 1:
+                elif dx >= bw - 1:
                     c = pal["dark"]
-                pp_(img, dx, h - bh + dy, c)
-        for dx in range(-bw + 2, bw - 1, 2):
-            pp_(img, dx, h - bh + bh // 2, pal["deep"])
-    if p.get("rail"):
-        for dx in range(-9, 10):
-            pp_(img, dx, h - 4, pal["dark"])
-            pp_(img, dx, h - 3, pal["mid"])
+                pp_(img, dx, top + dy, c)
+        for row in range(2, bh - 1, 2):
+            for dx in range(-bw + 2, bw - 1):
+                if (dx + row) % 3:
+                    pp_(img, dx, top + row, pal["deep"])
     if p.get("flag"):
-        for dy in range(4):
-            for dx in range(1, 6 - dy):
-                pp_(img, dx, h - 1 - dy, PP["cloth"]["base"] if dx > 2 else PP["cloth"]["lit"])
-    return 4
+        for dy in range(6):
+            for dx in range(2, 9 - abs(dy - 3)):
+                pp_(img, dx, h - 2 - dy, PP["cloth"]["base"] if dx > 4 else PP["cloth"]["lit"])
+    return max(4, ww + 2)
+
+
+def b_deadtree(img, rng, p):
+    """A bare trunk with three or four branches that break the outline. The
+    branches are the point -- a dead tree without them is a post."""
+    bark = PP["bark"]
+    h = p["h"]
+    for dy in range(h):
+        ww = 2 if dy < h * 0.55 else 1
+        for dx in range(-ww, ww + 1):
+            pp_(img, dx, dy, bark["lit"] if dx < 0 else (bark["deep"] if dx > 0 else bark["base"]))
+    for (sy, side, ln) in p["branches"]:
+        x, y = 0.0, float(sy)
+        for i in range(ln):
+            x += side
+            y += 0.9 if i < ln // 2 else 0.45
+            pp_(img, x, y, bark["base"])
+            pp_(img, x, y + 1, bark["lit"] if side < 0 else bark["deep"])
+        for k in range(3):
+            pp_(img, x + side * (k + 1) * 0.6, y + 1 + k, bark["dark"])
+    return 5
 
 
 def b_cactus(img, rng, p):
     pal = PP["palm"]
+
+    def column(x0, y0, hh, ww):
+        for dy in range(hh):
+            for dx in range(-ww, ww + 1):
+                c = pal["base"]
+                if dx <= -ww + 1:
+                    c = pal["lit"]
+                elif dx >= ww:
+                    c = pal["deep"]
+                pp_(img, x0 + dx, y0 + dy, c)
+        for dx in range(-ww + 1, ww):
+            pp_(img, x0 + dx, y0 + hh, pal["mid"] if dx < 0 else pal["base"])
+        for dy in range(1, hh, 3):
+            pp_(img, x0 - ww, y0 + dy, pal["tip"])
+            pp_(img, x0 + ww, y0 + dy, pal["tip"])
+
     h, w = p["h"], p.get("w", 3)
-    for dy in range(h):
-        for dx in range(-w, w + 1):
-            c = pal["base"]
-            if dx < -w + 1:
-                c = pal["lit"]
-            elif dx > w - 1:
-                c = pal["deep"]
-            pp_(img, dx, dy, c)
-    for dy in range(2, h - 1, 3):
-        pp_(img, -w, dy, pal["tip"])
-        pp_(img, w, dy, pal["tip"])
-    for dx in range(-w, w + 1):
-        pp_(img, dx, h, pal["mid"] if dx < 0 else pal["base"])
     for (side, ay, ah) in p.get("arms", []):
-        for dy in range(ah):
-            for k in range(-1, 2):
-                pp_(img, side * (w + 2) + k, ay + dy, pal["base"] if k else pal["lit"])
-        for dx in range(0, w + 3):
-            pp_(img, side * dx, ay, pal["dark"])
+        ax = side * (w + 4)
+        for i in range(3):
+            for k in range(3):
+                pp_(img, side * (w - 1 + i), ay + k,
+                    pal["mid"] if k == 2 else (pal["base"] if k else pal["deep"]))
+        for k in range(2):
+            pp_(img, ax - side, ay + 3 + k, pal["base"])
+        column(ax, ay + 2, ah, 2)
+    column(0, 0, h, w)
     if p.get("bloom"):
-        pp_(img, 0, h + 1, PP["bloom"]["tip"])
-        pp_(img, -1, h + 1, PP["bloom"]["base"])
-    return w + 2
+        for k in (-1, 0, 1):
+            pp_(img, k, h + 1, PP["bloom"]["tip"] if k == 0 else PP["bloom"]["base"])
+    return w + 3
 
 
 def b_reeds(img, rng, p):
@@ -1671,25 +1858,31 @@ def b_reeds(img, rng, p):
 
 def b_flat(img, rng, p):
     """Things that lie on the ground: shells, bones, driftwood, a rug, a pool.
-    No height, so no cast shadow -- only a rim, or the illusion is wrong."""
+    Almost no height, so almost no cast shadow -- only a lit north edge and a
+    dark south one, or the illusion is wrong."""
     pal = PP[p["pal"]]
     w, h = p["w"], p["h"]
     for dy in range(h):
-        span = int(w * math.sqrt(max(0.0, 1.0 - ((dy - h / 2.0) / (h / 2.0)) ** 2)))
+        span = int(w * math.sqrt(max(0.0, 1.0 - ((dy - h / 2.0) / (h / 2.0 + 0.5)) ** 2)))
         for dx in range(-span, span + 1):
-            c = pal["base"] if (dx + dy) % 5 else pal["mid"]
-            if dy < 2:
-                c = pal["dark"]
+            c = pal["base"] if (dx + dy) % 4 else pal["mid"]
+            if dy >= h - 2:
+                c = pal["lit"]
+            elif dy < 1:
+                c = pal["deep"]
             pp_(img, dx, dy + 1, c)
-    if p.get("ribs"):
-        for dx in range(-w + 1, w, 2):
-            for dy in range(h):
-                pp_(img, dx, dy + 1, pal["deep"])
-    if p.get("rim"):
-        for dy in range(h):
-            span = int(w * math.sqrt(max(0.0, 1.0 - ((dy - h / 2.0) / (h / 2.0)) ** 2)))
-            pp_(img, -span, dy + 1, pal["lit"])
+        if span:
+            pp_(img, -span, dy + 1, pal["lit"] if dy > h // 2 else pal["mid"])
             pp_(img, span, dy + 1, pal["deep"])
+    if p.get("ribs"):
+        for dx in range(-w + 2, w - 1, 3):
+            for dy in range(1, h - 1):
+                pp_(img, dx, dy + 1, pal["deep"])
+    if p.get("eyes"):
+        pp_(img, -2, h - 2, pal["deep"])
+        pp_(img, 2, h - 2, pal["deep"])
+        for dx in range(-1, 2):
+            pp_(img, dx, 2, pal["deep"])
     return 0
 
 
@@ -1922,9 +2115,14 @@ def b_monument(img, rng, p):
                 elif dx > span - 2:
                     c = stone["deep"]
                 pp_(img, dx, dy, c)
-        for _ in range(p.get("runes", 5)):
-            x, y = rng.randint(-w + 2, w - 2), rng.randint(3, h - 4)
-            pp_(img, x, y, PP["gold"]["base"])
+        # Carved marks in one column down the lit face. Scattered, they read as
+        # noise; stacked, they read as writing.
+        n = max(2, p.get("runes", 5) // 2)
+        for i in range(n):
+            y = int(3 + (h - 7) * (i + 0.5) / n)
+            x = -w // 3
+            pp_(img, x, y, PP["gold"]["lit"])
+            pp_(img, x + 1, y, PP["gold"]["base"])
             pp_(img, x, y + 1, PP["gold"]["dark"])
         return w
     if kind == "cairn":
@@ -1996,27 +2194,32 @@ def b_shard(img, rng, p):
 
 
 def b_mound(img, rng, p):
-    """Snow drift and sand hummock. Almost flat, one lit crown, no outline --
-    it is the ground, piled."""
+    """Snow drift and sand hummock. Almost flat and no outline -- it is the
+    ground, piled -- but a full step BRIGHTER than the ground it sits on, with
+    a shadowed lee on the south-east, or it is a stain rather than a mound."""
     pal = PP[p["pal"]]
     w, h = p["w"], p["h"]
-    for dy in range(h):
-        span = int(w * math.sqrt(max(0.0, 1.0 - (dy / float(h)) ** 2)))
-        for dx in range(-span, span + 1):
+    crest = displaced(("mound", p["pal"], w, h), h, h * 0.5, 16, 2, h + 2)
+    for dx in range(-w, w + 1):
+        i = int((dx + w) / float(2 * w) * 16)
+        hh = int(crest[min(16, i)] * math.sqrt(max(0.0, 1.0 - (dx / float(w + 1)) ** 2)))
+        for dy in range(hh + 1):
             c = pal["base"]
-            if dy > h - 3:
+            if dy >= hh - 1:
                 c = pal["tip"]
-            elif dx < -span + 3:
+            elif dx < -w * 0.3:
                 c = pal["lit"]
-            elif dx > span - 3:
+            elif dx > w * 0.35:
                 c = pal["dark"]
             pp_(img, dx, dy, c)
+        if dx > w * 0.2 and hh > 1:
+            pp_(img, dx, 0, pal["deep"])
     return 0
 
 
 BUILDERS = {
     "tree": b_tree, "pine": b_pine, "palm": b_palm, "bush": b_bush,
-    "boulder": b_boulder, "tuft": b_tuft, "flowers": b_flowers, "log": b_log,
+    "boulder": b_boulder, "tuft": b_tuft, "flowers": b_flowers, "log": b_log, "deadtree": b_deadtree,
     "stump": b_stump, "post": b_post, "cactus": b_cactus, "reeds": b_reeds,
     "flat": b_flat, "box": b_box, "furniture": b_furniture,
     "structure": b_structure, "monument": b_monument, "mushroom": b_mushroom,
@@ -2038,90 +2241,91 @@ BUILDERS = {
 # Slot index in props.png IS the prop id minus one; id 0 in the props plane
 # means nothing is there. Appending is safe, reordering rewrites every world.
 
-def _p(pid, kind, biome, density, solid=False, foot=(1, 1), shadow=True,
+def _p(pid, build, biome, density, solid=False, foot=(1, 1), shadow=True,
        outline=True, **params):
-    return dict(id=pid, kind=kind, biome=biome, density=density, solid=solid,
+    return dict(id=pid, build=build, biome=biome, density=density, solid=solid,
                 foot=list(foot), shadow=shadow, outline=outline, params=params)
 
 
 PROPS = [
     # --- grassland ------------------------------------------------------------
-    _p("grass_tuft", "tuft", "grass_short", 0.055, shadow=False, outline=False, pal="leaf", n=7, spread=8, h=5),
-    _p("grass_clump", "tuft", "grass_tall", 0.070, shadow=False, outline=False, pal="leaf", n=11, spread=10, h=9),
-    _p("flowers_gold", "flowers", "grass_short", 0.022, shadow=False, outline=False, pal="flower", n=5, spread=7),
-    _p("flowers_red", "flowers", "grass_short", 0.016, shadow=False, outline=False, pal="bloom", n=4, spread=6),
-    _p("thistle", "tuft", "grass_tall", 0.020, shadow=False, outline=False, pal="pale", n=5, spread=5, h=11),
-    _p("stone_small", "boulder", "grass_short", 0.024, pal="stone", w=5, h=5, cracks=2),
-    _p("boulder", "boulder", "grass_short", 0.012, solid=True, pal="stone", w=11, h=13, cracks=4),
-    _p("bush", "bush", "grass_short", 0.026, pal="leaf", r=8, tips=10),
-    _p("bramble", "bush", "grass_tall", 0.020, solid=True, pal="leaf", r=10, tips=14, berries=6),
-    _p("stump", "stump", "grass_short", 0.012, solid=True, r=5, h=7),
-    _p("log_fallen", "log", "grass_short", 0.010, solid=True, foot=(2, 1), pal="bark", w=13, r=4, moss=6),
+    _p("grass_tuft", "tuft", "grass_short", 0.055, shadow=False, outline=False, pal="leaf", n=11, spread=11, h=7),
+    _p("grass_clump", "tuft", "grass_tall", 0.070, shadow=False, outline=False, pal="leaf", n=15, spread=12, h=11),
+    _p("flowers_gold", "flowers", "grass_short", 0.022, shadow=False, outline=False, pal="flower", n=8, spread=10),
+    _p("flowers_red", "flowers", "grass_short", 0.016, shadow=False, outline=False, pal="bloom", n=7, spread=9),
+    _p("thistle", "tuft", "grass_tall", 0.020, shadow=False, outline=False, pal="pale", n=7, spread=7, h=13),
+    _p("stone_small", "boulder", "grass_short", 0.024, pal="stone", w=8, h=8, cracks=3),
+    _p("boulder", "boulder", "grass_short", 0.012, solid=True, pal="stone", w=13, h=16, cracks=5),
+    _p("bush", "bush", "grass_short", 0.026, pal="leaf", r=9, tips=12),
+    _p("bramble", "bush", "grass_tall", 0.020, solid=True, pal="leaf", r=11, tips=16, berries=8),
+    _p("stump", "stump", "grass_short", 0.012, solid=True, r=7, h=9),
+    _p("log_fallen", "log", "grass_short", 0.010, solid=True, foot=(2, 1), pal="bark", w=15, r=5, moss=8),
     _p("tree_lone", "tree", "grass_short", 0.014, solid=True, pal="leaf", trunk=13, crown=12, tw=2),
-    _p("fencepost", "post", "grass_tall", 0.012, h=17, rail=True),
-    _p("gate", "post", "grass_tall", 0.004, solid=True, h=22, rail=True, board=(7, 6)),
+    _p("fencepost", "post", "grass_tall", 0.012, h=19, rail=True),
+    _p("gate", "post", "grass_tall", 0.004, solid=True, h=24, rail=True, board=(9, 8)),
 
     # --- forest ---------------------------------------------------------------
     _p("tree_pine", "pine", "forest", 0.030, solid=True, pal="pine", trunk=8, tiers=4, w=12, th=8),
     _p("tree_broad", "tree", "forest", 0.028, solid=True, pal="leaf", trunk=15, crown=14, tw=3),
-    _p("tree_dead", "pine", "scree", 0.014, solid=True, pal="bark", trunk=16, tiers=2, w=7, th=6),
-    _p("log_mossy", "log", "forest", 0.014, solid=True, foot=(2, 1), pal="bark", w=15, r=5, moss=12),
-    _p("mushroom_ring", "mushroom", "forest", 0.018, shadow=False, n=6, spread=10, cap="fungus"),
-    _p("fern", "tuft", "forest", 0.030, shadow=False, outline=False, pal="pine", n=9, spread=9, h=7),
+    _p("tree_dead", "deadtree", "scree", 0.014, solid=True, h=30,
+       branches=[(11, -1, 8), (17, 1, 9), (23, -1, 6)]),
+    _p("log_mossy", "log", "forest", 0.014, solid=True, foot=(2, 1), pal="bark", w=17, r=6, moss=14),
+    _p("mushroom_ring", "mushroom", "forest", 0.018, shadow=False, n=7, spread=12, cap="fungus"),
+    _p("fern", "tuft", "forest", 0.030, shadow=False, outline=False, pal="pine", n=12, spread=12, h=9),
 
     # --- shore and sea --------------------------------------------------------
-    _p("driftwood", "log", "sand", 0.016, pal="pale", w=11, r=3),
-    _p("shell", "flat", "sand", 0.020, shadow=False, pal="pale", w=4, h=5, rim=True),
-    _p("beach_weed", "tuft", "sand", 0.024, shadow=False, outline=False, pal="reed", n=6, spread=8, h=6),
-    _p("tide_pool", "flat", "sand", 0.010, shadow=False, outline=False, pal="ice", w=9, h=7, rim=True),
-    _p("palm_shore", "palm", "sand", 0.012, solid=True, pal="palm", trunk=26, lean=6, fronds=6, flen=14),
-    _p("sea_rock", "boulder", "water", 0.014, solid=True, pal="stone", w=8, h=7, cracks=3),
-    _p("reed_bed", "reeds", "mud", 0.055, shadow=False, outline=False, n=12, spread=11, h=13, head=True),
+    _p("driftwood", "log", "sand", 0.022, pal="pale", w=13, r=4),
+    _p("shell", "flat", "sand", 0.026, shadow=False, pal="pale", w=7, h=8, ribs=True),
+    _p("beach_weed", "tuft", "sand", 0.038, shadow=False, outline=False, pal="reed", n=9, spread=11, h=8),
+    _p("tide_pool", "flat", "sand", 0.014, shadow=False, outline=False, pal="ice", w=13, h=10),
+    _p("palm_shore", "palm", "sand", 0.016, solid=True, pal="palm", trunk=26, lean=6, fronds=6, flen=14),
+    _p("sea_rock", "boulder", "water", 0.022, solid=True, pal="stone", w=11, h=10, cracks=4),
+    _p("reed_bed", "reeds", "mud", 0.055, shadow=False, outline=False, n=15, spread=13, h=15, head=True),
 
     # --- desert ---------------------------------------------------------------
-    _p("cactus_tall", "cactus", "dune", 0.018, solid=True, h=24, w=3, arms=[(-1, 12, 8), (1, 16, 6)], bloom=True),
-    _p("cactus_round", "cactus", "dune", 0.022, h=8, w=5, bloom=True),
-    _p("dry_shrub", "bush", "dune", 0.028, pal="leaf_dry", r=7, tips=14),
-    _p("dune_grass", "tuft", "dune", 0.045, shadow=False, outline=False, pal="leaf_dry", n=9, spread=10, h=8),
-    _p("sand_mound", "mound", "dune", 0.030, shadow=False, outline=False, pal="pale", w=13, h=6),
-    _p("skull", "flat", "hardpan", 0.010, pal="pale", w=5, h=6, rim=True),
-    _p("bones", "flat", "hardpan", 0.012, pal="pale", w=8, h=5, ribs=True),
-    _p("mesa_rock", "boulder", "hardpan", 0.018, solid=True, pal="stone", w=13, h=16, cracks=6),
-    _p("palm_oasis", "palm", "hardpan", 0.006, solid=True, pal="palm", trunk=30, lean=-5, fronds=7, flen=15),
+    _p("cactus_tall", "cactus", "dune", 0.018, solid=True, h=26, w=3, arms=[(-1, 9, 11), (1, 15, 8)], bloom=True),
+    _p("cactus_round", "cactus", "dune", 0.022, h=11, w=6, bloom=True),
+    _p("dry_shrub", "bush", "dune", 0.028, pal="leaf_dry", r=9, tips=16),
+    _p("dune_grass", "tuft", "dune", 0.045, shadow=False, outline=False, pal="leaf_dry", n=13, spread=13, h=10),
+    _p("sand_mound", "mound", "dune", 0.030, shadow=False, outline=False, pal="dustpile", w=16, h=8),
+    _p("skull", "flat", "hardpan", 0.014, pal="pale", w=7, h=9, eyes=True),
+    _p("bones", "flat", "hardpan", 0.018, pal="pale", w=11, h=7, ribs=True),
+    _p("mesa_rock", "boulder", "hardpan", 0.028, solid=True, pal="stone", w=15, h=19, cracks=7),
+    _p("palm_oasis", "palm", "hardpan", 0.008, solid=True, pal="palm", trunk=30, lean=-5, fronds=7, flen=15),
 
     # --- jungle ---------------------------------------------------------------
-    _p("jungle_fern", "tuft", "undergrowth", 0.075, shadow=False, outline=False, pal="palm", n=13, spread=12, h=11),
+    _p("jungle_fern", "tuft", "undergrowth", 0.075, shadow=False, outline=False, pal="palm", n=16, spread=14, h=13),
     _p("banana_palm", "palm", "undergrowth", 0.020, solid=True, pal="palm", trunk=22, lean=4, fronds=5, flen=16),
-    _p("vine_pillar", "post", "undergrowth", 0.016, solid=True, pal="bark", h=30, board=(4, 5)),
-    _p("giant_mushroom", "mushroom", "undergrowth", 0.014, n=3, spread=7, cap="bloom"),
-    _p("idol", "monument", "undergrowth", 0.004, solid=True, kind="menhir", pal="stone", h=26, w=6, runes=7),
-    _p("marsh_reeds", "reeds", "undergrowth", 0.030, shadow=False, outline=False, n=9, spread=10, h=12),
+    _p("vine_pillar", "post", "undergrowth", 0.016, solid=True, pal="bark", h=32, w=4, board=(6, 6)),
+    _p("giant_mushroom", "mushroom", "undergrowth", 0.014, n=4, spread=9, cap="bloom"),
+    _p("idol", "monument", "undergrowth", 0.004, solid=True, kind="menhir", pal="stone", h=28, w=7, runes=7),
+    _p("marsh_reeds", "reeds", "undergrowth", 0.030, shadow=False, outline=False, n=13, spread=13, h=14),
 
     # --- highland -------------------------------------------------------------
-    _p("scree_stone", "boulder", "scree", 0.045, pal="stone", w=6, h=5, cracks=2),
-    _p("crag", "boulder", "scree", 0.020, solid=True, pal="stone", w=14, h=18, cracks=7),
-    _p("cairn", "monument", "scree", 0.010, kind="cairn", stack=[6, 5, 4, 3], jog=1),
-    _p("scrub", "bush", "scree", 0.026, pal="pine", r=6, tips=8),
-    _p("snow_drift", "mound", "snow", 0.040, shadow=False, outline=False, pal="pale", w=14, h=7),
-    _p("ice_shard", "shard", "snow", 0.018, pal="ice", n=3, spread=6, h=11),
-    _p("marker_pole", "post", "snow", 0.010, h=24, flag=True),
-    _p("crystal", "shard", "ice", 0.014, pal="ice", n=4, spread=7, h=14),
+    _p("scree_stone", "boulder", "scree", 0.045, pal="stone", w=9, h=8, cracks=3),
+    _p("crag", "boulder", "scree", 0.020, solid=True, pal="stone", w=16, h=21, cracks=8),
+    _p("cairn", "monument", "scree", 0.010, kind="cairn", stack=[8, 7, 5, 4], jog=2),
+    _p("scrub", "bush", "scree", 0.026, pal="pine", r=8, tips=11),
+    _p("snow_drift", "mound", "snow", 0.040, shadow=False, outline=False, pal="snowpile", w=17, h=9),
+    _p("ice_shard", "shard", "snow", 0.018, pal="ice", n=4, spread=8, h=13),
+    _p("marker_pole", "post", "snow", 0.010, h=26, flag=True),
+    _p("crystal", "shard", "ice", 0.014, pal="ice", n=5, spread=9, h=16),
 
     # --- road -----------------------------------------------------------------
-    _p("milestone", "monument", "path_dirt", 0.012, kind="menhir", pal="stone", h=10, w=4, runes=2),
-    _p("signpost", "post", "path_dirt", 0.008, h=22, board=(8, 7)),
+    _p("milestone", "monument", "path_dirt", 0.012, kind="menhir", pal="stone", h=13, w=5, runes=3),
+    _p("signpost", "post", "path_dirt", 0.008, h=24, board=(10, 8)),
     _p("wayside_shrine", "monument", "path_dirt", 0.004, solid=True, kind="shrine"),
-    _p("rut_stone", "boulder", "path_dirt", 0.014, pal="stone", w=4, h=3, cracks=1),
+    _p("rut_stone", "boulder", "path_dirt", 0.014, pal="stone", w=7, h=5, cracks=2),
 
     # --- placed: the town -----------------------------------------------------
-    _p("barrel", "box", "placed", 0.0, solid=True, w=6, h=13, d=5, bands=True),
-    _p("crate", "box", "placed", 0.0, solid=True, w=7, h=12, d=4, slats=True),
+    _p("barrel", "box", "placed", 0.0, solid=True, w=7, h=15, d=5, bands=True),
+    _p("crate", "box", "placed", 0.0, solid=True, w=8, h=14, d=5, slats=True),
     _p("well", "structure", "placed", 0.0, solid=True, foot=(2, 2), kind="well"),
     _p("cart", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="cart"),
     _p("market_stall", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="stall"),
     _p("lamppost", "structure", "placed", 0.0, solid=True, kind="lamppost"),
     _p("bench", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="bench"),
-    _p("standing_stone", "monument", "placed", 0.0, solid=True, kind="menhir", pal="stone", h=30, w=7, runes=8),
+    _p("standing_stone", "monument", "placed", 0.0, solid=True, kind="menhir", pal="stone", h=34, w=8, runes=8),
 
     # --- placed: interiors ----------------------------------------------------
     _p("bed", "furniture", "placed", 0.0, solid=True, foot=(2, 2), kind="bed"),
@@ -2164,7 +2368,7 @@ def build_prop(pid):
     p = PROP_BY_ID[pid]
     img = prop_canvas()
     rng = rng_for("prop", pid)
-    rw = BUILDERS[p["kind"]](img, rng, p["params"])
+    rw = BUILDERS[p["build"]](img, rng, p["params"])
     if p["outline"]:
         poutline(img)
     if p["shadow"]:
@@ -2218,41 +2422,57 @@ def _cliff_edge(key, ends, amp, lo, hi):
 
 
 def cliff_face(name, left_end=False, right_end=False, top_rim=True, base=True):
+    """A vertical rock face, seen straight on.
+
+    The grooves run VERTICALLY. That is the whole trick: horizontal courses read
+    as a wall you are standing on (§1.4, the summit), vertical grooves read as a
+    wall you are standing under. Lit from the north-west, so the left third is
+    brighter and each groove has a lit western shoulder; darkening downward,
+    with the bottom rows going below anything on the ground plane."""
     r = R["cliff"]
     img = Image.new("RGBA", (N, N), (0, 0, 0, 0))
-    rng = rng_for("cliff", name)
-    rim = _cliff_edge(("cliffrim", name), 2, 1.6, 1, 4)
+    rng = rng_for("cliffface", name)
+    rim = _cliff_edge(("cliffrim", name), 3, 1.4, 2, 5)
     for x in range(N):
-        # Striations: a vertical column of banded rock, its bands offset by a
-        # slow wander so the face never reads as a ruled grid.
-        col_lit = 1.0 - min(1.0, max(0.0, (x - 3) / 24.0))
-        y = rim[x] if top_rim else 0
-        while y < N:
-            h = rng.randint(3, 6)
-            for j in range(h):
-                if y + j >= N:
-                    break
-                t = col_lit
-                c = mix(r["deep"], r["mid"], 0.25 + 0.55 * t)
-                if j == 0:
-                    c = mix(r["dark"], r["lit"], 0.30 + 0.60 * t)
-                elif j == h - 1:
-                    c = r["deep"]
-                if base and y + j > N - 4:
-                    c = mix(c, SHADOW, 0.55)
-                pxa(img, x, y + j, c)
-            y += h
-        if top_rim:
+        wramp = 1.0 - min(1.0, max(0.0, (x - 2) / 27.0))      # north-west light
+        for y in range(N):
+            t = y / float(N - 1)
+            c = mix(mix(r["dark"], r["mid"], 0.30 + 0.55 * wramp), r["deep"], 0.15 + 0.70 * t)
+            pxa(img, x, y, c)
+    # Grooves: five or six vertical fractures, each with a lit west shoulder and
+    # a dark east one, wandering by a pixel so none of them is a ruled line.
+    gx = rng.randint(1, 5)
+    while gx < N:
+        wob = 0.0
+        for y in range(N):
+            wob += rng.choice((-0.5, 0.0, 0.0, 0.0, 0.5))
+            wob = max(-2.0, min(2.0, wob))
+            t = y / float(N - 1)
+            pxa(img, gx + wob, y, mix(r["deep"], BLACK, 0.25 * t))
+            pxa(img, gx + wob - 1, y, mix(r["lit"], r["deep"], 0.25 + 0.65 * t))
+            pxa(img, gx + wob + 1, y, mix(r["dark"], r["deep"], 0.4 + 0.5 * t))
+        gx += rng.randint(4, 8)
+    if top_rim:
+        for x in range(N):
             for k in range(rim[x]):
-                pxa(img, x, k, r["tip"] if k == rim[x] - 1 else r["lit"])
+                pxa(img, x, k, r["tip"] if k < 1 else (r["lit"] if k < 2 else r["mid"]))
+    if base:
+        for x in range(N):
+            for k in range(4):
+                y = N - 1 - k
+                c = img.getpixel((x, y))[:3]
+                pxa(img, x, y, mix(c, SHADOW, 0.75 - 0.15 * k))
     if left_end:
         for y in range(N):
-            for k in range(3):
-                pxa(img, k, y, mix(r["lit"], r["tip"], 0.4 - k * 0.15))
+            for k in range(2):
+                c = img.getpixel((k, y))[:3]
+                pxa(img, k, y, mix(c, r["tip"], 0.45 - k * 0.20))
     if right_end:
         for y in range(N):
-            for k in range(3):
-                pxa(img, N - 1 - k, y, mix(r["deep"], SHADOW, 0.3 + k * 0.2))
+            for k in range(2):
+                x = N - 1 - k
+                c = img.getpixel((x, y))[:3]
+                pxa(img, x, y, mix(c, SHADOW, 0.55 - k * 0.20))
     return img
 
 
@@ -2370,9 +2590,9 @@ COMPOSITIONS = [
     ("shore", [(0.30, "ocean"), (0.44, "water"), (0.53, "sand"),
                (0.70, "grass_short"), (1.01, "grass_tall")],
      dict(seed=11, tilt=(0.42, 0.10))),
-    ("forest_edge", [(0.40, "path_dirt"), (0.55, "grass_short"),
-                     (0.66, "grass_tall"), (1.01, "forest")],
-     dict(seed=27, tilt=(0.0, 0.30), warp=0.25)),
+    ("forest_edge", [(0.46, "grass_short"), (0.55, "grass_tall"),
+                     (1.01, "forest")],
+     dict(seed=27, tilt=(0.10, 0.55), warp=0.25)),
     ("scree_slope", [(0.34, "grass_short"), (0.48, "scree"), (0.60, "rock"),
                      (0.72, "cliff"), (1.01, "snow")],
      dict(seed=41, tilt=(0.15, -0.45))),
@@ -2397,6 +2617,43 @@ def build_compositions(tiles, sprites, w=12, h=12, zoom=3):
         props = scatter_props(grid, sprites, seed)
         out[name] = render_patch(grid, tiles, seed=seed, props=props, zoom=zoom)
     return out
+
+
+def cliff_demo(tiles, sprites, cliffs, w=12, h=12, zoom=3):
+    """Two terrace drops, drawn the way HJWorld will have to draw them once the
+    elevation field stops being discarded:
+
+        lip    on the last cell of the UPPER terrace
+        face   on the first cell of the LOWER terrace
+        shadow on the cell below the face
+
+    A preview, not a shipped layout -- but it is the reference for the
+    three-cell stack, and it is how you check that a drop reads as a drop."""
+    bands = ["snow", "scree", "grass_short"]
+    edges = [displaced(("terrace", i), 4 + i * 4, 1.7, 16, 3 + i * 4, 6 + i * 4)
+             for i in range(len(bands) - 1)]
+    grid, drop_at = [[None] * w for _ in range(h)], []
+    for x in range(w):
+        ys = [e[int(x / float(w) * 16)] for e in edges]
+        for y in range(h):
+            band = 0
+            while band < len(ys) and y >= ys[band]:
+                band += 1
+            grid[y][x] = bands[band]
+        for y in ys:
+            if 1 <= y < h:
+                drop_at.append((x, y))
+    img = render_patch(grid, tiles, seed=5, zoom=1)
+    for (x, y) in drop_at:
+        img.alpha_composite(cliffs["lip_mid"], (x * N, (y - 1) * N))
+        img.alpha_composite(cliffs[("face_a", "face_b", "face_c")[x % 3]], (x * N, y * N))
+        if y + 1 < h:
+            img.alpha_composite(cliffs["shadow_mid"], (x * N, (y + 1) * N))
+    for (px_, py_, sprite) in sorted(scatter_props(grid, sprites, 5), key=lambda p: (p[1], p[0])):
+        if (px_, py_) in drop_at or (px_, py_ - 1) in drop_at:
+            continue
+        img.alpha_composite(sprite, (px_ * N + N // 2 - PROP_W // 2, py_ * N + N - PROP_H))
+    return img.resize((img.size[0] * zoom, img.size[1] * zoom), Image.NEAREST)
 
 
 def contact_sheet(built, scale=4, cols=5):
@@ -2550,7 +2807,196 @@ def stats(values):
 
 
 def rgb_delta(a, b):
-    pa, pb = a.convert("RGB"), b.convert("RGB")
-    ma = [sum(pa.getdata(i)) / float(N * N) for i in range(3)]
-    mb = [sum(pb.getdata(i)) / float(N * N) for i in range(3)]
+    def means(img):
+        p = img.convert("RGB").load()
+        acc = [0, 0, 0]
+        for y in range(N):
+            for x in range(N):
+                c = p[x, y]
+                for i in range(3):
+                    acc[i] += c[i]
+        return [v / float(N * N) for v in acc]
+
+    ma, mb = means(a), means(b)
     return sum(abs(ma[i] - mb[i]) for i in range(3)) / 3.0
+
+
+# --- output -------------------------------------------------------------------
+
+def manifest(overlay_rows, cliff_rows, prop_rows):
+    """Everything a consumer needs, in one file, so nobody has to parse Python.
+
+    tools/make_world.py currently reads ORDER out of this file's source and that
+    still works and is still supported -- but this is the better mechanism and
+    it carries the four new sets as well."""
+    return {
+        "tile": N,
+        "order": list(ORDER),
+        "walkable": {k: bool(v) for k, v in WALKABLE.items()},
+        "solid_ids": [i for i, n in enumerate(ORDER) if not WALKABLE[n]],
+        "tileset": {"file": "tileset.png", "layout": "one row; tile i at x = 32*i",
+                    "count": len(ORDER)},
+        "variants": {
+            "file": "tileset_var.png", "count": BASE_VARIANTS,
+            "layout": "row v holds alternate fill v+1 of ORDER[i] at (32*i, 32*v)",
+            "select": "v = hash(x, y) % (1 + count); v == 0 means tileset.png",
+        },
+        "precedence": list(PRECEDENCE),
+        "overlays": {
+            "file": "overlays.png", "cols": OVERLAY_COLS, "rows": overlay_rows,
+            "variants": VARIANTS,
+            "materials": [{"name": m, "rank": RANK[m], "slot": RANK[m] - 1}
+                          for m in OVERLAY_MATS],
+            "side_bits": list(SIDE_BITS),
+            "corner_bits": list(CORNER_BITS),
+            "layout": ("row = slot*%d + variant*2 + kind (kind 0 edge, 1 corner); "
+                       "col = mask; mask 0 is blank" % OVERLAY_ROWS_PER_MAT),
+            "rule": ("draw the cell's own fill, then for each DISTINCT "
+                     "higher-precedence material among its 8 neighbours, lowest "
+                     "rank first: the edge tile for the 4-bit side mask, then "
+                     "the corner tile for the diagonals whose two adjacent "
+                     "sides do not hold that material"),
+        },
+        "cliffs": {"file": "cliffs.png", "cols": CLIFF_COLS, "rows": cliff_rows,
+                   "order": list(CLIFF_ORDER),
+                   "layout": "index = row*4 + col, in `order`"},
+        "props": {
+            "file": "props.png", "cols": PROP_COLS, "rows": prop_rows,
+            "slot": [PROP_W, PROP_H],
+            "anchor": [PROP_AX, PROP_AY],
+            "layout": "slot i (0-based) at (64*(i%8), 96*(i//8)); plane value = i+1",
+            "draw": "dst = (cell.x*32 + 16 - 32, cell.y*32 + 32 - 96)",
+            "list": [
+                {"id": pid, "index": i, "plane": i + 1,
+                 "biome": PROP_BY_ID[pid]["biome"],
+                 "density": PROP_BY_ID[pid]["density"],
+                 "solid": PROP_BY_ID[pid]["solid"],
+                 "foot": PROP_BY_ID[pid]["foot"]}
+                for i, pid in enumerate(PROP_ORDER)],
+        },
+        "shadow": {"rgb": list(SHADOW), "alpha": SHADOW_A},
+    }
+
+
+def main():
+    os.makedirs(OUT, exist_ok=True)
+    written = []
+
+    def save(img, name):
+        path = os.path.join(OUT, name)
+        img.save(path)
+        written.append(name)
+
+    built = [(name, fill(name, 0)) for name in ORDER]
+    for name, img in built:
+        save(img, "%s.png" % name)
+
+    strip = Image.new("RGBA", (N * len(built), N))
+    for i, (_, img) in enumerate(built):
+        strip.paste(img, (i * N, 0))
+    save(strip, "tileset.png")
+
+    var = Image.new("RGBA", (N * len(ORDER), N * BASE_VARIANTS))
+    for i, name in enumerate(ORDER):
+        for v in range(BASE_VARIANTS):
+            var.paste(fill(name, v + 1), (i * N, v * N))
+    save(var, "tileset_var.png")
+
+    ov_atlas, ov_tiles, ov_rows = build_overlays()
+    save(ov_atlas, "overlays.png")
+
+    cl_atlas, _cl, cl_rows = build_cliffs()
+    save(cl_atlas, "cliffs.png")
+
+    pr_atlas, pr_sprites, pr_rows = build_props()
+    save(pr_atlas, "props.png")
+
+    with open(os.path.join(OUT, "tiles.json"), "w", encoding="utf-8") as f:
+        json.dump(manifest(ov_rows, cl_rows, pr_rows), f, indent=2, sort_keys=True)
+        f.write("\n")
+    written.append("tiles.json")
+
+    save(contact_sheet(built), "_sheet_x4.png")
+    save(overlay_sheet(ov_tiles), "_overlays_x3.png")
+    save(prop_sheet(pr_sprites), "_props_x2.png")
+    comps = build_compositions(ov_tiles, pr_sprites)
+    comps["cliffs"] = cliff_demo(ov_tiles, pr_sprites, _cl)
+    for name, img in comps.items():
+        save(img, "_comp_%s.png" % name)
+
+    # --- the report ----------------------------------------------------------
+    n_over = len(OVERLAY_MATS) * VARIANTS * 2 * 16
+    print("bases      %4d  (%d materials)" % (len(ORDER), len(ORDER)))
+    print("variants   %4d  (%d per material)" % (len(ORDER) * BASE_VARIANTS, BASE_VARIANTS))
+    print("overlays   %4d  (%d materials x 32 cases x %d variants)"
+          % (n_over, len(OVERLAY_MATS), VARIANTS))
+    print("cliffs     %4d" % len(CLIFF_ORDER))
+    print("props      %4d" % len(PROP_ORDER))
+    print("           ----")
+    print("total      %4d sprites\n"
+          % (len(ORDER) * (1 + BASE_VARIANTS) + n_over + len(CLIFF_ORDER) + len(PROP_ORDER)))
+
+    print("4x4 repeat seam test on the base fills: joint step vs the tile's own")
+    print("%-14s %-5s  %-14s %-14s %s"
+          % ("tile", "", "horizontal", "vertical", "luma lo-hi (range) mean"))
+    bad = 0
+    for name, img in built:
+        r = verify_seams(name, img)
+        vals = lumas(img)
+        bad += 0 if r["ok"] else 1
+        print("%-14s %-5s  %5.2f /%5.2f  %5.2f /%5.2f   %3.0f-%3.0f (%2.0f) %5.1f"
+              % (name, "ok" if r["ok"] else "SEAM",
+                 r["h_joint"], r["h_lim"], r["v_joint"], r["v_lim"],
+                 min(vals), max(vals), max(vals) - min(vals), sum(vals) / len(vals)))
+    print("seam failures: %d\n" % bad)
+
+    print("solid vs walkable, on the pairs that actually meet (rule: >= 12 luma)")
+    fails = 0
+    for a, b in ADJACENCY:
+        ia, ib = fill(a, 0), fill(b, 0)
+        la, lb = mean_luma(ia), mean_luma(ib)
+        solid = (not WALKABLE[a]) != (not WALKABLE[b])
+        d = abs(la - lb)
+        ok = (not solid) or d >= 12.0
+        fails += 0 if ok else 1
+        print("  %-13s %-13s  dLuma %5.1f  dRGB %5.1f  %s"
+              % (a, b, d, rgb_delta(ia, ib),
+                 ("solid pair  " + ("ok" if ok else "TOO CLOSE")) if solid else "both ground"))
+    print("contrast failures: %d\n" % fails)
+
+    tile_stats = stats([v for _, img in built for v in lumas(img)])
+    frame = comps["forest_edge"]
+    frame_stats = stats(lumas(frame))
+    shore_stats = stats(lumas(comps["shore"]))
+    print("luma range        min   p1  p50  p99  max   mean")
+    for label, s in (("all base tiles", tile_stats),
+                     ("frame: forest_edge", frame_stats),
+                     ("frame: shore", shore_stats)):
+        print("  %-17s %4.0f %4.0f %4.0f %4.0f %4.0f   %4.1f"
+              % (label, s["min"], s["p1"], s["p50"], s["p99"], s["max"], s["mean"]))
+    print("  (was: one shipped frame 11 / 34 / 53 / 81 / 122 -- a 47-point band)\n")
+
+    print("prop density by biome (instances per walkable cell of that biome)")
+    print("  target 0.12-0.20, i.e. 7-11 props in a 57-cell screen (§2.3)")
+    per = {}
+    for pr in PROPS:
+        per.setdefault(pr["biome"], [0, 0.0])
+        per[pr["biome"]][0] += 1
+        per[pr["biome"]][1] += pr["density"]
+    for biome in sorted(per, key=lambda b: -per[b][1]):
+        n, d = per[biome]
+        print("  %-13s %2d props  density %.3f   %4.1f per 57-cell screen"
+              % (biome, n, d, d * 57))
+    print()
+
+    digest = hashlib.md5()
+    for name in sorted(written):
+        with open(os.path.join(OUT, name), "rb") as f:
+            digest.update(name.encode("utf-8"))
+            digest.update(f.read())
+    print("wrote %d files to %s" % (len(written), OUT))
+    print("output digest (md5 of every file, in name order): %s" % digest.hexdigest())
+
+
+if __name__ == "__main__":
+    main()

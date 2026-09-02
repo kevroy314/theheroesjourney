@@ -303,8 +303,15 @@ SOLID = None      # filled in main(), once ORDER is known
 
 
 def solid_ids():
-    """Which ids cannot be stood on. By name, so a renumbered sheet cannot
-    quietly turn a wall into a floor."""
+    """Which ids cannot be stood on, from the tileset's own manifest.
+
+    make_tiles.py publishes this. A hand-kept copy here would be a third place
+    the same list lives, and the last one already went stale the moment the
+    tileset grew — three new materials were solid and nothing knew.
+    """
+    path = os.path.join(ROOT, "assets", "tiles", "tiles.json")
+    if os.path.exists(path):
+        return set(json.load(open(path)).get("solid_ids", []))
     names = ["wall_plaster", "wall_stone", "water", "rock", "void", "forest", "roof"]
     return {T[n] for n in names if n in T}
 

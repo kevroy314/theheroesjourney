@@ -12,12 +12,20 @@ extends RefCounted
 ## drawn map in assets/world/worldmap.png from the same source, so the map and
 ## the ground can never disagree.
 
+## Tile ids index ORDER in tools/make_tiles.py.
 const PATH := "res://data/world/overworld.json"
-
-## Tile ids index ORDER in tools/make_tiles.py. Solid ones are the ones you
-## cannot stand on; everything else is ground.
+const MANIFEST := "res://assets/tiles/tiles.json"
 const T_DOOR := 5
-const SOLID := [6, 7, 8, 9, 10, 16]   ## plaster, stone wall, water, rock, void, roof
+
+## Which ids cannot be stood on, read from the tileset's own manifest rather
+## than copied here.
+##
+## This was a hardcoded [6, 7, 8, 9, 10, 16]. The tileset then grew from 18
+## tiles to 25 and three of the new ones — ocean, jungle, cliff — are solid, so
+## the copy was silently wrong the moment the art changed and the player could
+## walk into the sea. A second copy of a list is a second chance to disagree
+## with it; make_tiles.py publishes the truth and this reads it.
+var solid: Dictionary = {}
 
 var w: int = 0
 var h: int = 0
@@ -65,7 +73,25 @@ func load_world() -> void:
 		regions[String(id)] = Vector2i(int(cell.get("x", 0)), int(cell.get("y", 0)))
 	var s: Dictionary = parsed.get("spawn", {})
 	spawn = Vector2i(int(s.get("x", 0)), int(s.get("y", 0)))
+	_load_solid()
 	loaded = true
+
+
+## Falls back to nothing-is-solid rather than to a stale guess: a world you can
+## walk through is an obvious bug, where a world with the wrong walls is a
+## subtle one that looks like level design.
+func _load_solid() -> void:
+	solid.clear()
+	var file := FileAccess.open(MANIFEST, FileAccess.READ)
+	if file == null:
+		push_error("HJWorld: %s missing — run tools/make_tiles.py" % MANIFEST)
+		return
+	var parsed = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not (parsed is Dictionary):
+		return
+	for id in parsed.get("solid_ids", []):
+		solid[int(id)] = true
 
 
 func at(x: int, y: int) -> int:
@@ -79,7 +105,7 @@ func at(x: int, y: int) -> int:
 
 
 func walkable(x: int, y: int) -> bool:
-	return not SOLID.has(at(x, y))
+	return not solid.has(at(x, y))
 
 
 func anchor(area_id: String) -> Vector2i:
