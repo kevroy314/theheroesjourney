@@ -28,13 +28,13 @@
   },
   "glyphs": {
     "start": "@",
-    "task": "»",
-    "free": "·",
+    "task": "\u00bb",
+    "free": "\u00b7",
     "threshold": "^",
     "echo": "~",
     "cache": "$",
-    "mirror": "§",
-    "trinket": "¤",
+    "mirror": "\u00a7",
+    "trinket": "\u00a4",
     "spite": "&",
     "locked": "?",
     "done": "+"
@@ -52,7 +52,11 @@
     "long_road": "res://assets/backdrops/areas/long_road.png",
     "foothills": "res://assets/backdrops/areas/foothills.png",
     "observatory": "res://assets/backdrops/areas/observatory.png",
-    "summit": "res://assets/backdrops/areas/summit.png"
+    "summit": "res://assets/backdrops/areas/summit.png",
+    "mountain": "res://assets/backdrops/areas/foothills.png",
+    "desert": "res://assets/backdrops/areas/long_road.png",
+    "ocean": "res://assets/backdrops/areas/the_town.png",
+    "jungle": "res://assets/backdrops/areas/tall_grass.png"
   },
   "palace_backdrops": {
     "default": "res://assets/backdrops/rooms/palace.png",

@@ -26,6 +26,9 @@ var history: Array = []                ## recent runs, newest first
 var codex: Array = []                  ## echo ids ever found
 var axis_tasks: Dictionary = {}        ## axis -> lifetime count
 var chapters_reached: int = 0
+## The deepest ring ever reached. Progression is now how far out you have been,
+## not how many chapters you were handed.
+var deepest_ring: int = 0
 var loops: int = 0                     ## how many times the loop has reset
 var runs_today: Dictionary = {}        ## day -> completed runs, for falloff
 
@@ -512,7 +515,8 @@ func save_game() -> void:
 		"streak": streak, "best_streak": best_streak,
 		"last_active_day": last_active_day, "rest_used_day": rest_used_day,
 		"codex": codex, "axis_tasks": axis_tasks,
-		"chapters_reached": chapters_reached, "loops": loops, "runs_today": runs_today,
+		"chapters_reached": chapters_reached, "deepest_ring": deepest_ring,
+		"loops": loops, "runs_today": runs_today,
 		"seen_first_reset": seen_first_reset, "seen_warden": seen_warden,
 		"paused": paused, "pause_started": pause_started,
 		"selected_theme": selected_theme, "selected_ruleset": selected_ruleset,
@@ -546,6 +550,7 @@ func load_game() -> void:
 			codex = parsed.get("codex", [])
 			axis_tasks = parsed.get("axis_tasks", {})
 			chapters_reached = int(parsed.get("chapters_reached", 0))
+			deepest_ring = int(parsed.get("deepest_ring", 0))
 			loops = int(parsed.get("loops", 0))
 			runs_today = parsed.get("runs_today", {})
 			seen_first_reset = bool(parsed.get("seen_first_reset", false))
@@ -604,3 +609,13 @@ func _first_default(pool: Dictionary) -> String:
 		if pool[id].get("unlocked_by_default", false):
 			return String(id)
 	return String(pool.keys()[0]) if pool.size() > 0 else ""
+
+
+## Record having reached a ring. The furthest you have ever been is the honest
+## measure of progress in a world you choose your own way through.
+func note_ring(tier: int) -> void:
+	if tier <= deepest_ring:
+		return
+	deepest_ring = tier
+	save_game()
+	Events.meta_changed.emit()

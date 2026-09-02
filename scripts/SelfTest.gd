@@ -59,11 +59,11 @@ static func run_all(host: Node) -> int:
 	print("\n--- The Heroes' Journey self-test ---")
 	print("runs: %d   full journeys: %d   tasks completed: %d   echoes found: %d" % [
 		RUNS, cleared, tasks, Meta.codex.size() - echoes_before])
-	print("resolve: %d   loops: %d   furthest chapter: %d" % [Meta.resolve, Meta.loops, Meta.chapters_reached])
+	print("resolve: %d   loops: %d   deepest ring: %d" % [Meta.resolve, Meta.loops, Meta.deepest_ring])
 
 	_check(failures, "tasks actually happen", tasks > RUNS * 3, "%d tasks" % tasks)
-	_check(failures, "the journey reaches the Summit", Meta.chapters_reached == Content.chapter_count(),
-		"furthest %d" % Meta.chapters_reached)
+	_check(failures, "the world is walked out to its furthest ring",
+		Meta.deepest_ring >= 3, "deepest ring %d" % Meta.deepest_ring)
 	_check(failures, "the Warden turns you back the first time", Meta.seen_warden and cleared == 0,
 		"seen=%s cleared=%d" % [str(Meta.seen_warden), cleared])
 
@@ -164,6 +164,15 @@ static func _play_one(host: Node, seed_value: int, failures: Array) -> Dictionar
 			break
 
 		match Game.screen:
+			"overworld":
+				# The harness cannot walk, so it steps straight into the nearest
+				# anomaly it has not already resolved. Walking is the player's
+				# problem; what this checks is that the loop of find-enter-clear
+				# always has a next move.
+				var cell := _next_anomaly(run)
+				if cell.x < 0:
+					break
+				Game.enter_anomaly(cell)
 			"area":
 				var available := HJAreaGen.available_ids(run)
 				if available.is_empty():
@@ -236,16 +245,26 @@ static func _advance_checks(host: Node, failures: Array) -> void:
 	Game.run = null
 	Game.clear_saved_run()
 	Game.start_run(24680)
-	var first_area := String(Game.run.area.get("id", ""))
+	Steps.grant(4000)
 
 	var actions := 0
+	var entered := false
 	while actions < 200 and Game.run != null and not Game.run.finished:
 		actions += 1
 		if actions % 8 == 0:
 			await host.get_tree().process_frame
-		if Game.run.chapter != 1:
+		# Stop as soon as one anomaly has been entered and finished, which is the
+		# unit this section is about.
+		if entered and Game.run.anomaly.is_empty():
 			break
+		if not Game.run.anomaly.is_empty():
+			entered = true
 		match Game.screen:
+			"overworld":
+				var cell := _next_anomaly(Game.run)
+				if cell.x < 0:
+					break
+				Game.enter_anomaly(cell)
 			"area":
 				var available := HJAreaGen.available_ids(Game.run)
 				if available.is_empty():
@@ -263,18 +282,22 @@ static func _advance_checks(host: Node, failures: Array) -> void:
 			_:
 				break
 
-	_check(failures, "clearing an area advances the chapter", Game.run != null and Game.run.chapter == 2,
-		"chapter %d" % (Game.run.chapter if Game.run else -1))
+	# Clearing an anomaly returns you to the world rather than handing you the
+	# next thing. That is the point of retiring chapters: nothing is next, and
+	# what you do now is a choice about how far you are willing to walk.
+	_check(failures, "clearing an anomaly returns you to the world",
+		Game.run != null and Game.run.anomaly.is_empty(), Game.screen)
 	if Game.run != null:
-		_check(failures, "the next area is generated and different",
-			String(Game.run.area.get("id", "")) != first_area and not Game.run.area.is_empty(),
-			"area %s" % Game.run.area.get("id", ""))
-		_check(failures, "the next area has something to do",
-			not HJAreaGen.available_ids(Game.run).is_empty(),
-			_dump_nodes(Game.run))
-		_check(failures, "the next area has its own deadline", Game.run.deadline_unix > HJClock.now(), "")
+		_check(failures, "the anomaly it cleared is remembered",
+			not Game.run.anomalies_cleared.is_empty(),
+			"%d cleared" % Game.run.anomalies_cleared.size())
+		_check(failures, "the run still has a deadline to run against",
+			Game.run.deadline_unix > HJClock.now(), "")
+		_check(failures, "there is always somewhere left to go",
+			_next_anomaly(Game.run).x >= 0, "world exhausted")
 		# Whatever screen we land on, there must be a way forward from it.
-		_check(failures, "never parked on a dead screen", Game.screen in ["area", "event", "boon", "task", "journey"],
+		_check(failures, "never parked on a dead screen",
+			Game.screen in ["area", "event", "boon", "task", "journey", "overworld"],
 			Game.screen)
 	Game.abandon_run()
 
@@ -289,9 +312,15 @@ static func _warden_checks(host: Node, failures: Array) -> void:
 		Meta.claimed.append("balance")
 	Game.run = null
 	Game.clear_saved_run()
-	Game.start_run(31337, Content.chapter_count())
-	_check(failures, "a run can start at the Summit", Game.run != null and Game.run.chapter == Content.chapter_count(),
-		"chapter %d" % (Game.run.chapter if Game.run else -1))
+	Game.start_run(31337)
+	# The Summit is a place now, not the last chapter, so the way to test it is
+	# to walk into it — which for a harness means stepping onto its cell.
+	var summit := HJWorld.shared().anchor("summit")
+	Game.run.world_pos = summit
+	Game.enter_anomaly(summit)
+	_check(failures, "the Summit can be entered directly",
+		Game.run != null and String(Game.run.anomaly.get("area", "")) == "summit",
+		"in %s" % (Game.run.anomaly.get("area", "?") if Game.run else "no run"))
 
 	var actions := 0
 	while actions < 200 and Game.run != null and not Game.run.finished:
@@ -299,6 +328,11 @@ static func _warden_checks(host: Node, failures: Array) -> void:
 		if actions % 8 == 0:
 			await host.get_tree().process_frame
 		match Game.screen:
+			"overworld":
+				var cell := _next_anomaly(Game.run)
+				if cell.x < 0:
+					break
+				Game.enter_anomaly(cell)
 			"area":
 				var available := HJAreaGen.available_ids(Game.run)
 				if available.is_empty():
@@ -360,8 +394,13 @@ static func _persistence_checks(failures: Array) -> void:
 	Game.run = null
 	Game.clear_saved_run()
 	Game.start_run(999)
+	# A run begins in the world with no area, so there is nothing to tap until
+	# an anomaly has been stepped into.
+	Steps.grant(2000)
+	Game.enter_anomaly(_next_anomaly(Game.run))
 	var available := HJAreaGen.available_ids(Game.run)
-	Game.tap_node(String(available[0]))
+	if not available.is_empty():
+		Game.tap_node(String(available[0]))
 	if Game.screen == "event":
 		Game.dismiss_event()
 	Game.run.grit = 77
@@ -599,6 +638,27 @@ static func _anomaly_checks(host: Node, failures: Array) -> void:
 	Game.abandon_run()
 	Steps.set_burn(1.0)
 	await host.get_tree().process_frame
+
+
+## The nearest anomaly this run has not finished, or (-1,-1) when the world is
+## exhausted. Nearest rather than random so a run walks outward through the
+## rings the way a player would, and the deeper tiers get exercised.
+static func _next_anomaly(run: HJRun) -> Vector2i:
+	var world := HJWorld.shared()
+	var best := Vector2i(-1, -1)
+	var best_d := 1 << 30
+	for entry in world.anomalies:
+		var a: Dictionary = entry
+		var cell := Vector2i(int(a.get("x", 0)), int(a.get("y", 0)))
+		if run.anomalies_cleared.has(Game._cell_key(cell)):
+			continue
+		var d := absi(cell.x - run.world_pos.x) + absi(cell.y - run.world_pos.y)
+		if run.world_pos.x < 0:
+			d = int(a.get("tier", 0))
+		if d < best_d:
+			best_d = d
+			best = cell
+	return best
 
 
 # --- helpers -------------------------------------------------------------------

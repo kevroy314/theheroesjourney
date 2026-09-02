@@ -510,6 +510,33 @@ def reachable(world, start):
     return seen
 
 
+def name_anomalies(cells, anomalies):
+    """The eight written chapters, as fixed anomalies at their own anchors.
+
+    Chapters used to be a sequence you were handed one at a time. They are now
+    *places*: the Waking Room is still the Waking Room and still opens with the
+    ceiling you cannot place, but you reach it by walking to it, and its
+    difficulty is the ring it sits in rather than its number.
+
+    Procedural anomalies fill the rest of the world. These eight are the spine.
+    """
+    named = []
+    for area_id, (cx, cy) in cells.items():
+        radius = math.hypot(cx - CENTRE[0], cy - CENTRE[1])
+        named.append({
+            "x": cx, "y": cy,
+            "tier": tier_at(radius),
+            "sector": SECTORS[max(range(4), key=lambda i: sector_weights(polar(cx, cy)[1])[i])][3],
+            "area": area_id,
+        })
+    # A procedural spawn sitting on a story anchor would hide it, so the named
+    # ones win their cell.
+    taken = {(a["x"], a["y"]) for a in named}
+    return named + [a for a in anomalies
+                    if (a["x"], a["y"]) not in taken
+                    and all(math.hypot(a["x"] - n["x"], a["y"] - n["y"]) > 8 for n in named)]
+
+
 def place_anomalies(world, rng, reach):
     """Where the roguelite content lives.
 
@@ -888,7 +915,7 @@ def main():
     # bare terrain underneath it.
     world.blocked = blocked
     reach = reachable(world, spawn)
-    anomalies = place_anomalies(world, rng, reach)
+    anomalies = name_anomalies(cells, place_anomalies(world, rng, reach))
 
     stranded = [n for n, c in cells.items() if c not in reach]
 
@@ -936,7 +963,9 @@ def main():
     print("props: %d placed (%.1f%% of cells), %d of them solid"
           % (filled, 100.0 * filled / (W * H), len(blocked)))
     print("cliff cells: %d" % len(faces))
-    print("anomalies: %d" % len(anomalies))
+    named = sum(1 for a in anomalies if a.get("area"))
+    print("anomalies: %d  (%d named story beats, %d procedural)"
+          % (len(anomalies), named, len(anomalies) - named))
     for tier in range(MAX_TIER + 1):
         band = [a for a in anomalies if a["tier"] == tier]
         secs = {}

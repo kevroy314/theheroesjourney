@@ -97,8 +97,16 @@ func build() -> void:
 	_pad.size_flags_vertical = Control.SIZE_SHRINK_END
 	v.add_child(_pad)
 
-	Steps.budget_changed.connect(_sync_budget)
 	_sync_budget()
+
+
+## Connected here rather than in build(): build() runs on every rebuild, and
+## _exit_tree only fires on leaving, so connecting there reconnected an already
+## connected signal every time anything refreshed the screen — an error per
+## rebuild, on the device as well as in the harness.
+func _enter_tree() -> void:
+	super._enter_tree()
+	Steps.budget_changed.connect(_sync_budget)
 
 
 func _exit_tree() -> void:

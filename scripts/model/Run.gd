@@ -11,7 +11,10 @@ var theme_id: String = ""
 var ruleset_id: String = ""
 
 # --- position ---
-var chapter: int = 1                 ## 1-based index into Content.chapters
+var chapter: int = 1                 ## legacy; the summary still reads it
+## The deepest ring reached this run. Distance from town is difficulty, so this
+## is the run's progress — it replaces "which chapter am I on".
+var zone: int = 0
 var area: Dictionary = {}            ## generated instance, see HJAreaGen
 var completed: Array = []            ## node ids finished
 var locked: Array = []               ## node ids closed off by an exclusive choice
@@ -94,7 +97,7 @@ func to_dict() -> Dictionary:
 		"pending_started": pending_started, "pending_movement": pending_movement,
 		"axis_tasks": axis_tasks, "finished": finished, "outcome": outcome,
 		"world_x": world_pos.x, "world_y": world_pos.y,
-		"anomaly": anomaly, "anomalies_cleared": anomalies_cleared,
+		"anomaly": anomaly, "anomalies_cleared": anomalies_cleared, "zone": zone,
 	}
 
 
@@ -113,6 +116,7 @@ static func from_dict(d: Dictionary) -> HJRun:
 	r.deadline_unix = int(d.get("deadline_unix", 0))
 	r.grit = int(d.get("grit", 0))
 	r.world_pos = Vector2i(int(d.get("world_x", -1)), int(d.get("world_y", -1)))
+	r.zone = int(d.get("zone", 0))
 	r.anomaly = d.get("anomaly", {})
 	r.anomalies_cleared = d.get("anomalies_cleared", [])
 	r.trinkets = d.get("trinkets", [])

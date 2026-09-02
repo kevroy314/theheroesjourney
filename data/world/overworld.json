@@ -50,6 +50,62 @@
  },
  "anomalies": [
   {
+   "x": 96,
+   "y": 141,
+   "tier": 1,
+   "sector": "jungle",
+   "area": "waking_room"
+  },
+  {
+   "x": 96,
+   "y": 141,
+   "tier": 1,
+   "sector": "jungle",
+   "area": "the_house"
+  },
+  {
+   "x": 128,
+   "y": 128,
+   "tier": 0,
+   "sector": "desert",
+   "area": "the_town"
+  },
+  {
+   "x": 76,
+   "y": 123,
+   "tier": 2,
+   "sector": "jungle",
+   "area": "tall_grass"
+  },
+  {
+   "x": 183,
+   "y": 108,
+   "tier": 2,
+   "sector": "desert",
+   "area": "long_road"
+  },
+  {
+   "x": 139,
+   "y": 67,
+   "tier": 2,
+   "sector": "mountain",
+   "area": "foothills"
+  },
+  {
+   "x": 105,
+   "y": 43,
+   "tier": 3,
+   "sector": "mountain",
+   "area": "observatory"
+  },
+  {
+   "x": 128,
+   "y": 16,
+   "tier": 4,
+   "sector": "mountain",
+   "area": "summit"
+  },
+  {
    "x": 130,
    "y": 138,
    "tier": 0,
