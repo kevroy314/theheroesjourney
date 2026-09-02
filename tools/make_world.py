@@ -45,6 +45,7 @@ import json
 import math
 import os
 import random
+import sys
 import zlib
 
 from PIL import Image
@@ -99,8 +100,8 @@ SECTORS = [
 ## are now *places in a radial world* rather than rungs of a ladder. Bearing in
 ## degrees, radius in tiles from the town.
 REGIONS = [
-    ("waking_room", 200.0, 6.0),
-    ("the_house", 205.0, 12.0),
+    ("waking_room", 202.0, 34.0),
+    ("the_house", 202.0, 34.0),
     ("the_town", 0.0, 0.0),
     ("tall_grass", 175.0, 52.0),
     ("long_road", 20.0, 58.0),
@@ -343,7 +344,14 @@ def carve_road(world, rng, a, b):
             closer = math.hypot(b[0] - nx, b[1] - ny)
             climb = abs(world.elev[ny][nx] - world.elev[y][x]) * 260.0
             jitter = rng.random() * 1.4
-            score = closer + climb + jitter
+            # Walls and roofs are expensive but not forbidden: a road must be
+            # able to reach a door, and the door is in the wall. Cheap enough to
+            # arrive, dear enough never to shortcut through a building.
+            through = 0.0
+            here = world.at(nx, ny)
+            if here in (T["wall_plaster"], T["wall_stone"], T["roof"]):
+                through = 220.0
+            score = closer + climb + jitter + through
             if best_score is None or score < best_score:
                 best, best_score = (nx, ny), score
         if best is None:
@@ -429,6 +437,53 @@ def coast_stop(world, bearing):
             break
         last = (x, y)
     return last
+
+
+def stamp_house(world, cells):
+    """The house you wake in.
+
+    Restored: the radial rewrite dropped this along with the observatory and the
+    summit, so the first room of the game was an unmarked patch of town square
+    with a bed standing in it. The waking room and the house are the same
+    building — upstairs and down — which is why they share an anchor.
+    """
+    cx, cy = cells["waking_room"]
+    x0, y0, w, h = cx - 8, cy - 7, 17, 14
+    for y in range(y0, y0 + h):
+        for x in range(x0, x0 + w):
+            edge = x in (x0, x0 + w - 1) or y in (y0, y0 + h - 1)
+            world.put(x, y, T["wall_plaster"] if edge else T["floor_boards"])
+    # An internal wall with a doorway: the room you wake in, and the one with
+    # the kettle in it.
+    for x in range(x0 + 1, x0 + w - 1):
+        if abs(x - cx) > 1:
+            world.put(x, cy, T["wall_plaster"])
+    world.put(cx, y0 + h - 1, T["door"])
+
+
+def stamp_observatory(world, cells):
+    """A stone drum on a ridge, one door facing back down the hill."""
+    cx, cy = cells["observatory"]
+    r = 8
+    for y in range(cy - r, cy + r + 1):
+        for x in range(cx - r, cx + r + 1):
+            d = math.hypot(x - cx, y - cy)
+            if d > r:
+                continue
+            world.put(x, y, T["wall_stone"] if d > r - 1.6 else T["floor_stone"])
+    world.put(cx, cy + r - 1, T["door"])
+
+
+def stamp_summit(world, cells):
+    """The door in the rock, and bare stone all round it so it is the only thing
+    to look at when you finally get up here."""
+    cx, cy = cells["summit"]
+    for y in range(cy - 6, cy + 7):
+        for x in range(cx - 7, cx + 8):
+            world.put(x, y, T["floor_stone"])
+    for x in range(cx - 7, cx + 8):
+        world.put(x, cy - 6, T["rock"])
+    world.put(cx, cy - 6, T["door"])
 
 
 def reachable(world, start):
@@ -777,13 +832,17 @@ def main():
     cells = region_cells()
 
     stamp_town(world, rng, CENTRE)
+    stamp_house(world, cells)
+    stamp_observatory(world, cells)
+    stamp_summit(world, cells)
 
     # Roads last, so nothing is painted over them. This is why the old map had
     # roads that dead-ended in walls: the town, observatory and summit were all
     # stamped after the carve and simply overwrote it.
     # Out of town every way, not only toward the northern story beats. The
     # player may leave in any direction and should find a road doing the same.
-    for name in ("summit", "observatory", "foothills", "long_road", "tall_grass"):
+    for name in ("summit", "observatory", "foothills", "long_road", "tall_grass",
+                 "waking_room"):
         carve_road(world, rng, CENTRE, cells[name])
     for bearing in (0.0, 90.0, 180.0, 270.0):
         target = coast_stop(world, bearing)
@@ -800,10 +859,29 @@ def main():
     cliffs = cliff_plane(steps, elev)
     faces = {(x, y) for y in range(H) for x in range(W) if cliffs[y][x]}
 
-    props, blocked = scatter_props(world, elev, rng, reach)
-    blocked |= faces
+    props, _scattered = scatter_props(world, elev, rng, reach)
     stock_town(world, props, CENTRE, rng)
     furnish_house(world, props, cells)
+
+    # The collision plane is *derived* from the finished prop plane rather than
+    # accumulated while scattering, and it is derived by the same function the
+    # Tiled importer uses (tools/world_to_tiled.py, imported rather than copied —
+    # a second implementation of this rule is a second chance to disagree with
+    # it). It has to be: a prop you place by hand in Tiled has to block, and the
+    # importer can only see the plane, so the generated file and the imported one
+    # can only agree if one rule produces both.
+    #
+    # It also fixes what the accumulate-as-you-go version got wrong. stock_town
+    # and furnish_house run *after* scatter_props and only wrote to the plane, so
+    # the well, the benches, the lampposts and the whole bedroom were solid in the
+    # catalogue and walk-through in the game. Deriving from the finished plane
+    # picks them up — 31 cells, none of which cuts anything off.
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from world_to_tiled import derive_blocked, props_by_plane
+    blocked_plane = derive_blocked([v for row in props for v in row],
+                                   [v for row in cliffs for v in row],
+                                   W, H, props_by_plane())
+    blocked = {(i % W, i // W) for i, v in enumerate(blocked_plane) if v}
 
     # Props that block have to be part of walkability, so reachability is
     # measured on the world the player will actually meet rather than on the
@@ -830,7 +908,7 @@ def main():
         # anchor cell is not the whole footprint. Exported as its own plane
         # rather than recomputed in the engine from the same manifest twice.
         "blocked_b64_deflate": encode_plane(
-            [[1 if (x, y) in blocked else 0 for x in range(W)] for y in range(H)]),
+            [blocked_plane[y * W:(y + 1) * W] for y in range(H)]),
         "cliffs_b64_deflate": encode_plane(cliffs),
         "terrace_levels": 5,
         "regions": {n: {"x": c[0], "y": c[1]} for n, c in cells.items()},

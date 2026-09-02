@@ -13,6 +13,12 @@ records they came from — region anchors, spawn, and whatever collections of
 {x, y, ...} the world model grows next — including any Kevin added by hand that
 the generator has never heard of.
 
+The `props` and `cliffs` layers fold back into byte planes here, because the
+plane is still the runtime format: the renderer indexes it per cell inside
+_draw, and objects are the editing format only. `blocked_b64_deflate` is then
+*derived* from those two planes rather than carried across, which is the only
+way a prop placed by hand in Tiled can block — see docs/MAP-EDITING.md.
+
 Everything this tool does not understand about the schema was stashed in the
 map's `hj_schema` property on export and is written straight back out, in the
 original key order, with the original JSON formatting. That is what makes an
@@ -34,8 +40,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from world_to_tiled import (  # noqa: E402  (path fixup has to come first)
     BASE_LAYER, EDIT_LAYER, MARKER_LAYER, P_GEN_X, P_GEN_Y, P_JSON, P_KEYS,
-    P_MARKER, P_SCHEMA, TMJ, WORLD_JSON, decode_layer, layer_by_name, prop_dict,
-    px_to_cell, tile_meta,
+    P_MARKER, P_SCHEMA, TMJ, TSJ, WORLD_JSON, decode_layer, derive_blocked,
+    encode_plane, firstgid_for, layer_by_name, objects_to_plane, plane_catalogue,
+    plane_tsj, prop_dict, props_by_plane, px_to_cell, tile_meta,
 )
 
 
@@ -104,9 +111,12 @@ def compose(tmj):
     edit_layer = layer_by_name(tmj, EDIT_LAYER)
     edit_gids = decode_layer(edit_layer, cells) if edit_layer else [0] * cells
 
-    firstgid = 1
-    for entry in tmj.get("tilesets", []):
-        firstgid = int(entry.get("firstgid", 1))
+    # By name, not "whichever came last": the map carries a props and a cliffs
+    # tileset now, and reading the terrain layers against the props atlas would
+    # turn every tile into a negative id.
+    firstgid = firstgid_for(tmj, os.path.basename(TSJ))
+    if firstgid is None:
+        firstgid = 1
 
     ids = []
     for i in range(cells):
@@ -123,13 +133,45 @@ def compose(tmj):
                 % (i % w, i // w))
         ids.append(gid - firstgid)
 
+    # --- the editable byte planes, folded back out of their object layers ---
+    #
+    # The plane is still what the game loads: scripts/ui/TileWorld.gd indexes it
+    # per cell every frame, and several thousand objects would be a quarter of a
+    # megabyte of JSON to parse at launch for a lookup one byte already answers.
+    # Objects are
+    # the editing format; this is where they stop being objects.
+    planes, plane_layers = {}, {}
+    for key, cat_name in env.get("planes", {}).items():
+        cat = plane_catalogue(cat_name)
+        layer = layer_by_name(tmj, cat["layer"])
+        if layer is None:
+            raise SystemExit(
+                "the map has no %r layer, but the world file has a %s plane. "
+                "Deleting the layer would empty it — re-export if that is what "
+                "you meant." % (cat["layer"], key))
+        first = firstgid_for(tmj, os.path.basename(plane_tsj(cat_name)))
+        planes[key] = objects_to_plane(layer.get("objects", []), w, h, cat, first)
+        plane_layers[cat["layer"]] = key
+
+    # blocked is derived from those, never edited and never carried verbatim,
+    # which is the only way a prop you placed by hand can block. tools/make_world.py
+    # calls the same function on the same planes, so the generated file and the
+    # imported one agree byte for byte.
+    by_cat = {name: key for key, name in env.get("planes", {}).items()}
+    for key in env.get("derived", {}):
+        planes[key] = derive_blocked(planes.get(by_cat.get("props")),
+                                     planes.get(by_cat.get("cliffs")),
+                                     w, h, props_by_plane())
+
     collections, markers = {}, {}
-    known = set(env.get("collections", {})) | {MARKER_LAYER}
+    known = set(env.get("collections", {})) | {MARKER_LAYER} | set(plane_layers)
     for layer in tmj.get("layers", []):
         if layer.get("type") != "objectgroup":
             continue
         name = layer.get("name")
         objects = layer.get("objects", [])
+        if name in plane_layers:
+            continue        # already folded into its plane above
         if name == MARKER_LAYER:
             for obj in objects:
                 markers[obj.get("name")] = object_to_record(obj, size)
@@ -155,6 +197,9 @@ def compose(tmj):
             world[key] = h
         elif key == env["tiles_key"]:
             world[key] = encode_tiles(ids, env)
+        elif key in planes:
+            world[key] = encode_plane(planes[key],
+                                      env.get("plane_zlib", {}).get(key, 9))
         elif key in collections:
             world[key] = collections[key]
         elif key in markers:

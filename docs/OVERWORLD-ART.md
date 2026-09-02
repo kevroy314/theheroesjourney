@@ -17,7 +17,8 @@ python3 tools/make_sprites.py     # -> assets/sprites/
 Both are deterministic — every RNG is seeded, and re-running produces
 byte-identical PNGs. Both print a verification table; read it, don't assume it.
 
-Everything is aliased, binary-alpha pixel art. Render with
+Everything is aliased pixel art with three alpha values in the whole output —
+0, 118 for shadow bands, and 255. No soft edge anywhere. Render with
 `TEXTURE_FILTER_NEAREST` at integer zoom or it turns to mush.
 
 ## Tiles
@@ -295,11 +296,11 @@ Underscore-prefixed files in `assets/tiles/` are debug assets, not game assets.
 
 ## Player sprite
 
-**24 wide x 32 tall** per frame, transparent background, in `assets/sprites/`.
+**32 wide x 48 tall** per frame, transparent background, in `assets/sprites/`.
 
-`player.png` is the sheet to slice. **72 x 128 = 3 columns x 4 rows of 24 x 32.**
+`player.png` is the sheet to slice. **96 x 192 = 3 columns x 4 rows of 32 x 48.**
 Zero margin, zero spacing, no per-cell offset. Cell (col *c*, row *r*) is the
-rect `(c*24, r*32, 24, 32)`.
+rect `(c*32, r*48, 32, 48)`.
 
 |  | col 0 | col 1 | col 2 |
 |---|---|---|---|
@@ -318,25 +319,126 @@ shows column 0, so idle needs no special case. The walk cycle is therefore
 Playing `0, 1, 2` instead gives a limp — there is no neutral between the two
 steps.
 
-`right` is a horizontal mirror of `left`. The figure is symmetric apart from the
-shoulder the satchel strap crosses, and at this size that is invisible.
+`right` is a horizontal mirror of `left`, shifted so the two share a bbox centre
+exactly. The figure is symmetric apart from the shoulder the satchel strap
+crosses, and at this size that is invisible.
 
 Per-facing strips are also written: `walk_down.png`, `walk_up.png`,
-`walk_left.png`, `walk_right.png`, each **72 x 32**, three columns in the same
-order. `_player_x4.png` is a 4x preview with the cell grid ruled over it — debug
-only.
+`walk_left.png`, `walk_right.png`, each **96 x 48**, three columns in the same
+order. `_player_x4.png` (4x, cell grid ruled over it), `_player_ground.png`
+(every facing on every walkable ground at 3x) and `_player_walk.png` (the cycle
+in playback order) are debug only.
+
+### Why 32 x 48
+
+The old frame was **24 x 32 — 0.75 x 1.0 tiles**, against a genre convention of
+1.0 x 1.5 (LPC, 32px tile) to 1.6 x 2.0 (Slynyrd). There was no room for legs in
+30 rows once the hood took 10, which is why the silhouette read as a bollard.
+32 x 48 is exactly LPC's ratio against our 32px tile.
+
+**32 wide rather than the 28 the art direction guessed**, because
+`scripts/ui/TileWorld.gd` places the frame with `(TILE - FRAME_W) * 0.5`: at 32
+that offset is zero, the sprite grid *is* the tile grid, and the baked contact
+shadow can spread past the boots without being clipped by the frame edge. The
+four extra columns cost 768 bytes.
+
+**`TileWorld.gd` must be updated to `FRAME_W = 32`, `FRAME_H = 48`.** The frame
+is still bottom-aligned with the tile and horizontally centred, so the only
+consequence is that his head now overlaps the tile above him — which is the same
+thing every prop does, and it is why he must be drawn in the Y-sorted object
+pass rather than unconditionally last.
+
+### Value: he is bracketed, not brightened
+
+The measured ground he can stand on now spans **34 luma (`grass_tall`) to 72
+(`snow`)** — 38 points. No single mid-tone separates from all of it: the old
+figure meaned 54, which sat *inside* the grass and *below* the whole desert and
+mountain half of the world. So the figure is pushed to **both** sides of the
+ground instead:
+
+- lit cloth **90–178**, folds **30–43**, boots warm **39–111**, rim **9**;
+- **nothing on the figure lands between 43 and 90**, which is the band sand
+  (62), ice (66), dune (68) and snow (72) occupy.
+
+Measured against every walkable material, with `lit` = pixels at least 15 luma
+above the ground, `dark` = at least 15 below, `lost` = within 10 either way:
+
+| ground | luma | mean delta | lit | dark | lost |
+|---|---:|---:|---:|---:|---:|
+| `grass_tall` | 34.2 | +39.9 | 60% | 26% | 14% |
+| `undergrowth` | 35.9 | +38.1 | 60% | 26% | 14% |
+| `mud` | 38.8 | +35.3 | 60% | 26% | 14% |
+| `grass_short` | 41.7 | +32.4 | 59% | 26% | 11% |
+| `floor_boards` | 42.2 | +31.8 | 59% | 26% | 11% |
+| `scree` | 43.8 | +30.3 | 54% | 26% | 11% |
+| `bridge` | 44.3 | +29.8 | 54% | 26% | 11% |
+| `path_dirt` | 46.0 | +28.1 | 54% | 30% | 12% |
+| `floor_stone` | 46.0 | +28.0 | 54% | 30% | 12% |
+| `hardpan` | 50.0 | +24.1 | 54% | 30% | 16% |
+| `door` | 52.0 | +22.1 | 54% | 30% | 16% |
+| `sand` | 62.2 | +11.9 | 51% | 40% | 9% |
+| `ice` | 66.2 | +7.8 | 49% | 40% | 8% |
+| `dune` | 67.9 | +6.2 | 49% | 40% | 3% |
+| `snow` | 72.2 | +1.8 | 46% | 41% | 5% |
+
+The figure is 773 opaque pixels, luma **9 / 80 / 146 / 188** (min, p50, p90, max),
+mean **74.1**. The worst ground by `lost` is `hardpan` at 16%, and the reason is
+the dark folds and boots sitting near its 50; the worst by mean delta is `snow`
+at +1.8.
+
+**The mean is the wrong number to optimise and the tool says so.** A figure
+bracketed either side of the ground has a mean *near* the ground by
+construction — his is 74.1 and snow is 72.2 — and that is the goal, not the
+fault. What matters is that on every walkable material at least 45% of him
+reads light and at least 26% reads dark, and that the silhouette itself is never
+in question: the rim is luma 9 and the brightest thing he can stand on is 72.
+
+### Rim and shadow
+
+- A **hard near-black rim** around the whole silhouette, derived from the alpha
+  mask (so it cannot disagree with the pose) and **eight-connected**, because at
+  48 rows there are far more diagonal steps than at 32 and a four-connected rim
+  leaks daylight through every one. Same colour and same pass as
+  `poutline()` in `make_tiles.py`: **one sprite works on grass and on snow
+  because of this, exactly as it does for props.** Do not tint it away.
+- A **baked contact shadow**, a hard-edged ellipse in the one shadow colour at
+  the one alpha (118) the tiles use, centred under the sole and filling only
+  pixels the figure and its rim have not claimed. Centred, not offset south-east
+  — the character stands anywhere, including the cell below a cliff, and an
+  offset shadow eventually falls across something it should not. The consumer
+  needs no separate shadow pass.
+
+### Telling the four facings apart
+
+The old sheet's functional failure was that down, up and profile were the same
+little hooded person. Each facing now carries a different *shape* and moves the
+one warm mass to a different height:
+
+| facing | head | warm mass | silhouette |
+|---|---|---|---|
+| `down` | face void — brim shadow, two dark eyes, a lit nose | amber scarf at the **throat** | symmetric, satchel strap crossing the chest |
+| `up` | closed cowl with a centre seam, no opening | leather pack across the **middle of the back**, four times the size | symmetric, no strap |
+| `left` / `right` | brow jutting two pixels forward, face recessed behind it, jaw forward again | scarf at the throat, pack seen **edge-on** behind the shoulder | narrow, cloak trailing off the back, near arm swinging outside it |
 
 ### Geometry the loader can rely on
 
 - The figure is horizontally centred in its cell in every facing: bounding box
-  centre is x = 11.5 for all four. Turning does not move the character.
-- The feet are at a fixed row in every frame: the sole is row 30, its outline
-  row 31. Nothing bobs vertically when the character stops walking — the step
-  frames compress the upper body by one pixel instead. Align the bottom of the
-  32px cell with the bottom of the tile the character is standing on.
-- Vertical extent is rows 1..31 inclusive; row 0 is empty.
-- Nine opaque colours plus fully transparent. Alpha is binary — 0 or 255, no
-  soft edge anywhere — so nearest filtering is lossless.
+  centre is x = 15.5 for all four. Turning does not move the character.
+- The feet are at a fixed row in every frame: the sole is row 44, its rim row
+  45. Nothing bobs vertically when the character stops walking — the step frames
+  compress the upper body by one pixel instead, and the lifted foot is drawn
+  five rows short rather than drawn somewhere new. Align the bottom of the 48px
+  cell with the bottom of the tile the character is standing on.
+- Vertical extent of the figure is rows 0..45; the contact shadow reaches row 47
+  and rows 46–47 hold nothing else.
+- Proportions: hood 13 rows (30% of the figure), torso 16, legs 15 (34%).
+  Widths hood 16, collar 12, shoulders 22, waist 12, hem 18 — every step is at
+  least 2px, so it survives being a third of a phone tile. The arms hang
+  **outside** the torso with a one-pixel transparent gap the rim turns into a
+  hard black line.
+- 23 opaque colours in three ramps — cool cloak, warm leather, one saturated
+  accent garment — plus skin. **Three alpha values: 0, 118 (shadow), 255.** No
+  soft edge anywhere, so nearest filtering is lossless.
 
 ## Notes
 
@@ -346,13 +448,20 @@ only.
   the solid-vs-walkable rule, where brightness is the whole point and 12 luma is
   the floor. `grass_short` and `scree` are two luma apart and read as different
   ground because one is green and one is blue-grey.
-- The character has a hard near-black outline derived from his own alpha mask,
-  and every standing prop now has the same. That outline is what keeps a sprite
-  legible over any tile; do not tint it away. **The claim that his cloak is the
-  lightest thing on the ground plane was false when it was written and is more
-  false now** — he means 54, `sand` is 62, `dune` 68 and `snow` 72. §2.4 of
-  `docs/ART-DIRECTION-OVERWORLD.md` has the redraw spec; his lit side needs to
-  reach 130-150.
+- The character and every standing prop carry the same hard near-black rim,
+  derived from their own alpha mask, in the same colour by the same 8-connected
+  pass. That rim is what keeps a sprite legible over any tile; do not tint it
+  away. **§1.6 and §2.4 of `docs/ART-DIRECTION-OVERWORLD.md` were measured
+  against the *old* tileset and their diagnosis is now stale**: the character is
+  no longer invisible on grass, he was *darker* than the ground across the
+  desert and the mountain, and no single mid-tone can separate from ground
+  spanning 34 to 72 luma. He is bracketed either side of it instead — see
+  "Player sprite" above for the measured table. What §2.4 got right and is now
+  built: the size (32 x 48), arms outside the silhouette, three ramps rather
+  than one, a contact shadow, and facings that differ by shape rather than by
+  detail. What it got wrong: "not in Python span tables" — the span tables are
+  what make the sheet re-derivable from the theme, and the sculpting pass that
+  lights every span from the north-west is what the 24x32 file was missing.
 - `export_presets.cfg` excludes `art/*` but not `assets/*`, so all of this ships
   in the pck as soon as it exists. The whole set is ~1.8 MB, of which
   `overlays.png` is 350 KB and the debug previews are 750 KB — strip the

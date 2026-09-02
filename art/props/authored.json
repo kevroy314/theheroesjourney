@@ -1,0 +1,37 @@
+{
+  "base_count": 70,
+  "props": [
+    {
+      "args": {
+        "bg_tol": 0.1,
+        "coverage": 0.42,
+        "crop": "645,335,296,345",
+        "drop_shadow": false,
+        "fill_holes": 0.0,
+        "luma": [
+          10.0,
+          60.0
+        ],
+        "saturate": 1.0,
+        "size": "32x46"
+      },
+      "biome": "scree",
+      "density": 0.006,
+      "foot": [
+        1,
+        1
+      ],
+      "id": "tree_windswept",
+      "index": 70,
+      "plane": 71,
+      "ramps": [
+        "bark",
+        "wood"
+      ],
+      "solid": true,
+      "source": "art/area_road_v1.png",
+      "sprite": "art/props/tree_windswept.png",
+      "sprite_sha": "783f9644d4192bbb"
+    }
+  ]
+}

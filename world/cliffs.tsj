@@ -1,12 +1,12 @@
 {
-  "columns": 25,
-  "image": "../assets/tiles/tileset.png",
-  "imageheight": 32,
-  "imagewidth": 800,
+  "columns": 4,
+  "image": "../assets/tiles/cliffs.png",
+  "imageheight": 128,
+  "imagewidth": 128,
   "margin": 0,
-  "name": "heroes",
+  "name": "cliffs",
   "spacing": 0,
-  "tilecount": 25,
+  "tilecount": 16,
   "tiledversion": "1.12.2",
   "tileheight": 32,
   "tiles": [
@@ -16,7 +16,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "floor_boards"
+          "value": "lip_mid"
         }
       ]
     },
@@ -26,7 +26,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "floor_stone"
+          "value": "lip_left"
         }
       ]
     },
@@ -36,7 +36,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "grass_short"
+          "value": "lip_right"
         }
       ]
     },
@@ -46,7 +46,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "grass_tall"
+          "value": "lip_solo"
         }
       ]
     },
@@ -56,7 +56,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "path_dirt"
+          "value": "face_a"
         }
       ]
     },
@@ -66,7 +66,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "door"
+          "value": "face_b"
         }
       ]
     },
@@ -76,7 +76,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "wall_plaster"
+          "value": "face_c"
         }
       ]
     },
@@ -86,7 +86,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "wall_stone"
+          "value": "face_mid"
         }
       ]
     },
@@ -96,7 +96,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "water"
+          "value": "face_left"
         }
       ]
     },
@@ -106,7 +106,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "rock"
+          "value": "face_right"
         }
       ]
     },
@@ -116,7 +116,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "void"
+          "value": "corner_left"
         }
       ]
     },
@@ -126,7 +126,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "sand"
+          "value": "corner_right"
         }
       ]
     },
@@ -136,7 +136,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "scree"
+          "value": "shadow_mid"
         }
       ]
     },
@@ -146,7 +146,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "snow"
+          "value": "shadow_left"
         }
       ]
     },
@@ -156,7 +156,7 @@
         {
           "name": "name",
           "type": "string",
-          "value": "bridge"
+          "value": "shadow_right"
         }
       ]
     },
@@ -166,103 +166,12 @@
         {
           "name": "name",
           "type": "string",
-          "value": "forest"
-        }
-      ]
-    },
-    {
-      "id": 16,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "roof"
-        }
-      ]
-    },
-    {
-      "id": 17,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "ocean"
-        }
-      ]
-    },
-    {
-      "id": 18,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "dune"
-        }
-      ]
-    },
-    {
-      "id": 19,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "hardpan"
-        }
-      ]
-    },
-    {
-      "id": 20,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "jungle"
-        }
-      ]
-    },
-    {
-      "id": 21,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "undergrowth"
-        }
-      ]
-    },
-    {
-      "id": 22,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "mud"
-        }
-      ]
-    },
-    {
-      "id": 23,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "cliff"
-        }
-      ]
-    },
-    {
-      "id": 24,
-      "properties": [
-        {
-          "name": "name",
-          "type": "string",
-          "value": "ice"
+          "value": "shadow_solo"
         }
       ]
     }
   ],
   "tilewidth": 32,
   "type": "tileset",
-  "version": "1.10",
-  "wangsets": []
+  "version": "1.10"
 }
