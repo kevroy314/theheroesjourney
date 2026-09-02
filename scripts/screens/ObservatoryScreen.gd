@@ -76,7 +76,9 @@ func _entry_card(entry: Dictionary, index: int) -> PanelContainer:
 
 	var detail := HJUI.hbox(10)
 	detail.add_child(HJUI.label(String(entry.get("day", "")), HJUI.FS_TINY, "muted"))
-	detail.add_child(HJUI.label("%d %s → +%d %s" % [
+	# ASCII, not an arrow. The theme font is Latin-1 and U+2192 renders as tofu —
+	# the trap this project documented and then shipped anyway.
+	detail.add_child(HJUI.label("%d %s -> +%d %s" % [
 		int(entry.get("grit", 0)), Palette.word("grit"),
 		int(entry.get("earned", 0)), Palette.word("resolve")],
 		HJUI.FS_TINY, "accent_2", HORIZONTAL_ALIGNMENT_RIGHT))

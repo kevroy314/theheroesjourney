@@ -262,7 +262,13 @@ static func chip(caption: String, value: String, role: String = "accent", icon_i
 	sb.content_margin_left = 12
 	sb.content_margin_right = 12
 	var v := vbox(0)
-	v.add_child(label(caption.to_upper(), FS_TINY, "muted"))
+	# A chip is a fixed-width cell in a row of them, so a caption long enough to
+	# wrap pushes its orphan onto the value line and the chip reads "MOV / E 8".
+	# Captions here are one short word by design; clip rather than wrap.
+	var cap := label(caption.to_upper(), FS_TINY, "muted")
+	cap.autowrap_mode = TextServer.AUTOWRAP_OFF
+	cap.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	v.add_child(cap)
 	var value_label := label(value, FS_BODY, role)
 	v.add_child(value_label)
 
