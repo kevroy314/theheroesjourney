@@ -2998,5 +2998,24 @@ def main():
     print("output digest (md5 of every file, in name order): %s" % digest.hexdigest())
 
 
+def warn_about_authored():
+    """This tool rewrites props.png and tiles.json wholesale, which silently
+    deletes anything tools/add_prop.py appended. The registry survives, so the
+    fix is one command — but only if you are told, and a prop that quietly
+    stops existing is exactly the kind of loss nobody notices until the world
+    is missing something."""
+    registry = os.path.join(ROOT, "art", "props", "authored.json")
+    if not os.path.exists(registry):
+        return
+    try:
+        n = len(json.load(open(registry)).get("props", []))
+    except (OSError, ValueError):
+        n = 0
+    if n:
+        print("\n!! %d authored prop(s) were just overwritten." % n)
+        print("!! Restore them with:  python3 tools/add_prop.py reapply")
+
+
 if __name__ == "__main__":
     main()
+    warn_about_authored()

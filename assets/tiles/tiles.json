@@ -1020,6 +1020,18 @@
         "index": 69,
         "plane": 70,
         "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.006,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "tree_windswept",
+        "index": 70,
+        "plane": 71,
+        "solid": true
       }
     ],
     "rows": 9,

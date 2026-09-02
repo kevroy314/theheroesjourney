@@ -47,7 +47,6 @@ import argparse
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 import sys
 
@@ -275,7 +274,10 @@ def compose(rgb, mask, outline=True, shadow=True, shadow_w=None):
     if outline:
         MT.poutline(img)
     if shadow:
-        rw = shadow_w if shadow_w is not None else 0.72 * base_halfwidth(mask)
+        # Measured over the 29 hand-drawn props that cast one: the shadow is a
+        # median 1.27x the width of the base it sits under. It has to be wider,
+        # or pshadow's "under, never over" rule leaves nothing visible.
+        rw = shadow_w if shadow_w is not None else 1.25 * base_halfwidth(mask)
         # "should not exceed a tile in length" -- §2.2b, quoting Slynyrd.
         rw = int(round(max(4, min(16, rw))))
         MT.pshadow(img, rw)
@@ -430,10 +432,26 @@ def ground_mean(biome):
 
 
 def check_art(sprite, biomes, warn):
-    """The checks docs/ART-DIRECTION-OVERWORLD.md actually asks for, as numbers."""
+    """The checks docs/ART-DIRECTION-OVERWORLD.md asks for, as numbers.
+
+    Every threshold below is calibrated against the 70 props make_tiles.py
+    already draws, so "fails a check" means "unlike anything in the game",
+    not "unlike my taste". The measurements, on body pixels (rim excluded):
+
+        rim coverage      1.00 for all 55 outlined props, once the anchor row
+                          -- which is the bottom edge of the slot and cannot
+                          be rimmed -- is left out
+        max luma          118 is the highest anything reaches
+        colours           median 5, p90 8, most 11
+        vs the ground     54 of 54 have either a highlight >= ground+18 or a
+                          shadow <= ground-12. Mean luma is NOT the test: 20
+                          of 54 sit within 8 points of their ground's mean and
+                          read perfectly well, because what separates a prop
+                          from the ground is its extremes and its rim.
+    """
     a = np.asarray(sprite)
     opaque = a[:, :, 3] == 255
-    shadow = (a[:, :, 3] == MT.SHADOW_A)
+    shadow = a[:, :, 3] == MT.SHADOW_A
     rgb = a[:, :, :3].astype(float)
     ok = True
 
@@ -450,26 +468,29 @@ def check_art(sprite, biomes, warn):
         warn("WARN  bigger than anything hand-drawn (%dx%d). Check it does not "
              "swallow the tile it stands on." % BIGGEST_AUTHORED)
 
-    # rim: every boundary pixel of the silhouette should be the outline colour
     out = np.array(MT.OUTLINE)
     body = opaque & ~(rgb == out).all(2)
+    if not body.any():
+        warn("FAIL  the sprite is nothing but rim")
+        return False
+
     edge = np.zeros_like(body)
     for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        sh = np.roll(np.roll(body, dy, 0), dx, 1)
-        edge |= body & ~sh
+        edge |= body & ~np.roll(np.roll(body, dy, 0), dx, 1)
+    edge[H - 1, :] = False            # the anchor row is the slot's own edge
     rim = (rgb == out).all(2) & opaque
     nb = np.zeros_like(rim)
     for dy in (-1, 0, 1):
         for dx in (-1, 0, 1):
             nb |= np.roll(np.roll(rim, dy, 0), dx, 1)
     covered = (edge & nb).sum() / max(1, edge.sum())
-    say("  rim           %.0f%% of the silhouette boundary is rimmed" % (100 * covered))
-    if covered < 0.9:
+    say("  rim           %.0f%% of the silhouette boundary is rimmed "
+        "(every hand-drawn prop: 100%%)" % (100 * covered))
+    if covered < 0.98:
         warn("WARN  the rim is broken. It is what lets one sprite sit on grass "
              "and on snow; without it the prop disappears into dark ground.")
         ok = False
 
-    # standing on the ground, not floating over it
     last = np.flatnonzero(opaque.any(1))[-1]
     say("  contact       lowest opaque row y=%d of %d; %d shadow px"
         % (last, H - 1, int(shadow.sum())))
@@ -481,32 +502,63 @@ def check_art(sprite, biomes, warn):
         warn("NOTE  no contact shadow. Correct for ground cover (grass, "
              "flowers); wrong for anything that stands up.")
 
-    l = luma(rgb[opaque])
-    say("  value         min %.0f  mean %.0f  p99 %.0f  max %.0f"
+    l = luma(rgb[body])
+    say("  value         min %.0f  mean %.0f  p99 %.0f  max %.0f  "
+        "(nothing drawn exceeds 118)"
         % (l.min(), l.mean(), np.percentile(l, 99), l.max()))
-    if np.percentile(l, 99) > 150:
-        warn("WARN  p99 luma over 150. §2.6 reserves the top of the range for "
-             "the character's lit side; this will blow out the scene.")
+    if l.max() > 130:
+        warn("WARN  max luma over 130. §2.6 reserves 130-150 for the "
+             "character's lit side; this will blow out the scene.")
         ok = False
     for b in biomes:
         g = ground_mean(b)
         if g is None:
             continue
-        d = l.mean() - g
-        say("  vs %-12s ground mean %.0f, prop mean %.0f, separation %+.0f"
-            % (b, g, l.mean(), d))
-        if abs(d) < 8:
-            warn("WARN  under 8 luma from %s. It will read as a texture, not "
-                 "an object." % b)
+        hi, lo = l.max() - g, g - l.min()
+        say("  vs %-12s ground mean %.0f: highlight %+.0f, shadow %+.0f"
+            % (b, g, hi, lo))
+        if hi < 18 and lo < 12:
+            warn("WARN  on %s it has neither a highlight 18 above the ground "
+                 "nor a shadow 12 below it. All 54 scattered props have one or "
+                 "the other; this one will read as texture." % b)
             ok = False
 
-    cols = {tuple(c) for c in rgb[opaque].astype(int).reshape(-1, 3).tolist()}
-    say("  colours       %d distinct (hand-drawn props use 6-13)" % len(cols))
-    if len(cols) > 20:
-        warn("WARN  %d colours. Reduce --ramps or --colors; at 24px this reads "
-             "as noise." % len(cols))
+    cols = {tuple(c) for c in rgb[body].astype(int).reshape(-1, 3).tolist()}
+    say("  colours       %d distinct (hand-drawn props: median 5, most 11)"
+        % len(cols))
+    if len(cols) > 14:
+        warn("WARN  %d colours. Lower --ramps; at 24px this reads as noise."
+             % len(cols))
         ok = False
     return ok
+
+
+def world_has(biome):
+    """How many cells of this material the generated world actually contains.
+
+    Worth checking, and it is the mistake this tool made first: `hardpan` is a
+    real material in the tileset and a legal `biome` value, and the current
+    world generator does not produce a single cell of it. A prop declared on it
+    is correctly registered, correctly drawn, and will never once appear.
+    Returns None if the world has not been generated.
+    """
+    path = os.path.join(ROOT, "data", "world", "overworld.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        import base64
+        import zlib
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        key = next((k for k in d if k.startswith("tiles")), None)
+        if key is None:
+            return None
+        raw = zlib.decompress(base64.b64decode(d[key]))
+        if biome not in MT.ORDER:
+            return 0
+        return raw.count(MT.ORDER.index(biome))
+    except Exception:
+        return None
 
 
 def preview(sprite, pid, biomes, out_png):
@@ -552,6 +604,9 @@ def preview(sprite, pid, biomes, out_png):
 
 def cmd_add(a):
     os.makedirs(STORE, exist_ok=True)
+    # Before anything else, and specifically before --generate can spend quota:
+    # if the catalogue has already been renumbered, stop here.
+    check_catalogue(load_manifest(), Image.open(ATLAS).convert("RGBA"))
     src = a.src
     if a.generate:
         if not a.spend_quota:
@@ -620,6 +675,18 @@ def cmd_add(a):
     say("verify")
     warns = []
     ok = check_art(sprite, biomes, lambda m: warns.append(m) or say("  " + m))
+    if a.biome != "placed":
+        n = world_has(a.biome)
+        if n is None:
+            say("  world         not generated yet; run tools/make_world.py")
+        else:
+            say("  world         %d %s cells in data/world/overworld.json" % (n, a.biome))
+            if n == 0:
+                warns.append("WARN  zero cells")
+                say("  WARN  the world has no %s. This prop is legal and will "
+                    "never appear. Pick a material the generator produces, or "
+                    "use --biome placed and put it somewhere on purpose." % a.biome)
+                ok = False
     preview(sprite, a.id, biomes, os.path.join(STORE, "_preview_%s.png" % a.id))
 
     if warns and not a.force:
@@ -628,9 +695,12 @@ def cmd_add(a):
             "the checks." % len(warns))
 
     if a.dry_run:
-        sprite.save(os.path.join(STORE, a.id + ".png"))
+        # Never the registered filename: a dry run must not be able to leave a
+        # sprite on disk that disagrees with the one already in the atlas.
+        out = os.path.join(STORE, "_dryrun_%s.png" % a.id)
+        sprite.save(out)
         say("dry run      wrote %s, catalogue untouched"
-            % os.path.relpath(os.path.join(STORE, a.id + ".png"), ROOT))
+            % os.path.relpath(out, ROOT))
         return 0
 
     entry = {"id": a.id, "biome": a.biome, "density": a.density,
@@ -651,9 +721,12 @@ def cmd_add(a):
             % (man_len, reg["base_count"] + len(reg["props"]),
                reg["base_count"], len(reg["props"])))
 
+    # Append first. Only once the atlas and the manifest have accepted the
+    # sprite does the authored copy on disk change -- otherwise a refused add
+    # leaves a sprite file that disagrees with the atlas and `reapply` jams.
     sprite_path = os.path.join(STORE, a.id + ".png")
-    sprite.save(sprite_path)
     idx, rows = append_prop(entry, sprite, replace=a.replace)
+    sprite.save(sprite_path)
     say("  appended      %s at index %d, plane id %d (atlas %d rows)"
         % (a.id, idx, idx + 1, rows))
 
