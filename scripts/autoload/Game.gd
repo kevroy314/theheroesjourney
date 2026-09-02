@@ -102,7 +102,16 @@ func start_run(run_seed: int = 0, from_chapter: int = 1) -> void:
 	Steps.reset_run()
 	Steps.grant(int(Rules.value("steps.starting_grant", run.ctx())))
 	apply_effects(Rules.hook("on_run_start", run.ctx()))
-	enter_chapter(from_chapter)
+
+	# You wake in the world, not in a chapter. There is no sequence to be at the
+	# start of any more — the deadline runs until you find something, and what
+	# you find is decided by how far you are willing to walk.
+	run.zone = 0
+	run.deadline_unix = HJClock.now() + HJClock.hours_to_seconds(
+		maxf(1.0, 24.0 + Rules.value("area.deadline_bonus_hours", run.ctx(), 0.0)))
+	Notify.sync()
+	changed()
+	goto("overworld")
 
 
 func enter_chapter(index: int) -> void:
@@ -837,13 +846,21 @@ func enter_anomaly(cell: Vector2i) -> void:
 
 	var tier := int(spawn.get("tier", 0))
 	rng.seed = run.seed ^ (cell.x * 73856093) ^ (cell.y * 19349663)
-	var template := Content.anomaly_for(tier, rng)
+
+	# A named cell is one of the eight written beats and always serves the same
+	# place; everywhere else draws from the tier's pool. That is the whole of
+	# what is left of chapters: they are locations now, not a sequence.
+	var area_id := String(spawn.get("area", ""))
+	var template: Dictionary = Content.area(area_id) if area_id != "" \
+		else Content.anomaly_for(tier, rng)
 	if template.is_empty():
-		push_error("Game: no anomaly template for tier %d" % tier)
+		push_error("Game: no anomaly for tier %d at %s" % [tier, str(cell)])
 		return
 
 	run.anomaly = {"x": cell.x, "y": cell.y, "tier": tier,
-		"sector": String(spawn.get("sector", ""))}
+		"sector": String(spawn.get("sector", "")), "area": area_id}
+	run.zone = maxi(run.zone, tier)
+	Meta.note_ring(tier)
 	run.completed = []
 	run.locked = []
 	run.revealed = false
@@ -873,6 +890,16 @@ func enter_anomaly(cell: Vector2i) -> void:
 ## needs no tuning knob: burn fast and the mountain is simply out of range.
 func leave_anomaly(finished: bool = false) -> void:
 	if not has_active_run() or run.anomaly.is_empty():
+		return
+
+	# The Summit is still the ending. Retiring chapters removed the sequence, not
+	# the destination: walking out of the Summit having got past the Warden is
+	# how a loop is closed, and it is the only anomaly that ends a run rather
+	# than returning you to the world.
+	if finished and String(run.anomaly.get("area", "")) == "summit" \
+			and run.is_done("warden"):
+		run.anomaly = {}
+		end_run("cleared")
 		return
 	var total := int(run.area.get("order", []).size())
 	var done := int(run.completed.size())

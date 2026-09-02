@@ -105,6 +105,15 @@ func run_area_id() -> String:
 	var run: HJRun = Game.run
 	if run == null:
 		return "default"
+	# Inside a named beat the plate is that place; inside a procedural anomaly
+	# it is the quarter of the world you found it in, because that is the only
+	# thing about it that is true of somewhere.
+	var named := String(run.anomaly.get("area", ""))
+	if named != "":
+		return named
+	var sector := String(run.anomaly.get("sector", ""))
+	if sector != "":
+		return sector
 	return String(run.chapter_def().get("area", "default"))
 
 
