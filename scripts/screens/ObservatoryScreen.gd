@@ -9,7 +9,7 @@ func register() -> String:
 
 func build() -> void:
 	var v := page(12)
-	v.add_child(HJUI.header("The Observatory", "%d loops on the log" % Meta.history.size(),
+	v.add_child(HJUI.header("The Observatory", "%d loops on the log" % History.count(),
 		func(): Game.goto("palace")))
 
 	var scroll := HJUI.scroll()
@@ -51,14 +51,15 @@ func build() -> void:
 	list.add_child(axes_card)
 
 	list.add_child(HJUI.label("THE LOG", HJUI.FS_SMALL, "muted"))
-	if Meta.history.is_empty():
+	var rows := History.recent(40)
+	if rows.is_empty():
 		var empty := HJUI.panel("panel")
 		empty.add_child(HJUI.label("No loops recorded yet.", HJUI.FS_SMALL, "muted"))
 		list.add_child(empty)
 		return
 
-	var index := Meta.history.size()
-	for entry in Meta.history:
+	var index := rows.size()
+	for entry in rows:
 		list.add_child(_entry_card(entry, index))
 		index -= 1
 

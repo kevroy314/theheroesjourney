@@ -27,6 +27,7 @@ Palette="*res://scripts/autoload/Palette.gd"
 Notify="*res://scripts/autoload/Notify.gd"
 Game="*res://scripts/autoload/Game.gd"
 Steps="*res://scripts/autoload/Steps.gd"
+History="*res://scripts/autoload/History.gd"
 Updater="*res://scripts/autoload/Updater.gd"
 
 [display]

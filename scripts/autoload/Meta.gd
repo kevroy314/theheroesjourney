@@ -21,7 +21,9 @@ var rest_used_day: String = ""         ## a Rest Token was spent on this day
 var rooms_owned: Array = []            ## Mind Palace room ids bought
 var room_grid: Dictionary = {}         ## "x,y" -> room id
 var palace_size: int = 0               ## 0 = not initialised yet
-var history: Array = []                ## recent runs, newest first
+## Legacy. Runs live in History (user://history.ndjson) now, appended and never
+## rewritten. This stays only long enough to be migrated out of an old save.
+var history: Array = []
 
 var codex: Array = []                  ## echo ids ever found
 var axis_tasks: Dictionary = {}        ## axis -> lifetime count
@@ -492,12 +494,6 @@ func bank(grit: int, rate: float, keep: float, cleared: bool) -> int:
 		note_run_completed()
 	else:
 		loops += 1
-	history.push_front({
-		"unix": HJClock.now(), "day": HJClock.today(),
-		"cleared": cleared, "grit": kept, "earned": earned,
-	})
-	while history.size() > 40:
-		history.pop_back()
 	save_game()
 	Events.meta_changed.emit()
 	return earned
@@ -511,7 +507,6 @@ func save_game() -> void:
 		"resolve": resolve, "levels": levels, "unlocked": unlocked,
 		"inventory": inventory, "claimed": claimed,
 		"rooms_owned": rooms_owned, "room_grid": room_grid, "palace_size": palace_size,
-		"history": history,
 		"streak": streak, "best_streak": best_streak,
 		"last_active_day": last_active_day, "rest_used_day": rest_used_day,
 		"codex": codex, "axis_tasks": axis_tasks,
@@ -522,12 +517,27 @@ func save_game() -> void:
 		"selected_theme": selected_theme, "selected_ruleset": selected_ruleset,
 		"guild_id": guild_id, "stats": stats, "notify_prefs": notify_prefs,
 	}
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	_write_atomic(SAVE_PATH, JSON.stringify(payload, "  "))
+
+
+## Write through a temporary file and rename over the original.
+##
+## Android kills apps abruptly — a backgrounded game is a candidate the moment
+## memory is short — and a save half-written when that happens is the worst bug
+## in this class: it is silent, it is total, and it is discovered days later. A
+## rename is atomic, so the old save survives intact until the new one is
+## complete on disk.
+func _write_atomic(path: String, text: String) -> void:
+	var tmp := path + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
-		push_warning("Meta: could not write %s" % SAVE_PATH)
+		push_warning("Meta: could not write %s" % tmp)
 		return
-	f.store_string(JSON.stringify(payload, "  "))
+	f.store_string(text)
 	f.close()
+	var dir := DirAccess.open(path.get_base_dir())
+	if dir == null or dir.rename(tmp.get_file(), path.get_file()) != OK:
+		push_warning("Meta: could not replace %s" % path)
 
 
 func load_game() -> void:
@@ -543,6 +553,12 @@ func load_game() -> void:
 			room_grid = parsed.get("room_grid", {})
 			palace_size = int(parsed.get("palace_size", 0))
 			history = parsed.get("history", [])
+			# One-time move of an old save's inline rows into the archive. It
+			# refuses if the archive already exists, so this cannot double up.
+			var moved := History.migrate_from(history)
+			if moved > 0:
+				print("Meta: moved %d runs into the archive" % moved)
+			history = []
 			streak = int(parsed.get("streak", 0))
 			best_streak = int(parsed.get("best_streak", 0))
 			last_active_day = String(parsed.get("last_active_day", ""))

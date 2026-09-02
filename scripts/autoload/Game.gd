@@ -181,6 +181,27 @@ func end_run(outcome: String) -> void:
 		"first_reset": first_reset,
 		"repeats": Meta.runs_completed_today(),
 	}
+	# Archived after banking, so `earned` is the real number. Records what makes a
+	# run distinguishable rather than only what it scored — where you got to, how
+	# much of it you finished, and what walking it cost.
+	History.record({
+		"outcome": outcome,
+		"cleared": cleared,
+		"seed": run.seed,
+		"zone": run.zone,
+		"deepest_ring": Meta.deepest_ring,
+		"anomalies_cleared": run.anomalies_cleared.size(),
+		"grit": run.grit,
+		"earned": earned,
+		"steps_walked": Steps.walked,
+		"steps_spent": Steps.spent,
+		"final_burn": Steps.burn,
+		"axis_tasks": run.axis_tasks.duplicate(),
+		"echoes": run.echoes.duplicate(),
+		"trinkets": run.trinkets.duplicate(),
+		"minutes": int((HJClock.now() - run.started_unix) / 60),
+	})
+
 	Notify.sync()
 	clear_saved_run()
 	goto("summary")

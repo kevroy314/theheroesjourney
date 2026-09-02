@@ -36,6 +36,12 @@ static func run_all(host: Node) -> int:
 				_restore(parsed)
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(BACKUP))
 
+	# The harness plays real runs and every one of them archives itself. Point the
+	# archive somewhere disposable first, or testing the game costs the player
+	# their history.
+	History.use_path("user://history_selftest.ndjson")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(History.path))
+
 	var saved_meta := _snapshot()
 	var backup := FileAccess.open(BACKUP, FileAccess.WRITE)
 	if backup != null:
@@ -76,6 +82,12 @@ static func run_all(host: Node) -> int:
 	_palace_checks(failures)
 	await _anomaly_checks(host, failures)
 	await _screen_checks(host, failures)
+
+	_check(failures, "finished runs are archived", History.count() > 0,
+		"%d rows" % History.count())
+	_archive_checks(failures)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(History.path))
+	History.use_path(History.PATH)
 
 	_restore(saved_meta)
 	# The run finished, so the on-disk copy has done its job. Leaving it would
@@ -659,6 +671,47 @@ static func _next_anomaly(run: HJRun) -> Vector2i:
 	return best
 
 
+## The archive, including the one-time move out of an old save.
+##
+## Worth a test rather than a manual check: migration runs exactly once on a real
+## player's device, in a code path nobody exercises again, and getting it wrong
+## silently loses everything they did before the change.
+static func _archive_checks(failures: Array) -> void:
+	var scratch := "user://history_migrate_test.ndjson"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(scratch))
+	var live := History.path
+	History.use_path(scratch)
+
+	# Legacy rows are newest-first, the way Meta.history stored them.
+	var legacy := [
+		{"day": "2026-08-24", "cleared": true, "grit": 104, "earned": 24},
+		{"day": "2026-08-23", "cleared": false, "grit": 103, "earned": 23},
+		{"day": "2026-08-22", "cleared": false, "grit": 102, "earned": 22},
+	]
+	var moved := History.migrate_from(legacy)
+	_check(failures, "an old save's history is migrated", moved == 3, "%d moved" % moved)
+	_check(failures, "migration keeps every row", History.count() == 3,
+		"%d in archive" % History.count())
+	var newest: Dictionary = History.recent(1)[0] if History.count() > 0 else {}
+	_check(failures, "migration preserves order",
+		String(newest.get("day", "")) == "2026-08-24", String(newest.get("day", "?")))
+	_check(failures, "migrated rows are marked as such", bool(newest.get("migrated", false)), "")
+
+	# Running it twice must not double the archive: a player who reinstalls over
+	# an old save would otherwise accumulate a second copy of their whole life.
+	var again := History.migrate_from(legacy)
+	_check(failures, "migration refuses to run twice", again == 0 and History.count() == 3,
+		"%d moved, %d rows" % [again, History.count()])
+
+	# Appending after a migration must not disturb what was migrated.
+	History.record({"outcome": "loop", "grit": 7})
+	_check(failures, "appending after migration keeps the old rows",
+		History.count() == 4, "%d rows" % History.count())
+
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(scratch))
+	History.use_path(live)
+
+
 # --- helpers -------------------------------------------------------------------
 
 static func _snapshot() -> Dictionary:
@@ -667,7 +720,7 @@ static func _snapshot() -> Dictionary:
 		"unlocked": Meta.unlocked.duplicate(), "inventory": Meta.inventory.duplicate(true),
 		"claimed": Meta.claimed.duplicate(), "streak": Meta.streak, "best": Meta.best_streak,
 		"rooms_owned": Meta.rooms_owned.duplicate(), "room_grid": Meta.room_grid.duplicate(true),
-		"palace_size": Meta.palace_size, "history": Meta.history.duplicate(true),
+		"palace_size": Meta.palace_size,
 		"last_active_day": Meta.last_active_day, "rest_used_day": Meta.rest_used_day,
 		"codex": Meta.codex.duplicate(), "axis_tasks": Meta.axis_tasks.duplicate(true),
 		"chapters_reached": Meta.chapters_reached, "loops": Meta.loops,
@@ -686,7 +739,6 @@ static func _restore(s: Dictionary) -> void:
 	Meta.rooms_owned = s["rooms_owned"]
 	Meta.room_grid = s["room_grid"]
 	Meta.palace_size = s["palace_size"]
-	Meta.history = s["history"]
 	Meta.streak = s["streak"]
 	Meta.best_streak = s["best"]
 	Meta.last_active_day = s["last_active_day"]
