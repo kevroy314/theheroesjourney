@@ -10,6 +10,8 @@ func register() -> String:
 ## Remembered on entry: Game.screen has already moved on by the time build()
 ## runs, so the previous screen has to be captured before that.
 var _whence := "palace"
+## Reset by leaving the screen, so the form is never left open over a stale value.
+var _editing_server := false
 
 
 func _enter_tree() -> void:
@@ -276,10 +278,21 @@ func _updates(list: VBoxContainer) -> void:
 			check.pressed.connect(func(): Updater.check())
 			cv.add_child(check)
 
-	var forget := HJUI.button("Change server", "quiet")
-	forget.custom_minimum_size.y = 62
-	forget.pressed.connect(func(): Updater.set_server("", ""))
-	cv.add_child(forget)
+	# Reveals the form with the current values in it. It used to be "Change
+	# server" wired straight to set_server("", "") — a one-tap unconfirmed wipe
+	# of the URL and key, sitting directly beneath the action button. Granting
+	# the install permission restarts the app, the card comes back in a
+	# different state so the buttons move, and a tap aimed at "Allow installing"
+	# lands here and destroys the settings instead. Editing is not destroying.
+	if _editing_server:
+		cv.add_child(_server_fields())
+	else:
+		var edit := HJUI.button("Edit server", "quiet")
+		edit.custom_minimum_size.y = 62
+		edit.pressed.connect(func() -> void:
+			_editing_server = true
+			refresh())
+		cv.add_child(edit)
 
 	card.add_child(cv)
 	list.add_child(card)
@@ -308,6 +321,7 @@ func _server_fields() -> Control:
 	var save := HJUI.button("Save", "primary")
 	save.pressed.connect(func() -> void:
 		Updater.set_server(url.text, secret.text)
+		_editing_server = false
 		Game.say("Update server saved.", "good"))
 	box.add_child(save)
 	return box
