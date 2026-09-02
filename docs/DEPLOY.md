@@ -1,5 +1,11 @@
 # Build, cache and deploy
 
+> **The shipped target is Android** (and iOS, not yet built). The web
+> export documented below is a development preview: it is how a UI change
+> is checked in a browser in seconds, and what the self-test drives. It has
+> no step counter behind it, so it cannot run the actual game loop. See
+> the **Android** section for how the app is really built and shipped.
+
 ```bash
 npm run build        # export + content-hash + precompress + serve
 npm run serve        # serving config only (skips the export)
