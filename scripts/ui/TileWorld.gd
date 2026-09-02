@@ -31,6 +31,8 @@ var run: HJRun
 var node_at: Dictionary = {}         ## Vector2i -> node id, this chapter's beats
 
 var _tiles: Texture2D
+var _variants: Texture2D
+var _overlays: Texture2D
 var _player: Texture2D
 var _cell := Vector2i.ZERO           ## the tile the character occupies
 var _from := Vector2i.ZERO           ## where the current move started
@@ -59,6 +61,8 @@ func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
 
 func _ready() -> void:
 	_tiles = load("res://assets/tiles/tileset.png")
+	_variants = load("res://assets/tiles/tileset_var.png")
+	_overlays = load("res://assets/tiles/overlays.png")
 	_player = load("res://assets/sprites/player.png")
 	set_process(true)
 
@@ -142,13 +146,90 @@ func _draw() -> void:
 		int(ceil((cam.x + size.x) / scale)), int(ceil((cam.y + size.y) / scale)))
 	for y in range(maxi(0, first.y), mini(world.h, last.y + 1)):
 		for x in range(maxi(0, first.x), mini(world.w, last.x + 1)):
-			var index := world.at(x, y)
-			var dst := Rect2(Vector2(x, y) * scale - cam, Vector2(scale, scale))
-			draw_texture_rect_region(_tiles, dst,
-				Rect2(index * TILE, 0, TILE, TILE))
+			_draw_cell(x, y, Rect2(Vector2(x, y) * scale - cam, Vector2(scale, scale)))
 
 	_draw_markers(cam, scale)
 	_draw_character(cam)
+
+
+## Deterministic per cell, so a tile keeps its variant. A cell that reshuffled
+## its fill every frame would shimmer.
+static func _wobble(x: int, y: int, salt: int) -> int:
+	var h := (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
+	return absi(h)
+
+
+## One cell: its own fill, then every higher-ranked neighbour bleeding into it.
+##
+## This is the transliteration of `overlay_plan()` in tools/make_tiles.py, and
+## it is what turns a mosaic of squares into terrain. Without it every material
+## meets every other along a 32-pixel straight edge, which is precisely what
+## "a bunch of disjoint right angles" describes.
+##
+## Cheap in the common case: most cells sit inside a field of their own material
+## and draw exactly once.
+func _draw_cell(x: int, y: int, dst: Rect2) -> void:
+	var mine := world.at(x, y)
+
+	# The fill, from one of four variants so a large field does not visibly tile.
+	var variant := 0
+	if world.variant_count > 0:
+		variant = _wobble(x, y, 11) % (1 + world.variant_count)
+	if variant == 0 or _variants == null:
+		draw_texture_rect_region(_tiles, dst, Rect2(mine * TILE, 0, TILE, TILE))
+	else:
+		draw_texture_rect_region(_variants, dst,
+			Rect2(mine * TILE, (variant - 1) * TILE, TILE, TILE))
+
+	if _overlays == null:
+		return
+	var my_rank: int = world.rank.get(mine, -1)
+	if my_rank < 0:
+		return          # architectural: floors, walls, roofs neither bleed nor take
+
+	# Which neighbouring materials outrank this one, and on which sides.
+	var sides: Dictionary = {}      # tile id -> side bitmask
+	var corners: Dictionary = {}    # tile id -> corner bitmask
+	const SIDE := [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
+	const DIAG := [Vector2i(1, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1)]
+
+	for i in range(4):
+		var n := world.at(x + SIDE[i].x, y + SIDE[i].y)
+		if n == mine or int(world.rank.get(n, -1)) <= my_rank:
+			continue
+		sides[n] = int(sides.get(n, 0)) | (1 << i)
+	for i in range(4):
+		var n := world.at(x + DIAG[i].x, y + DIAG[i].y)
+		if n == mine or int(world.rank.get(n, -1)) <= my_rank:
+			continue
+		# Only when neither adjacent side already carries it — otherwise the
+		# edge piece has covered this corner and a second draw doubles the ink.
+		var a := world.at(x + SIDE[i].x, y + SIDE[i].y)
+		var b := world.at(x + SIDE[(i + 1) % 4].x, y + SIDE[(i + 1) % 4].y)
+		if a == n or b == n:
+			continue
+		corners[n] = int(corners.get(n, 0)) | (1 << i)
+
+	# Lowest rank first, so a shore laps over sand before the road lies over both.
+	var others := sides.keys()
+	for k in corners:
+		if not others.has(k):
+			others.append(k)
+	others.sort_custom(func(a, b): return int(world.rank.get(a, 0)) < int(world.rank.get(b, 0)))
+
+	for other in others:
+		var slot: int = world.overlay_slot.get(other, -1)
+		if slot < 0:
+			continue
+		var v := _wobble(x, y, other) % 3
+		var side_mask := int(sides.get(other, 0))
+		if side_mask > 0:
+			draw_texture_rect_region(_overlays, dst,
+				Rect2(side_mask * TILE, (slot * 6 + v * 2) * TILE, TILE, TILE))
+		var corner_mask := int(corners.get(other, 0))
+		if corner_mask > 0:
+			draw_texture_rect_region(_overlays, dst,
+				Rect2(corner_mask * TILE, (slot * 6 + v * 2 + 1) * TILE, TILE, TILE))
 
 
 ## A mark on every node tile, in the same vocabulary as the chalk board: amber

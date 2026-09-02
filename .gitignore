@@ -48,3 +48,11 @@ Thumbs.db
 web-push-keys.json
 .env
 server/data/
+
+# Tiled's editor state next to the map: which layer was selected, where the view
+# was scrolled, the undo history. Per-machine, rewritten constantly, meaningless
+# in a diff. world/overworld.tmj and world/tileset.tsj are the opposite — they
+# hold the hand-drawn map and the hand-authored terrain sets, and are the only
+# copy of that work. Commit those. See docs/MAP-EDITING.md.
+world/*.tiled-session
+world/*.autosave

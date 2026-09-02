@@ -12,12 +12,28 @@ extends RefCounted
 ## drawn map in assets/world/worldmap.png from the same source, so the map and
 ## the ground can never disagree.
 
+## Tile ids index ORDER in tools/make_tiles.py.
 const PATH := "res://data/world/overworld.json"
-
-## Tile ids index ORDER in tools/make_tiles.py. Solid ones are the ones you
-## cannot stand on; everything else is ground.
+const MANIFEST := "res://assets/tiles/tiles.json"
 const T_DOOR := 5
-const SOLID := [6, 7, 8, 9, 10, 16]   ## plaster, stone wall, water, rock, void, roof
+
+## Which ids cannot be stood on, read from the tileset's own manifest rather
+## than copied here.
+##
+## This was a hardcoded [6, 7, 8, 9, 10, 16]. The tileset then grew from 18
+## tiles to 25 and three of the new ones — ocean, jungle, cliff — are solid, so
+## the copy was silently wrong the moment the art changed and the player could
+## walk into the sea. A second copy of a list is a second chance to disagree
+## with it; make_tiles.py publishes the truth and this reads it.
+var solid: Dictionary = {}
+
+## Draw order for the overlay stack, from the manifest. A material only bleeds
+## onto ones *below* it, so water laps over sand and the road lies over
+## everything — the rank is what decides which of two neighbours does the
+## intruding, and without it every boundary would be drawn twice.
+var rank: Dictionary = {}          ## tile id -> rank, 0 = lowest
+var overlay_slot: Dictionary = {}  ## tile id -> row block in overlays.png
+var variant_count := 0
 
 var w: int = 0
 var h: int = 0
@@ -65,7 +81,41 @@ func load_world() -> void:
 		regions[String(id)] = Vector2i(int(cell.get("x", 0)), int(cell.get("y", 0)))
 	var s: Dictionary = parsed.get("spawn", {})
 	spawn = Vector2i(int(s.get("x", 0)), int(s.get("y", 0)))
+	_load_solid()
 	loaded = true
+
+
+## Falls back to nothing-is-solid rather than to a stale guess: a world you can
+## walk through is an obvious bug, where a world with the wrong walls is a
+## subtle one that looks like level design.
+func _load_solid() -> void:
+	solid.clear()
+	var file := FileAccess.open(MANIFEST, FileAccess.READ)
+	if file == null:
+		push_error("HJWorld: %s missing — run tools/make_tiles.py" % MANIFEST)
+		return
+	var parsed = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not (parsed is Dictionary):
+		return
+	for id in parsed.get("solid_ids", []):
+		solid[int(id)] = true
+
+	var order: Array = parsed.get("order", [])
+	var index: Dictionary = {}
+	for i in range(order.size()):
+		index[String(order[i])] = i
+	var precedence: Array = parsed.get("precedence", [])
+	for r in range(precedence.size()):
+		var name := String(precedence[r])
+		if not index.has(name):
+			continue
+		rank[int(index[name])] = r
+		# Rank 0 owns no edge set — nothing is below it to bleed onto — so the
+		# atlas holds ranks 1 and up and the slot is one less than the rank.
+		if r > 0:
+			overlay_slot[int(index[name])] = r - 1
+	variant_count = int(parsed.get("variants", {}).get("count", 0))
 
 
 func at(x: int, y: int) -> int:
@@ -79,7 +129,7 @@ func at(x: int, y: int) -> int:
 
 
 func walkable(x: int, y: int) -> bool:
-	return not SOLID.has(at(x, y))
+	return not solid.has(at(x, y))
 
 
 func anchor(area_id: String) -> Vector2i:
