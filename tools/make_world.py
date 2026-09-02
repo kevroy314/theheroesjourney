@@ -295,7 +295,11 @@ class World:
         if 0 <= x < W and 0 <= y < H:
             self.tiles[y][x] = tile
 
+    blocked = frozenset()
+
     def walkable(self, x, y):
+        if (x, y) in self.blocked:
+            return False
         return self.at(x, y) not in SOLID
 
 
@@ -494,6 +498,198 @@ def encode(tiles):
     return base64.b64encode(zlib.compress(raw, 9)).decode("ascii")
 
 
+def scatter_props(world, elev, rng, reach):
+    """Put things in the world.
+
+    The measured failure was that half of all possible screens showed exactly
+    one material and the room you wake in had no bed. Terrain alone cannot fix
+    that: a field of perfect grass is still a field of nothing. Props are what
+    turn ground into somewhere.
+
+    Density is per walkable cell of the material the prop belongs to, declared
+    by the tileset rather than guessed here. A prop occupies its foot cells and
+    those become impassable when it says so, which is what stops a boulder being
+    scenery you can stand inside.
+    """
+    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
+    catalogue = manifest["props"]["list"]
+    by_biome = {}
+    for prop in catalogue:
+        by_biome.setdefault(prop["biome"], []).append(prop)
+
+    plane = [[0] * W for _ in range(H)]
+    blocked = set()
+
+    def free(x, y, foot):
+        for fy in range(foot[1]):
+            for fx in range(foot[0]):
+                cx, cy = x + fx, y - fy
+                if (cx, cy) in blocked or plane[cy][cx] != 0:
+                    return False
+                if not world.walkable(cx, cy):
+                    return False
+                # Never on a road or in a doorway: those are the two places the
+                # player is guaranteed to be walking through.
+                if world.at(cx, cy) in (T["path_dirt"], T["door"], T["bridge"]):
+                    return False
+        return True
+
+    for y in range(1, H - 1):
+        for x in range(1, W - 1):
+            material = ORDER[world.at(x, y)]
+            options = by_biome.get(material)
+            if not options or (x, y) not in reach:
+                continue
+            for prop in options:
+                if rng.random() >= prop["density"]:
+                    continue
+                foot = prop["foot"]
+                if not free(x, y, foot):
+                    break
+                plane[y][x] = prop["plane"]
+                if prop["solid"]:
+                    for fy in range(foot[1]):
+                        for fx in range(foot[0]):
+                            blocked.add((x + fx, y - fy))
+                break
+    return plane, blocked
+
+
+def furnish_house(world, plane, cells):
+    """The bedroom you wake in, which had nothing in it at all.
+
+    Placed by hand rather than scattered, because this is the first thing anyone
+    sees and a randomly positioned bed is worse than none.
+    """
+    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
+    interior = {p["id"]: p["plane"] for p in manifest["props"]["list"]
+                if p["biome"] == "placed"}
+    cx, cy = cells["waking_room"]
+    layout = [("bed", -2, -1), ("chair", 2, 0), ("table", 3, -1),
+              ("bookshelf", -3, 1), ("chest", 2, 2), ("floor_lamp", -3, -2),
+              ("plant_pot", 3, 2), ("rug", 0, 1)]
+    for name, dx, dy in layout:
+        if name not in interior:
+            continue
+        x, y = cx + dx, cy + dy
+        if 0 <= x < W and 0 <= y < H and world.walkable(x, y):
+            plane[y][x] = interior[name]
+
+
+def terrace(elev, levels=5):
+    """Quantise elevation into steps, then smooth the steps into contours.
+
+    Quantising alone is not enough. Noise crossing a threshold produces a
+    speckle of one-cell drops, and a one-cell drop rendered as a cliff is a
+    block sitting on the grass rather than an escarpment — which is exactly how
+    the first version looked. A majority filter pulls the boundaries into long
+    contours, so a terrace edge runs along the land the way a real one does.
+    """
+    steps = [[min(levels - 1, int(e * levels)) for e in row] for row in elev]
+    for _ in range(3):
+        out = [row[:] for row in steps]
+        for y in range(1, H - 1):
+            for x in range(1, W - 1):
+                tally = {}
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        v = steps[y + dy][x + dx]
+                        tally[v] = tally.get(v, 0) + 1
+                out[y][x] = max(tally, key=lambda k: (tally[k], -abs(k - steps[y][x])))
+        steps = out
+    return steps
+
+
+def stock_town(world, plane, centre, rng):
+    """The town, which had streets and buildings and nothing in them.
+
+    Placed rather than scattered: town props belong beside a building or along a
+    street, and scattering them across flagstone would read as debris. A well in
+    the middle of a square is a landmark; a well two tiles from a wall is
+    litter.
+    """
+    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
+    placed = {p["id"]: p for p in manifest["props"]["list"] if p["biome"] == "placed"}
+    cx, cy = centre
+
+    def put(name, x, y):
+        prop = placed.get(name)
+        if prop is None or not (0 <= x < W and 0 <= y < H):
+            return
+        if not world.walkable(x, y) or plane[y][x] != 0:
+            return
+        if world.at(x, y) == T["door"]:
+            return
+        plane[y][x] = prop["plane"]
+
+    put("well", cx + 1, cy - 2)
+    for i, name in enumerate(["market_stall", "cart", "barrel", "crate"]):
+        put(name, cx - 6 + i * 3, cy + 4)
+    for offset in (-13, -5, 5, 13):
+        put("lamppost", cx + offset, cy - 9)
+        put("lamppost", cx + offset, cy + 9)
+    put("bench", cx - 3, cy - 2)
+    put("bench", cx + 4, cy + 2)
+    put("standing_stone", cx - 15, cy - 14)
+
+    # Barrels and crates against the walls of whatever buildings are here.
+    for _ in range(40):
+        x = cx + rng.randint(-20, 20)
+        y = cy + rng.randint(-20, 20)
+        if world.at(x, y) == T["roof"] or not world.walkable(x, y):
+            continue
+        touching = any(world.at(x + dx, y + dy) == T["roof"]
+                       for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+        if touching:
+            put(rng.choice(["barrel", "crate"]), x, y)
+
+
+MIN_CLIFF_RUN = 4         # cells; shorter than this reads as a block, not a bluff
+MIN_CLIFF_DROP = 0.004    # elevation, so a cliff only forms on genuinely steep ground
+
+
+def cliff_plane(steps, elev):
+    """Where the ground steps down hard enough and far enough to be a cliff.
+
+    Returns a plane the renderer draws directly rather than a rule it has to
+    re-derive, because the rule is not local: whether a cell is a cliff depends
+    on how far the drop runs either side of it, and asking the renderer to
+    measure that per frame would be both slow and a second implementation to
+    disagree with.
+
+    Two conditions, and the first version had neither, which is why cliffs came
+    out as isolated blocks scattered over gentle grass:
+
+      the drop must be steep     — a terrace boundary drawn across a shallow
+                                   slope is a wall where the eye expects a hill
+      the drop must be long      — a bluff three cells wide is a crate
+
+    1 left end, 2 middle, 3 right end.
+    """
+    plane = [[0] * W for _ in range(H)]
+    for y in range(1, H):
+        x = 0
+        while x < W:
+            if not (steps[y - 1][x] > steps[y][x]
+                    and elev[y - 1][x] - elev[y][x] > MIN_CLIFF_DROP):
+                x += 1
+                continue
+            start = x
+            while (x < W and steps[y - 1][x] > steps[y][x]
+                   and elev[y - 1][x] - elev[y][x] > MIN_CLIFF_DROP):
+                x += 1
+            if x - start < MIN_CLIFF_RUN:
+                continue
+            for i in range(start, x):
+                plane[y][i] = 1 if i == start else (3 if i == x - 1 else 2)
+    return plane
+
+
+def encode_plane(plane):
+    raw = bytes(bytearray(v for row in plane for v in row))
+    return base64.b64encode(zlib.compress(raw, 9)).decode("ascii")
+
+
 def encode_elevation(elev):
     """The elevation field, quantised to a byte a cell.
 
@@ -596,6 +792,24 @@ def main():
 
     spawn = cells["the_town"]
     reach = reachable(world, spawn)
+
+    # A cliff face is the wall of a terrace, and you cannot walk up a wall. The
+    # renderer derives the same faces from the same quantisation, so the picture
+    # and the collision cannot disagree.
+    steps = terrace(elev)
+    cliffs = cliff_plane(steps, elev)
+    faces = {(x, y) for y in range(H) for x in range(W) if cliffs[y][x]}
+
+    props, blocked = scatter_props(world, elev, rng, reach)
+    blocked |= faces
+    stock_town(world, props, CENTRE, rng)
+    furnish_house(world, props, cells)
+
+    # Props that block have to be part of walkability, so reachability is
+    # measured on the world the player will actually meet rather than on the
+    # bare terrain underneath it.
+    world.blocked = blocked
+    reach = reachable(world, spawn)
     anomalies = place_anomalies(world, rng, reach)
 
     stranded = [n for n, c in cells.items() if c not in reach]
@@ -610,6 +824,15 @@ def main():
         "centre": {"x": CENTRE[0], "y": CENTRE[1]},
         "tiles_b64_deflate": encode(tiles),
         "elevation_b64_deflate": encode_elevation(elev),
+        "props_b64_deflate": encode_plane(props),
+        # A prop's art is 64x96 and its collision is one or two cells at its
+        # foot, so solidity cannot be derived from the prop plane alone — the
+        # anchor cell is not the whole footprint. Exported as its own plane
+        # rather than recomputed in the engine from the same manifest twice.
+        "blocked_b64_deflate": encode_plane(
+            [[1 if (x, y) in blocked else 0 for x in range(W)] for y in range(H)]),
+        "cliffs_b64_deflate": encode_plane(cliffs),
+        "terrace_levels": 5,
         "regions": {n: {"x": c[0], "y": c[1]} for n, c in cells.items()},
         "anomalies": anomalies,
         "spawn": {"x": spawn[0], "y": spawn[1]},
@@ -631,6 +854,10 @@ def main():
     print("reachable from spawn: %d cells (%.1f%% of walkable)"
           % (len(reach), 100.0 * len(reach) / max(1, sum(
               1 for y in range(H) for x in range(W) if world.walkable(x, y)))))
+    filled = sum(1 for row in props for v in row if v)
+    print("props: %d placed (%.1f%% of cells), %d of them solid"
+          % (filled, 100.0 * filled / (W * H), len(blocked)))
+    print("cliff cells: %d" % len(faces))
     print("anomalies: %d" % len(anomalies))
     for tier in range(MAX_TIER + 1):
         band = [a for a in anomalies if a["tier"] == tier]

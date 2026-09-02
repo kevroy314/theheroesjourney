@@ -35,6 +35,22 @@ var rank: Dictionary = {}          ## tile id -> rank, 0 = lowest
 var overlay_slot: Dictionary = {}  ## tile id -> row block in overlays.png
 var variant_count := 0
 
+## What is standing on each cell, and what that makes impassable. A prop's art
+## is 64x96 and its collision is the cell or two under its foot, so the two are
+## separate planes rather than one derived from the other.
+var props: PackedByteArray = PackedByteArray()
+var blocked: PackedByteArray = PackedByteArray()
+var prop_solid: Dictionary = {}
+
+## Elevation quantised into steps. A smooth field has nowhere to put a cliff;
+## terraces give it edges. The generator derives its cliff collision from this
+## same plane, so the wall you can see and the wall you cannot walk through are
+## the same wall.
+## 0 none, 1 left end, 2 middle, 3 right end. Baked by the generator because
+## whether a cell is a cliff depends on how far the drop runs either side of it,
+## which is not a question the renderer can answer per frame.
+var cliffs: PackedByteArray = PackedByteArray()
+
 var w: int = 0
 var h: int = 0
 var tiles: PackedByteArray = PackedByteArray()
@@ -79,6 +95,9 @@ func load_world() -> void:
 	for id in parsed.get("regions", {}):
 		var cell: Dictionary = parsed["regions"][id]
 		regions[String(id)] = Vector2i(int(cell.get("x", 0)), int(cell.get("y", 0)))
+	props = _plane(parsed, "props_b64_deflate")
+	blocked = _plane(parsed, "blocked_b64_deflate")
+	cliffs = _plane(parsed, "cliffs_b64_deflate")
 	var s: Dictionary = parsed.get("spawn", {})
 	spawn = Vector2i(int(s.get("x", 0)), int(s.get("y", 0)))
 	_load_solid()
@@ -118,6 +137,33 @@ func _load_solid() -> void:
 	variant_count = int(parsed.get("variants", {}).get("count", 0))
 
 
+## One byte per cell, or empty if the key is absent — an older world file should
+## render without props rather than refuse to load.
+func _plane(parsed: Dictionary, key: String) -> PackedByteArray:
+	var raw := String(parsed.get(key, ""))
+	if raw == "":
+		return PackedByteArray()
+	var out := Marshalls.base64_to_raw(raw).decompress(w * h, FileAccess.COMPRESSION_DEFLATE)
+	return out if out.size() == w * h else PackedByteArray()
+
+
+## The prop standing on a cell, 0 for none. The value is the manifest's `plane`,
+## which is the atlas slot plus one.
+## Which cliff piece stands on a cell, 0 for none.
+func cliff_at(x: int, y: int) -> int:
+	var i := y * w + x
+	if x < 0 or y < 0 or x >= w or y >= h or i >= cliffs.size():
+		return 0
+	return cliffs[i]
+
+
+func prop_at(x: int, y: int) -> int:
+	var i := y * w + x
+	if x < 0 or y < 0 or x >= w or y >= h or i >= props.size():
+		return 0
+	return props[i]
+
+
 func at(x: int, y: int) -> int:
 	# The size check is not paranoia: a world that failed to load leaves an empty
 	# array, and without this every draw call becomes a thousand out-of-bounds
@@ -129,6 +175,9 @@ func at(x: int, y: int) -> int:
 
 
 func walkable(x: int, y: int) -> bool:
+	var i := y * w + x
+	if i >= 0 and i < blocked.size() and blocked[i] != 0:
+		return false
 	return not solid.has(at(x, y))
 
 
