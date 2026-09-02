@@ -13,10 +13,20 @@ tools/make_world.py is re-run?** The answer here is a layered map.
                       painted into it.
       layer "edits"   hand-authored. Never written by the generator. Empty cells
                       mean "no override"; a tile here wins over base.
-      object layers   region anchors, spawn, anomalies, props. Generated objects
+      object layers   region anchors, spawn, anomalies. Generated objects
                       remember where the generator last put them, so an object
                       you drag is treated as pinned and stops following the
                       generator. Objects you add yourself are never touched.
+      layers "props"  the byte planes, exploded into tile objects you can drag,
+        and "cliffs"  delete and add. They have no per-object identity to pin by
+                      — a fresh seed is a fresh scatter — so the map remembers
+                      the whole plane the generator last produced (hj_gen_planes)
+                      and every cell where the objects disagree with it is an
+                      override, re-applied on top of the next generation. That is
+                      the base/edits split again, and it is what makes *deleting*
+                      a generated prop stick: the empty cell is a statement, not
+                      an absence. The plane, not the objects, is still what the
+                      game loads.
 
 So `overworld.tmj` — not `overworld.json` — is the durable artefact, and it is
 the file that must be committed. Regeneration is:
@@ -93,9 +103,10 @@ P_PLANES = "hj_gen_planes"
 # props_b64_deflate and cliffs_b64_deflate are one byte per cell, and a byte is
 # the one thing Tiled cannot show you. Both become object layers here and are
 # folded back into their planes on import; the plane stays the runtime format
-# because the renderer indexes it per cell every frame and 4,779 objects of JSON
-# would be 280 KB to parse at every launch for a lookup the plane already does
-# in O(1). See docs/MAP-EDITING.md.
+# because the renderer indexes it per cell every frame and the several thousand
+# objects this explodes into would be a quarter of a megabyte of JSON to parse at
+# every launch, for a lookup the plane already does in O(1). See
+# docs/MAP-EDITING.md.
 #
 # This table is the one place in the map tooling that knows a world-file key by
 # name, and it has to be: every plane in the file is the same w*h bytes, so

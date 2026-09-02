@@ -13,6 +13,12 @@ records they came from — region anchors, spawn, and whatever collections of
 {x, y, ...} the world model grows next — including any Kevin added by hand that
 the generator has never heard of.
 
+The `props` and `cliffs` layers fold back into byte planes here, because the
+plane is still the runtime format: the renderer indexes it per cell inside
+_draw, and objects are the editing format only. `blocked_b64_deflate` is then
+*derived* from those two planes rather than carried across, which is the only
+way a prop placed by hand in Tiled can block — see docs/MAP-EDITING.md.
+
 Everything this tool does not understand about the schema was stashed in the
 map's `hj_schema` property on export and is written straight back out, in the
 original key order, with the original JSON formatting. That is what makes an
@@ -130,8 +136,9 @@ def compose(tmj):
     # --- the editable byte planes, folded back out of their object layers ---
     #
     # The plane is still what the game loads: scripts/ui/TileWorld.gd indexes it
-    # per cell every frame, and 4,779 objects would be a quarter of a megabyte of
-    # JSON to parse at launch for a lookup one byte already answers. Objects are
+    # per cell every frame, and several thousand objects would be a quarter of a
+    # megabyte of JSON to parse at launch for a lookup one byte already answers.
+    # Objects are
     # the editing format; this is where they stop being objects.
     planes, plane_layers = {}, {}
     for key, cat_name in env.get("planes", {}).items():
