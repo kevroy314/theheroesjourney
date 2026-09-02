@@ -1,0 +1,307 @@
+{
+  "compressionlevel": -1,
+  "height": 320,
+  "infinite": false,
+  "layers": [
+    {
+      "compression": "zlib",
+      "data": "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",
+      "encoding": "base64",
+      "height": 320,
+      "id": 1,
+      "locked": true,
+      "name": "base",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 150,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "compression": "zlib",
+      "data": "eNrtwTEBAAAAwqD1T20Gf6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+A+4eAAE=",
+      "encoding": "base64",
+      "height": 320,
+      "id": 2,
+      "locked": false,
+      "name": "edits",
+      "opacity": 1,
+      "type": "tilelayer",
+      "visible": true,
+      "width": 150,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "draworder": "topdown",
+      "id": 3,
+      "locked": false,
+      "name": "regions",
+      "objects": [
+        {
+          "class": "regions",
+          "height": 0,
+          "id": 1,
+          "name": "waking_room",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 2384.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 9648.0
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 2384.0,
+          "y": 9648.0
+        },
+        {
+          "class": "regions",
+          "height": 0,
+          "id": 2,
+          "name": "the_house",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 2384.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 9296.0
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 2384.0,
+          "y": 9296.0
+        },
+        {
+          "class": "regions",
+          "height": 0,
+          "id": 3,
+          "name": "the_town",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 2096.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 8464.0
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 2096.0,
+          "y": 8464.0
+        },
+        {
+          "class": "regions",
+          "height": 0,
+          "id": 4,
+          "name": "tall_grass",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 2768.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 7056.0
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 2768.0,
+          "y": 7056.0
+        },
+        {
+          "class": "regions",
+          "height": 0,
+          "id": 5,
+          "name": "long_road",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 2192.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 5520.0
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 2192.0,
+          "y": 5520.0
+        },
+        {
+          "class": "regions",
+          "height": 0,
+          "id": 6,
+          "name": "foothills",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 2608.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 3824.0
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 2608.0,
+          "y": 3824.0
+        },
+        {
+          "class": "regions",
+          "height": 0,
+          "id": 7,
+          "name": "observatory",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 1808.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 2288.0
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 1808.0,
+          "y": 2288.0
+        },
+        {
+          "class": "regions",
+          "height": 0,
+          "id": 8,
+          "name": "summit",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 2384.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 720.0
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 2384.0,
+          "y": 720.0
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "draworder": "topdown",
+      "id": 4,
+      "locked": false,
+      "name": "markers",
+      "objects": [
+        {
+          "class": "spawn",
+          "height": 0,
+          "id": 9,
+          "name": "spawn",
+          "point": true,
+          "properties": [
+            {
+              "name": "hj_gen_x",
+              "type": "float",
+              "value": 2384.0
+            },
+            {
+              "name": "hj_gen_y",
+              "type": "float",
+              "value": 9648.0
+            },
+            {
+              "name": "hj_marker",
+              "type": "bool",
+              "value": true
+            }
+          ],
+          "rotation": 0,
+          "visible": true,
+          "width": 0,
+          "x": 2384.0,
+          "y": 9648.0
+        }
+      ],
+      "opacity": 1,
+      "type": "objectgroup",
+      "visible": true,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "nextlayerid": 5,
+  "nextobjectid": 10,
+  "orientation": "orthogonal",
+  "properties": [
+    {
+      "name": "hj_schema",
+      "type": "string",
+      "value": "{\"cell_bytes\":1,\"collections\":{\"regions\":\"dict\"},\"h_key\":\"h\",\"indent\":1,\"key_order\":[\"_comment\",\"w\",\"h\",\"tiles_b64_deflate\",\"regions\",\"spawn\"],\"markers\":[\"spawn\"],\"passthrough\":{\"_comment\":\"Generated by tools/make_world.py. Do not hand-edit; regenerate. Tile ids index ORDER in tools/make_tiles.py.\"},\"tiles_key\":\"tiles_b64_deflate\",\"trailing_newline\":true,\"w_key\":\"w\",\"zlib_level\":9}"
+    }
+  ],
+  "renderorder": "right-down",
+  "tiledversion": "1.12.2",
+  "tileheight": 32,
+  "tilesets": [
+    {
+      "firstgid": 1,
+      "source": "tileset.tsj"
+    }
+  ],
+  "tilewidth": 32,
+  "type": "map",
+  "version": "1.10",
+  "width": 150
+}
