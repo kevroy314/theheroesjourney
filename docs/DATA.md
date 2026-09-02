@@ -13,6 +13,9 @@ data/echoes/*.json      the story, in fragments
 data/content/           config, chapters, items, trinkets, loot, spite,
                         achievements (the Wheel), rooms (the Mind Palace),
                         upgrades (traits)
+data/world/*.json       the overworld, as packed tile planes
+data/schema.json        the shape of all of the above — see Validation, below.
+                        Not content: Content globs the subdirectories, not data/
 ```
 
 ## Modifiers — the schema everything shares
@@ -137,3 +140,97 @@ loot.cache_mult  loot.echo_weight  loot.trinket_weight
 shop.discount
 spite.chance  spite.kind_weight
 ```
+
+## Validation
+
+Everything above is a contract, and until recently nothing checked it. A typo in
+a `when` clause, a `next` pointing at a node that does not exist, a modifier
+`key` no code reads — each of those fails *silently*, and a rule that quietly
+does nothing is indistinguishable from a rule that legally did nothing.
+
+`data/schema.json` describes the shape of every content type. Two checkers read
+it, with different reach:
+
+| | `Content.validate()` | `tools/validate_data.py` |
+|---|---|---|
+| sees | the merged runtime view | the files on disk |
+| runs | at load, every launch, including on a device | `python3 tools/validate_data.py`, and in CI |
+| catches only it can | ids that collided while merging, a hand-dropped file on a device | anything needing the GDScript source, plus the world and tileset |
+| needs Godot | yes | no |
+
+Run the tool before you commit content. `./test.sh` fails on anything
+`Content.validate()` reports, and so does CI; the CI `data` job also runs the
+Python tool, which fails a bad edit in seconds instead of after the self-test
+has downloaded an engine.
+
+**Loud in the editor, fatal in CI, tolerant on a player's device.** A source
+checkout gets `push_error` for every problem and a red self-test. An exported
+build prints them and carries on — a player cannot fix our data file, and
+refusing to start is a worse answer than a slightly wrong number.
+
+### The three classes of check
+
+1. **Keys.** Every required key present, and **no unknown keys** — that second
+   half is the one that catches typos, because `"whn"` is only an error if
+   unknown keys are errors. Keys beginning `_` are documentation and always
+   allowed.
+
+2. **References.** Every node `next` names a node in its own area; every slot
+   `attach` likewise (it becomes the generated side node's `side_of`, which
+   gates when the node opens); every chapter and anomaly `area` resolves; every
+   `loot` names a table; every `movement` is a real movement or a legal `$`
+   token; every Palace adjacency key names a room; every overworld region and
+   anomaly points at a real area; every prop `biome` is a real material *the
+   world actually contains cells of*.
+
+3. **Vocabulary.** Every modifier `op` is one of the five `Rules` applies, every
+   `when` condition is one `Rules.passes` implements, every hook is one
+   `Rules.hook` fires, and **every modifier `key` is one some `Rules.value()`
+   call actually reads**. That last one needs a scan of the GDScript, so only
+   the Python tool can do it.
+
+The vocabulary lists in `data/schema.json` are not trusted on their own: the
+Python tool re-derives each of them from the source it claims to describe — the
+`match` arms of `Rules.passes`, `Game.use_item`, `Meta.wheel_met`, the keys of
+`Main.SCREENS` — and fails if the two disagree in either direction. A schema
+that has quietly stopped describing the code is worse than none, because it
+validates confidently against the wrong words.
+
+Modifiers and hooks are found by walking the data structurally rather than by
+being declared per type, so a new content type that carries them is validated
+for free instead of whenever someone remembers.
+
+### Errors and warnings
+
+`ERROR` means the data contradicts itself — a typo, a dangling reference, an
+unknown key — and can be fixed inside `data/` alone. Fatal.
+
+`WARN` means the data is consistent but something *outside* `data/` makes it
+dead: a verb no code implements, a prop on a biome the world generator never
+produces. Fixing those needs a code or art decision, so they are printed loudly
+and do not fail the build. `--strict` promotes every warning to an error.
+
+### Adding a content type
+
+Add one entry to `data/schema.json` under `types`:
+
+```jsonc
+"quests": {
+  "files":    { "dir": "content", "paths": ["quests[]"] },   // where it lives on disk
+  "runtime":  ["quests[]"],                                  // where it lives on Content
+  "required": ["id", "name", "giver"],
+  "optional": ["desc", "modifiers"],
+  "enum":     { "kind": "quest_kinds" },                     // a vocabulary list
+  "refs":     { "giver": "npcs" }                            // an id set
+}
+```
+
+Both checkers pick it up with no code change. A path is dot-separated:
+`name` takes a field, `name[]` expands a list, `name{}` expands a dictionary's
+values, and a bare `.` means the document itself. A `runtime` path's first
+segment names a property on `Content`. Any type with an `id` contributes its ids
+to a set named after the type, which `refs` can point at; `id_space` shares one
+set between two types (anomalies and areas do this).
+
+A vocabulary the engine implements as a `match` should also be reconciled
+against the source in `tools/validate_data.py`, so it cannot drift.

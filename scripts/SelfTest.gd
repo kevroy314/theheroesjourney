@@ -107,6 +107,17 @@ static func run_all(host: Node) -> int:
 # --- static content ------------------------------------------------------------
 
 static func _content_checks(failures: Array) -> void:
+	# Schema, references and vocabulary, checked against data/schema.json. The
+	# self-test only ever finds a broken rule by playing over it, and a rule that
+	# quietly does nothing plays exactly like a rule that legally did nothing —
+	# so this is the one check here that does not need a seed to get lucky.
+	# tools/validate_data.py runs the rest (the GDScript source scan) in CI.
+	var problems: Array = Content.validate()
+	for problem in problems:
+		failures.append("content: %s" % problem)
+	_check(failures, "content passes schema validation", problems.is_empty(),
+		"%d problem(s)" % problems.size())
+
 	_check(failures, "themes loaded", Content.themes.size() >= 1, str(Content.themes.keys()))
 	_check(failures, "rulesets loaded", Content.rulesets.size() >= 1, str(Content.rulesets.keys()))
 	_check(failures, "chapters loaded", Content.chapters.size() == 8, "%d chapters" % Content.chapters.size())
