@@ -9,8 +9,8 @@ config/name="The Heroes' Journey"
 ; Must match version/code in the Android export preset, or the phone loops
 ; on an update it already has. build_android.sh is the thing that keeps them
 ; in step.
-config/version_code=213
-config/version="0.2.13"
+config/version_code=214
+config/version="0.2.14"
 run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/show_image=false
