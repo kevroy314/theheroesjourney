@@ -83,6 +83,18 @@ HILL = 0.66
 SCREE = 0.79
 SNOW = 0.89
 
+## The dry and wet ends of the moisture axis, which is where the five materials
+## the tileset drew and the generator never made now live. All of them are
+## thresholds on the same two fields (plus, for ice, the field's own gradient),
+## because a test on anything else is a boundary — see biome().
+HARDPAN = 0.10           # the driest ground there is: cracked flat
+DUNE = 0.22              # dry, and above the shore band, so deep desert
+MARSH = 0.75             # wet enough to be standing water
+MARSH_TOP = 0.45         # ...and low enough for it to sit there
+UNDERGROWTH = 0.66       # damp: the walkable floor between grass and wood
+CANOPY = 0.82            # wet: closed forest
+ICE_SLOPE = 0.0015       # elevation change per cell; flat ground, high up
+
 ## Each quarter of the world, as a compass bearing and what it does to the two
 ## fields. Weights fall off with angular distance, so a sector is a *bias*, not
 ## a border — the desert thins into scrub and the scrub thickens into jungle
@@ -235,7 +247,26 @@ def build_fields():
     return elev, moist
 
 
-def biome(e, m):
+def slope_field(elev):
+    """How fast the ground is changing height, per cell.
+
+    A third *derived* quantity, not a third input: it is the gradient of the
+    elevation we already have. It buys the one distinction the two raw fields
+    cannot make, which is between a peak and a plateau — both are simply "high".
+    Ice needs that, because a frozen tarn is flat ground high up and a snowfield
+    is the steep ground around it. Central differences, halved, so the number is
+    an elevation change per cell rather than per two.
+    """
+    out = [[0.0] * W for _ in range(H)]
+    for y in range(H):
+        for x in range(W):
+            dx = elev[y][min(W - 1, x + 1)] - elev[y][max(0, x - 1)]
+            dy = elev[min(H - 1, y + 1)][x] - elev[max(0, y - 1)][x]
+            out[y][x] = math.hypot(dx, dy) * 0.5
+    return out
+
+
+def biome(e, m, s):
     """A tile id from the two fields, and from nothing else.
 
     Deliberately blind to which sector it is in. The first version tested the
@@ -247,28 +278,65 @@ def biome(e, m):
     continuously. By the time we are choosing a tile there is nothing left but
     two numbers, so a desert is simply somewhere dry and a shore is simply where
     the ground crosses sea level.
+
+    `s` is the third argument and it is not a third field: it is the *gradient*
+    of the elevation already passed in, which is the only thing that separates a
+    plateau from a peak. Nothing else may be added here.
+
+    The tileset drew twenty-five materials and this function used to emit seven,
+    so dune, hardpan, undergrowth, mud and ice existed as art with props authored
+    for them and not one cell anywhere. They are bands on the same two numbers:
+
+      hardpan       the driest ground of all — cracked flat, nothing grows
+      dune          dry, and above the shore band, so it is desert not beach
+      mud           wet *and* low: water with nowhere to drain, which is where
+                    the jungle runs into the sea
+      undergrowth   damp: the walkable floor of a wood, between open grass and
+                    closed canopy, so a forest now has an edge you walk through
+      ice           above the snow line where the ground has stopped climbing
     """
     if e < SEA:
         return T["water"]
+    # Marsh before the shore band, because a wet shore is a marsh and not a
+    # beach: the test that matters is where the water cannot drain, not how
+    # close the coast is.
+    if m >= MARSH and e < MARSH_TOP:
+        return T["mud"]
     if e < SHORE:
         return T["sand"]
     if e < GRASS:
+        if m < HARDPAN:
+            return T["hardpan"]
+        if m < DUNE:
+            return T["dune"]
         if m < 0.30:
             return T["sand"]
-        if m > 0.68:
+        if m > CANOPY:
             return T["forest"]
+        if m > UNDERGROWTH:
+            return T["undergrowth"]
         return T["grass_short"]
     if e < HILL:
+        if m < HARDPAN:
+            return T["hardpan"]
+        if m < DUNE:
+            return T["dune"]
         if m < 0.27:
             return T["sand"]
-        if m > 0.70:
+        # Higher ground sheds water, so every wet band asks for a little more of
+        # it up here — the same two-point offset the old thresholds used.
+        if m > CANOPY + 0.02:
             return T["forest"]
+        if m > UNDERGROWTH + 0.02:
+            return T["undergrowth"]
         return T["grass_tall"] if m > 0.50 else T["grass_short"]
     if e < SCREE:
         return T["scree"] if m < 0.55 else T["grass_short"]
     if e < SNOW:
         return T["scree"]
-    return T["snow"]
+    # Above the snow line the question is no longer how high but how steep: the
+    # summit plateau is flat and freezes over, the flanks it sits on do not.
+    return T["ice"] if s < ICE_SLOPE else T["snow"]
 
 
 def region_cells():
@@ -660,10 +728,16 @@ def furnish_house(world, plane, cells):
     interior = {p["id"]: p["plane"] for p in manifest["props"]["list"]
                 if p["biome"] == "placed"}
     cx, cy = cells["waking_room"]
-    layout = [("bed", -2, -1), ("chair", 2, 0), ("table", 3, -1),
+    # dy == 0 is the internal wall stamp_house lays down for every x more than
+    # one cell from centre, so a chair at (cx+2, cy) was being placed into a
+    # wall and silently dropped — a piece of furniture that has never existed.
+    # Nothing checks `placed` props, so the only way to find this was to look.
+    layout = [("bed", -2, -1), ("chair", 2, -1), ("table", 3, -2),
               ("bookshelf", -3, 1), ("chest", 2, 2), ("floor_lamp", -3, -2),
               ("plant_pot", 3, 2), ("rug", 0, 1)]
     for name, dx, dy in layout:
+        if dy == 0 and abs(dx) > 1:
+            continue        # would be the internal wall; skip rather than lose it silently
         if name not in interior:
             continue
         x, y = cx + dx, cy + dy
@@ -808,6 +882,15 @@ def draw_map(world, cells, anomalies, px=3):
         T["forest"]: mix(C["good"], C["bg"], 0.86),
         T["scree"]: mix(mix(C["line"], C["muted"], 0.45), C["bg"], 0.30),
         T["snow"]: mix(C["muted"], C["bg"], 0.26),
+        # The five the generator never used to make. Kept in the same family as
+        # the material they sit beside — dune is sand with the sun on it, mud is
+        # sand with the light gone out of it — so the map still reads as four
+        # countries rather than twelve.
+        T["dune"]: mix(mix(C["bg"], C["accent"], 0.46), C["muted"], 0.18),
+        T["hardpan"]: mix(mix(C["bg"], C["accent"], 0.34), C["danger"], 0.15),
+        T["mud"]: mix(mix(C["bg"], C["accent"], 0.20), C["line"], 0.42),
+        T["undergrowth"]: mix(mix(C["good"], C["warn"], 0.24), C["bg"], 0.74),
+        T["ice"]: mix(C["accent_2"], C["text"], 0.42),
         T["rock"]: mix(C["line"], C["bg"], 0.50),
         T["path_dirt"]: mix(C["bg"], C["accent"], 0.30),
         T["bridge"]: mix(C["accent"], C["bg"], 0.55),
@@ -867,7 +950,9 @@ def main():
     rng = random.Random(20260901)
 
     elev, moist = build_fields()
-    tiles = [[biome(elev[y][x], moist[y][x]) for x in range(W)] for y in range(H)]
+    grade = slope_field(elev)
+    tiles = [[biome(elev[y][x], moist[y][x], grade[y][x]) for x in range(W)]
+             for y in range(H)]
     world = World(tiles, elev)
     cells = region_cells()
 
