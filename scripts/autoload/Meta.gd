@@ -27,10 +27,13 @@ var history: Array = []
 
 var codex: Array = []                  ## echo ids ever found
 var axis_tasks: Dictionary = {}        ## axis -> lifetime count
-var chapters_reached: int = 0
-## The deepest ring ever reached. Progression is now how far out you have been,
-## not how many chapters you were handed.
+## The deepest ring ever reached. Progression is how far out you have been, not
+## how many chapters you were handed.
 var deepest_ring: int = 0
+## Anomalies closed over every run. `deepest_ring` says how far you got; this
+## says how much you actually finished, and ring 0 being the town means a ring
+## number alone cannot tell "never played" from "played once, nearby".
+var anomalies_closed: int = 0
 
 ## Where Second Wind puts you next time. (-1,-1) is "nowhere owed" — the next
 ## run starts in town like any other.
@@ -318,8 +321,12 @@ func wheel_met(node: Dictionary) -> bool:
 			return Content.echoes.size() > 0 and codex.size() >= Content.echoes.size()
 		"loops":
 			return loops >= int(req.get("count", 0))
-		"chapter":
-			return chapters_reached >= int(req.get("count", 0))
+		"ring":
+			return deepest_ring >= int(req.get("count", 0))
+		"anomalies":
+			return anomalies_closed >= int(req.get("count", 0))
+		"warden":
+			return seen_warden
 	return false
 
 
@@ -514,7 +521,7 @@ func save_game() -> void:
 		"streak": streak, "best_streak": best_streak,
 		"last_active_day": last_active_day, "rest_used_day": rest_used_day,
 		"codex": codex, "axis_tasks": axis_tasks,
-		"chapters_reached": chapters_reached, "deepest_ring": deepest_ring,
+		"deepest_ring": deepest_ring, "anomalies_closed": anomalies_closed,
 		"resume_x": resume_at.x, "resume_y": resume_at.y,
 		"loops": loops, "runs_today": runs_today,
 		"seen_first_reset": seen_first_reset, "seen_warden": seen_warden,
@@ -570,8 +577,9 @@ func load_game() -> void:
 			rest_used_day = String(parsed.get("rest_used_day", ""))
 			codex = parsed.get("codex", [])
 			axis_tasks = parsed.get("axis_tasks", {})
-			chapters_reached = int(parsed.get("chapters_reached", 0))
 			deepest_ring = int(parsed.get("deepest_ring", 0))
+			anomalies_closed = int(parsed.get("anomalies_closed", 0))
+			_migrate_chapters(parsed)
 			resume_at = Vector2i(int(parsed.get("resume_x", -1)), int(parsed.get("resume_y", -1)))
 			loops = int(parsed.get("loops", 0))
 			runs_today = parsed.get("runs_today", {})
@@ -604,7 +612,9 @@ func wipe() -> void:
 	rest_used_day = ""
 	codex = []
 	axis_tasks = {}
-	chapters_reached = 0
+	deepest_ring = 0
+	anomalies_closed = 0
+	resume_at = Vector2i(-1, -1)
 	loops = 0
 	runs_today = {}
 	seen_first_reset = false
@@ -641,3 +651,28 @@ func note_ring(tier: int) -> void:
 	deepest_ring = tier
 	save_game()
 	Events.meta_changed.emit()
+
+
+## Record an anomaly actually closed, as opposed to walked away from.
+func note_anomaly_closed() -> void:
+	anomalies_closed += 1
+	save_game()
+	Events.meta_changed.emit()
+
+
+## Carry an old save's chapter progress onto the ring scale.
+##
+## Eight chapters became five rings, so the two numbers are not interchangeable:
+## a player who had reached chapter 6 under the old model should keep the packs
+## that unlocked for them, and a straight copy would either hand them the whole
+## catalogue or take it all away. Runs once — after it, `deepest_ring` is set
+## and the branch never fires again.
+func _migrate_chapters(parsed: Dictionary) -> void:
+	var old := int(parsed.get("chapters_reached", 0))
+	if old <= 0 or deepest_ring > 0:
+		return
+	deepest_ring = clampi(int(round(float(old - 1) * 4.0 / 7.0)), 0, 4)
+	# They got somewhere, so they closed something. Without this the first
+	# achievement would silently re-lock for a player who had already earned it.
+	anomalies_closed = maxi(anomalies_closed, 1)
+	print("Meta: migrated chapter %d to ring %d" % [old, deepest_ring])

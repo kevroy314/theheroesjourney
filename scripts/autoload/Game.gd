@@ -2,8 +2,6 @@ extends Node
 ## Run orchestrator. Owns the run, drives the loop, and is the only thing that
 ## mutates player state. Screens call in here and listen to Events.
 
-const RUN_PATH := "user://heroes_run.json"
-
 var run: HJRun = null
 var screen: String = "title"
 ## The screen before this one, so a screen reachable from two places can send
@@ -12,6 +10,12 @@ var previous_screen: String = "title"
 var summary: Dictionary = {}
 var event: Dictionary = {}     ## popup currently on the event screen
 var rng := RandomNumberGenerator.new()
+
+## What a resolved node yields, and what an item does. Split out so this file
+## stays the answer to "what is the game doing", not also to "what does a cache
+## pay" and "what does the Tonic do".
+var outcomes := HJOutcomes.new(self)
+var items := HJItems.new(self)
 
 
 func boot() -> void:
@@ -86,7 +90,7 @@ func has_active_run() -> bool:
 	return run != null and not run.finished
 
 
-func start_run(run_seed: int = 0, from_chapter: int = 1) -> void:
+func start_run(run_seed: int = 0) -> void:
 	run = HJRun.new()
 	run.seed = run_seed if run_seed != 0 else randi()
 	run.started_unix = HJClock.now()
@@ -111,50 +115,15 @@ func start_run(run_seed: int = 0, from_chapter: int = 1) -> void:
 	Steps.grant(int(Rules.value("steps.starting_grant", run.ctx())))
 	apply_effects(Rules.hook("on_run_start", run.ctx()))
 
-	# You wake in the world, not in a chapter. There is no sequence to be at the
-	# start of any more — the deadline runs until you find something, and what
-	# you find is decided by how far you are willing to walk.
+	# You wake in the world. There is no sequence to be at the start of — the
+	# deadline runs until you find something, and what you find is decided by
+	# how far you are willing to walk.
 	run.zone = 0
 	run.deadline_unix = HJClock.now() + HJClock.hours_to_seconds(
 		maxf(1.0, 24.0 + Rules.value("area.deadline_bonus_hours", run.ctx(), 0.0)))
 	Notify.sync()
 	changed()
 	goto("overworld")
-
-
-func enter_chapter(index: int) -> void:
-	var chapter := Content.chapter(index)
-	if chapter.is_empty():
-		end_run("cleared")
-		return
-
-	run.chapter = index
-	run.completed = []
-	run.locked = []
-	run.revealed = false
-	run.chosen_movement = ""
-	run.pending_node = ""
-	run.pending_boons = []
-
-	var area_def := Content.area(String(chapter.get("area", "")))
-	if area_def.is_empty():
-		push_error("Game: chapter %d has no area definition" % index)
-		end_run("cleared")
-		return
-
-	rng.seed = run.seed + index * 7919
-	run.area = HJAreaGen.build(area_def, rng, run.ctx())
-
-	var hours := float(chapter.get("deadline_hours", 24)) + Rules.value("area.deadline_bonus_hours", run.ctx(), 0.0)
-	run.deadline_unix = HJClock.now() + HJClock.hours_to_seconds(maxf(1.0, hours))
-
-	Meta.chapters_reached = maxi(Meta.chapters_reached, index)
-	Meta.save_game()
-	Notify.sync()
-
-	apply_effects(Rules.hook("on_area_enter", run.ctx()))
-	changed()
-	goto("area")
 
 
 func end_run(outcome: String) -> void:
@@ -261,39 +230,38 @@ func tap_node(id: String) -> void:
 			changed()
 			goto("task")
 		"free":
-			_finish_node(id)
+			finish_node(id)
 			_show_text(String(node.get("label", "")), String(node.get("text", "")))
 		"echo":
-			_finish_node(id)
-			_give_echo()
+			finish_node(id)
+			outcomes.give_echo()
 		"cache":
-			_finish_node(id)
-			var amount := int(round(float(node.get("grit", 10)) * Rules.value("loot.cache_mult", run.ctx(), 1.0)))
-			_add_grit(amount)
-			_show_text("Worth Picking Up", "You pocket what's there. +%d %s." % [amount, Palette.word("grit")])
+			finish_node(id)
+			var amount := int(round(float(node.get("grit", 10))
+				* Rules.value("loot.cache_mult", run.ctx(), 1.0)))
+			add_grit(amount)
+			_show_text("Worth Picking Up",
+				"You pocket what's there. +%d %s." % [amount, Palette.word("grit")])
 		"mirror":
-			_finish_node(id)
-			_mirror()
+			finish_node(id)
+			outcomes.mirror()
 		"trinket":
-			_finish_node(id)
-			offer_boons()
+			finish_node(id)
+			outcomes.offer_boons()
 		"spite":
-			_finish_node(id)
-			_spite()
+			finish_node(id)
+			outcomes.spite()
 		"warden":
-			_warden(id)
+			outcomes.warden(id)
 		"threshold":
-			_finish_node(id)
-			# Inside an anomaly the threshold is the way out of *it*, not the way
-			# on to the next chapter.
-			if not run.anomaly.is_empty():
-				leave_anomaly(true)
-			else:
-				clear_area()
+			finish_node(id)
+			# The threshold is the way out of the anomaly. It used to be the way
+			# on to the next chapter, and there is no next any more.
+			leave_anomaly(true)
 	changed()
 
 
-func _finish_node(id: String) -> void:
+func finish_node(id: String) -> void:
 	if not run.completed.has(id):
 		run.completed.append(id)
 		# Doing the thing is what buys you more world. A task pays a flat stipend
@@ -372,7 +340,7 @@ func complete_task(movement_id: String, scaled: bool) -> void:
 		run.full_scale = false
 
 	var award := maxi(1, int(round(float(node.get("grit", 5)) * multiplier)))
-	_add_grit(award)
+	add_grit(award)
 
 	for tag in node.get("grants", []):
 		if not run.tags.has(tag):
@@ -387,11 +355,11 @@ func complete_task(movement_id: String, scaled: bool) -> void:
 	apply_effects(Rules.hook("on_task_complete", ctx))
 
 	run.pending_node = ""
-	_finish_node(id)
+	finish_node(id)
 
 	var loot_table := String(node.get("loot", ""))
 	if loot_table != "":
-		_roll_loot(loot_table)
+		outcomes.roll_loot(loot_table)
 
 	changed()
 	if run.pending_boons.is_empty() and event.is_empty():
@@ -406,193 +374,9 @@ func skip_task() -> void:
 
 # --- rewards -------------------------------------------------------------------
 
-func _add_grit(amount: int) -> void:
+## The only place run grit changes. Public because HJOutcomes pays out through it.
+func add_grit(amount: int) -> void:
 	run.grit = maxi(0, run.grit + amount)
-
-
-func _roll_loot(table_id: String) -> void:
-	var table: Array = Content.loot.get(table_id, [])
-	if table.is_empty():
-		return
-	var ctx := run.ctx()
-	var total := 0.0
-	var weights: Array = []
-	for entry in table:
-		var w := float(entry.get("w", 1))
-		if entry.has("scaled_by"):
-			w *= Rules.value(String(entry["scaled_by"]), ctx, 1.0)
-		weights.append(w)
-		total += w
-	if total <= 0.0:
-		return
-	var roll := rng.randf() * total
-	for i in range(table.size()):
-		roll -= float(weights[i])
-		if roll <= 0.0:
-			_award(table[i])
-			return
-
-
-func _award(entry: Dictionary) -> void:
-	match String(entry.get("type", "")):
-		"grit":
-			var amount := int(round(float(entry.get("amount", 5)) * Rules.value("run.grit_mult", run.ctx(), 1.0)))
-			_add_grit(amount)
-			say("+%d %s" % [amount, Palette.word("grit")], "good")
-		"echo":
-			_give_echo()
-		"trinket":
-			offer_boons()
-		"item":
-			var item_id := Meta.random_item(rng)
-			if item_id != "":
-				Meta.give_item(item_id)
-				say("Found: %s" % Content.item(item_id).get("name", item_id), "good")
-
-
-func _give_echo() -> void:
-	var id := Meta.next_echo_id()
-	if id == "":
-		_add_grit(10)
-		say("Nothing new in it, but you pocket something anyway.", "info")
-		return
-	Meta.find_echo(id)
-	if not run.echoes.has(id):
-		run.echoes.append(id)
-	var e := Content.echo(id)
-	_show_event({
-		"kind": "echo",
-		"title": String(e.get("title", Palette.word("echo"))),
-		"text": String(e.get("text", "")),
-		"footer": "%s %d of %d — kept in the Codex" % [Palette.word("echo"), int(e.get("order", 0)), Content.echoes.size()],
-	})
-
-
-func _mirror() -> void:
-	var lines := [
-		"You catch yourself in the glass. The reflection arrives a beat after you do.",
-		"For a moment the face is yours with twenty more years on it. Then it isn't.",
-		"Your reflection finishes the movement slightly before you start it.",
-	]
-	_show_event({
-		"kind": "mirror",
-		"title": "A Reflection",
-		"text": String(lines[rng.randi_range(0, lines.size() - 1)]),
-		"footer": Palette.data.get("mountain_line", ""),
-	})
-	var reveal := String(Content.echo_reveals.get("first_mirror", ""))
-	if reveal != "" and not Meta.codex.has(reveal):
-		Meta.find_echo(reveal)
-
-
-# --- spite ---------------------------------------------------------------------
-
-func _spite() -> void:
-	var spite: Dictionary = Content.spite
-	var events: Array = spite.get("events", [])
-	if events.is_empty():
-		return
-
-	if run.ward:
-		run.ward = false
-		_show_event({"kind": "spite", "title": "Spite", "text": String(spite.get("warded", "")), "footer": ""})
-		return
-
-	var kind_weight := Rules.value("spite.kind_weight", run.ctx(), 1.0)
-	if run.kind_spite:
-		kind_weight = 999.0
-		run.kind_spite = false
-
-	var total := 0.0
-	var weights: Array = []
-	for e in events:
-		var w := float(e.get("weight", 1))
-		if String(e.get("alter", "")) == "kind":
-			w *= kind_weight
-		weights.append(w)
-		total += w
-
-	var roll := rng.randf() * total
-	var picked: Dictionary = events[events.size() - 1]
-	for i in range(events.size()):
-		roll -= float(weights[i])
-		if roll <= 0.0:
-			picked = events[i]
-			break
-
-	var alter_line := ""
-	for alter in spite.get("alters", []):
-		if alter.get("id", "") == picked.get("alter", ""):
-			alter_line = String(alter.get("line", ""))
-
-	_apply_spite_effect(picked.get("effect", {}))
-	_show_event({
-		"kind": "spite",
-		"title": "Spite",
-		"text": alter_line + "\n\n" + String(picked.get("text", "")),
-		"footer": "",
-	})
-
-	var reveal := String(Content.echo_reveals.get("first_spite", ""))
-	if reveal != "" and not Meta.codex.has(reveal):
-		Meta.find_echo(reveal)
-
-
-func _apply_spite_effect(effect: Dictionary) -> void:
-	match String(effect.get("type", "")):
-		"grit":
-			var amount := int(effect.get("amount", 0))
-			_add_grit(amount)
-			say("%+d %s" % [amount, Palette.word("grit")], "good" if amount > 0 else "bad")
-		"item":
-			var id := Meta.random_item(rng)
-			if id != "":
-				Meta.give_item(id)
-				say("Spite left you a %s." % Content.item(id).get("name", id), "good")
-		"steal_item":
-			var held: Array = Meta.inventory.keys()
-			if held.size() > 0:
-				var id := String(held[rng.randi_range(0, held.size() - 1)])
-				Meta.take_item(id)
-				say("Your %s is gone." % Content.item(id).get("name", id), "bad")
-		"trinket":
-			offer_boons()
-		"reveal_area":
-			run.revealed = true
-		"hide_area":
-			run.revealed = false
-		"deadline":
-			run.deadline_unix += HJClock.hours_to_seconds(float(effect.get("amount", -1)))
-			Notify.sync()
-
-
-# --- the Warden ----------------------------------------------------------------
-
-func _warden(id: String) -> void:
-	if not Meta.seen_warden:
-		Meta.seen_warden = true
-		Meta.find_echo(String(Content.echo_reveals.get("reach_summit", "e14")))
-		Meta.save_game()
-		summary_event_then_end(
-			"The Warden of the Loop",
-			"They turn around, and it is your face, thirty years further on, and they are not surprised to see you.\n\n\"Every morning you got back,\" they say, \"you got back because I sent it. You are not being punished. You are being built.\"\n\nThey are kind about it. That is the worst part.\n\n\"Not yet,\" they say. \"Come back when you are looking after all of it.\"",
-			"loop")
-		return
-
-	if not Meta.balance_unlocked():
-		summary_event_then_end(
-			"Not Yet",
-			"The Warden looks at you for a long moment and shakes their head.\n\n\"You are strong in one direction. That is not the same as being ready.\"\n\nBalance the Wheel — every spoke off the mark — and the door will open.",
-			"loop")
-		return
-
-	_finish_node(id)
-	_show_event({
-		"kind": "warden",
-		"title": "The Loop Opens",
-		"text": "\"There it is,\" they say, and they sound relieved, and they sound tired.\n\n\"You looked after all of it. That is the whole trick. I can stop now.\"\n\nThey step aside.",
-		"footer": "",
-	})
 
 
 func summary_event_then_end(title: String, text: String, outcome: String) -> void:
@@ -602,70 +386,40 @@ func summary_event_then_end(title: String, text: String, outcome: String) -> voi
 
 # --- area flow -----------------------------------------------------------------
 
-func clear_area() -> void:
-	var bonus := int(round(Rules.value("run.clear_bonus", run.ctx(), 40) * Meta.streak_multiplier()))
-	_add_grit(bonus)
-	var cleared_name := String(run.area.get("name", "Area"))
-	say("%s cleared. +%d %s." % [cleared_name, bonus, Palette.word("grit")], "good")
-	apply_effects(Rules.hook("on_area_clear", run.ctx()))
-
-	if run.chapter >= Content.chapter_count():
-		end_run("cleared")
-		return
-
-	# Always start the next thing. Parking the player on a finished map with
-	# nothing to tap is the one state this screen must never be in, and a
-	# deadline a day out is no reason to hold the next area back.
-	var next_index := run.chapter + 1
-	var next_chapter := Content.chapter(next_index)
-	enter_chapter(next_index)
-	_show_event({
-		"kind": "text",
-		"title": "%s is behind you" % cleared_name,
-		"text": "%s\n\n%s" % [next_chapter.get("blurb", ""), next_chapter.get("scene", "")],
-		"footer": "%s — due %s" % [next_chapter.get("name", ""), HJClock.format_deadline(run.deadline_unix)],
-	})
-
-
 ## Last-resort way out of an area that has somehow run dry.
+##
+## Walks to the threshold if there is an unfinished one, so the exit is taken
+## the way the player would have taken it — clear bonus, hooks and all — and
+## falls back to simply stepping outside if there is not.
 func force_advance() -> void:
 	if not has_active_run():
+		return
+	if run.anomaly.is_empty():
+		# Standing in an area that is not an anomaly should not be reachable.
+		# If it happens anyway, the way out is the world, not a dead screen.
+		run.area = {}
+		run.completed = []
+		changed()
+		goto("overworld")
 		return
 	for id in run.area.get("order", []):
 		var node_id := String(id)
 		if String(run.node(node_id).get("type", "")) == "threshold" and not run.is_done(node_id):
-			_finish_node(node_id)
-			if not run.anomaly.is_empty():
-				leave_anomaly(true)
-			else:
-				clear_area()
+			finish_node(node_id)
+			leave_anomaly(true)
 			return
-	clear_area()
+	leave_anomaly(true)
 
 
 # --- boons ---------------------------------------------------------------------
+# Screens call these on Game; the work is HJOutcomes'.
 
 func offer_boons(count: int = 3) -> void:
-	var pool: Array = []
-	for id in Content.trinkets.keys():
-		if not run.trinkets.has(id):
-			pool.append(id)
-	if pool.is_empty():
-		_add_grit(15)
-		return
-	pool.shuffle()
-	run.pending_boons = pool.slice(0, mini(count, pool.size()))
-	goto("boon")
+	outcomes.offer_boons(count)
 
 
 func take_boon(trinket_id: String) -> void:
-	if trinket_id != "":
-		run.trinkets.append(trinket_id)
-		rebuild_rules()
-		say("Gained %s." % Content.trinkets.get(trinket_id, {}).get("name", trinket_id), "good")
-	run.pending_boons = []
-	changed()
-	goto("area")
+	outcomes.take_boon(trinket_id)
 
 
 # --- events --------------------------------------------------------------------
@@ -673,10 +427,11 @@ func take_boon(trinket_id: String) -> void:
 func _show_text(title: String, text: String) -> void:
 	if text.strip_edges() == "":
 		return
-	_show_event({"kind": "text", "title": title, "text": text, "footer": ""})
+	show_event({"kind": "text", "title": title, "text": text, "footer": ""})
 
 
-func _show_event(payload: Dictionary) -> void:
+## Put a popup on screen. Public because HJOutcomes speaks through it.
+func show_event(payload: Dictionary) -> void:
 	event = payload
 	goto("event")
 
@@ -699,85 +454,7 @@ func dismiss_event() -> void:
 # --- items ---------------------------------------------------------------------
 
 func use_item(id: String) -> bool:
-	var item := Content.item(id)
-	if item.is_empty() or Meta.item_count(id) <= 0:
-		return false
-
-	match String(item.get("use", "")):
-		"resume_run":
-			# Consumed when the loop closes rather than tapped — `where: "auto"`.
-			# The item was written for chapters ("begin again at the chapter you
-			# reached") and did nothing at all, because nothing implemented the
-			# verb. Under zone levels it means something better: the loop still
-			# resets the world, but you wake where you were standing instead of
-			# walking back out from town.
-			Meta.resume_at = run.world_pos if has_active_run() else Vector2i(-1, -1)
-			Meta.save_game()
-			say("Second Wind. You will wake where you stood.", "good")
-		"keep_streak":
-			if not Meta.spend_rest_token():
-				say("Nothing to protect today.", "warn")
-				return false
-			say("Rest counts. %s: %d days." % [Palette.word("streak"), Meta.streak], "good")
-			return true
-		"extend_deadline":
-			if not has_active_run():
-				return false
-			Meta.take_item(id)
-			run.deadline_unix += HJClock.hours_to_seconds(float(item.get("amount", 12)))
-			Notify.sync()
-			say("The hour hand slips back. %s left." % HJClock.format_remaining(run.seconds_left()), "good")
-		"ward":
-			if not has_active_run():
-				return false
-			Meta.take_item(id)
-			run.ward = true
-			say("Tonic ready. The next setback will slide off.", "good")
-		"skip_to_threshold":
-			if not has_active_run() or _tasks_done_here() <= 0:
-				say("Do at least one thing here first.", "warn")
-				return false
-			Meta.take_item(id)
-			for node_id in run.area.get("order", []):
-				if String(run.node(String(node_id)).get("type", "")) == "threshold":
-					say("You walk straight for the door.", "warn")
-					tap_node(String(node_id))
-					break
-		"reveal_area":
-			if not has_active_run():
-				return false
-			Meta.take_item(id)
-			run.revealed = true
-			say("The room gives up its corners.", "good")
-		"full_scale":
-			if not has_active_run():
-				return false
-			Meta.take_item(id)
-			run.full_scale = true
-			say("Take the easier version. It costs you nothing.", "good")
-		"guarantee_kind_spite":
-			if not has_active_run():
-				return false
-			Meta.take_item(id)
-			run.kind_spite = true
-			say("If they find you now, it will be the good half.", "good")
-		"reveal_echo":
-			Meta.take_item(id)
-			_give_echo()
-			return true
-		_:
-			return false
-
-	changed()
-	return true
-
-
-func _tasks_done_here() -> int:
-	var n := 0
-	for id in run.completed:
-		if String(run.node(String(id)).get("type", "")) == "task":
-			n += 1
-	return n
+	return items.use(id)
 
 
 # --- pause ---------------------------------------------------------------------
@@ -812,7 +489,7 @@ func apply_effects(effects: Array) -> void:
 		var silent := bool(effect.get("silent", false))
 		match String(effect.get("type", "")):
 			"grit":
-				_add_grit(int(round(amount)))
+				add_grit(int(round(amount)))
 				if not silent:
 					say("%+d %s." % [int(round(amount)), Palette.word("grit")], "good")
 			"item":
@@ -826,26 +503,18 @@ func apply_effects(effects: Array) -> void:
 
 
 # --- persistence ---------------------------------------------------------------
+# The file lives in HJRunStore; these stay because the whole app calls them.
 
 func save_run() -> void:
-	if run == null or run.finished:
-		return
-	var f := FileAccess.open(RUN_PATH, FileAccess.WRITE)
-	if f == null:
-		return
-	f.store_string(JSON.stringify(run.to_dict()))
-	f.close()
+	HJRunStore.write(run)
 
 
 func load_run() -> void:
-	if not FileAccess.file_exists(RUN_PATH):
-		return
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(RUN_PATH))
-	if not (parsed is Dictionary):
-		return
-	var restored := HJRun.from_dict(parsed)
+	var restored := HJRunStore.read()
 	if restored == null:
-		clear_saved_run()
+		# Either there was nothing to load, or it was written under a run model
+		# this build no longer understands. Both mean: start clean.
+		HJRunStore.erase()
 		return
 	run = restored
 	rng.seed = run.seed
@@ -854,13 +523,7 @@ func load_run() -> void:
 
 
 func clear_saved_run() -> void:
-	if FileAccess.file_exists(RUN_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(RUN_PATH))
-		if FileAccess.file_exists(RUN_PATH):
-			var f := FileAccess.open(RUN_PATH, FileAccess.WRITE)
-			if f != null:
-				f.store_string("{}")
-				f.close()
+	HJRunStore.erase()
 
 
 # --- anomalies -----------------------------------------------------------------
@@ -948,7 +611,17 @@ func leave_anomaly(finished: bool = false) -> void:
 	if finished or share >= 0.999:
 		run.anomalies_cleared.append(_cell_key(Vector2i(
 			int(run.anomaly.get("x", 0)), int(run.anomaly.get("y", 0)))))
-		say("The anomaly closes. You walk at your own pace again.", "good")
+		# The clear bonus and the on_area_clear hook used to hang off the old
+		# chapter advance, which nothing could reach once anomalies replaced it.
+		# `run.clear_bonus` sat in config at 40 and a trinket added 50 to it, and
+		# neither number had been payable for as long as anomalies have existed.
+		var bonus := int(round(Rules.value("run.clear_bonus", run.ctx(), 40)
+			* Meta.streak_multiplier()))
+		add_grit(bonus)
+		apply_effects(Rules.hook("on_area_clear", run.ctx()))
+		Meta.note_anomaly_closed()
+		say("The anomaly closes. +%d %s, and you walk at your own pace again."
+			% [bonus, Palette.word("grit")], "good")
 	elif share <= 0.0:
 		say("You back out. Nothing here is finished.", "warn")
 	else:

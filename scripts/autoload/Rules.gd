@@ -116,8 +116,10 @@ func passes(condition: Dictionary, ctx: Dictionary) -> bool:
 			"axis":
 				if String(ctx.get("axis", "")) != String(want):
 					return false
-			"chapter_gte":
-				if int(ctx.get("chapter", 0)) < int(want):
+			"zone_gte":
+				# How far out you are, in rings. Replaces "which chapter are you
+				# on" — the world has distances now, not a sequence.
+				if int(ctx.get("zone", 0)) < int(want):
 					return false
 			"has_relic":
 				if not (ctx.get("relics", []) as Array).has(want):

@@ -33,11 +33,11 @@
     { "id": "persistent", "name": "Persistent", "desc": "Survive ten loop resets and keep going.",
       "req": { "type": "loops", "count": 10 }, "resolve": 80,
       "modifiers": [ { "key": "run.loop_keep", "op": "add", "value": 0.1 } ] },
-    { "id": "first_light", "name": "First Light", "desc": "Clear The Waking Room.",
-      "req": { "type": "chapter", "count": 1 }, "resolve": 20 },
-    { "id": "wayfarer", "name": "Wayfarer", "desc": "Reach the Foothills.",
-      "req": { "type": "chapter", "count": 6 }, "resolve": 90 },
+    { "id": "first_light", "name": "First Light", "desc": "Close your first anomaly.",
+      "req": { "type": "anomalies", "count": 1 }, "resolve": 20 },
+    { "id": "wayfarer", "name": "Wayfarer", "desc": "Walk out to the third ring.",
+      "req": { "type": "ring", "count": 3 }, "resolve": 90 },
     { "id": "witness", "name": "Witness", "desc": "Stand in front of the Warden.",
-      "req": { "type": "chapter", "count": 8 }, "resolve": 200 }
+      "req": { "type": "warden" }, "resolve": 200 }
   ]
 }

@@ -24,7 +24,7 @@
       "grit": 26, "grants": ["settled"], "loot": "uncommon", "next": ["morning"] },
 
     { "id": "early", "type": "task", "label": "Actually Go To Bed",
-      "text": "The whole chapter has been leading here and you knew it.",
+      "text": "The whole day has been leading here and you knew it.",
       "task": { "movement": "bedtime", "units": 1 },
       "grit": 40, "loot": "uncommon", "next": ["morning"] },
 

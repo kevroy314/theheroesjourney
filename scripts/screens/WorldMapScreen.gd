@@ -1,8 +1,8 @@
 extends HJScreen
 ## The map. One screen for "where am I and where could I go".
 ##
-## This replaces two. The Journey was a list of eight chapters in the order you
-## would be handed them, and once chapters became places that list was a lie —
+## This replaces two. The Journey was a list of eight beats in the order you
+## would be handed them, and once those beats became places that list was a lie —
 ## there is no order any more. The map was the other half of the same
 ## information and carried none of it: no anomalies, no rings, no way to tell a
 ## cleared one from a waiting one.

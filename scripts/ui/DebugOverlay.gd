@@ -327,7 +327,7 @@ func _capture() -> void:
 func _summary_lines() -> Array:
 	var lines: Array = ["screen: %s" % Game.screen]
 	if Game.run != null:
-		lines.append("chapter %d · %s" % [Game.run.chapter, Game.run.area.get("id", "")])
+		lines.append("ring %d · %s" % [Game.run.zone, Game.run.area.get("id", "")])
 		lines.append("grit %d · left %s" % [Game.run.grit, HJClock.format_remaining(Game.run.seconds_left())])
 		lines.append("pending: %s" % (Game.run.pending_node if Game.run.pending_node != "" else "—"))
 	else:

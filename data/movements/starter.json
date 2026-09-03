@@ -1,5 +1,5 @@
 {
-  "_comment": "Always unlocked. Carries at least one movement on every axis so no chapter can ever become unplayable because a pack is unaffordable.",
+  "_comment": "Always unlocked. Carries at least one movement on every axis so no anomaly can ever become unplayable because a pack is unaffordable.",
   "pack": {
     "id": "starter",
     "name": "First Steps",

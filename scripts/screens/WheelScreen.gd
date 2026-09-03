@@ -84,8 +84,12 @@ func _progress(node: Dictionary) -> String:
 			return "%d / %d" % [Meta.codex.size(), Content.echoes.size()]
 		"loops":
 			return "%d / %d" % [Meta.loops, int(req.get("count", 0))]
-		"chapter":
-			return "reached %d / %d" % [Meta.chapters_reached, int(req.get("count", 0))]
+		"ring":
+			return "ring %d / %d" % [Meta.deepest_ring, int(req.get("count", 0))]
+		"anomalies":
+			return "%d / %d closed" % [Meta.anomalies_closed, int(req.get("count", 0))]
+		"warden":
+			return "met" if Meta.seen_warden else "not yet"
 		"all_axes_ring":
 			var moved := 0
 			for axis in Content.axes():

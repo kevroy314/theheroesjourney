@@ -17,7 +17,7 @@
       "region",
       "kind",
       "axis",
-      "chapter_gte",
+      "zone_gte",
       "has_relic",
       "hp_below",
       "has_tag",
@@ -66,7 +66,9 @@
       "streak",
       "echoes_all",
       "loops",
-      "chapter"
+      "ring",
+      "anomalies",
+      "warden"
     ],
     "screens": [
       "title",
@@ -411,7 +413,7 @@
       ],
       "optional": [
         "desc",
-        "min_chapter"
+        "min_ring"
       ]
     },
     "echoes": {
@@ -431,31 +433,6 @@
         "text"
       ],
       "optional": []
-    },
-    "chapters": {
-      "files": {
-        "dir": "content",
-        "paths": [
-          "chapters[]"
-        ]
-      },
-      "runtime": [
-        "chapters[]"
-      ],
-      "required": [
-        "id",
-        "area",
-        "name",
-        "axes",
-        "deadline_hours",
-        "blurb",
-        "scene"
-      ],
-      "optional": [],
-      "refs": {
-        "area": "areas",
-        "axes": "axes"
-      }
     },
     "trinkets": {
       "files": {

@@ -23,7 +23,7 @@ func build() -> void:
 		var card := HJUI.panel("panel", "accent")
 		var cv := HJUI.vbox(6)
 		cv.add_child(HJUI.label(String(run.area.get("name", "")), HJUI.FS_BODY, "text"))
-		cv.add_child(HJUI.label("Chapter %d · %s left" % [run.chapter, HJClock.format_remaining(run.seconds_left())],
+		cv.add_child(HJUI.label("Ring %d · %s left" % [run.zone, HJClock.format_remaining(run.seconds_left())],
 			HJUI.FS_SMALL, "warn" if run.seconds_left() < 12 * 3600 else "muted"))
 		card.add_child(cv)
 		v.add_child(card)

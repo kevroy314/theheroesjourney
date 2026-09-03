@@ -695,6 +695,12 @@ def main():
     rules = os.path.join(SCRIPTS, "autoload", "Rules.gd")
     meta = os.path.join(SCRIPTS, "autoload", "Meta.gd")
     main_gd = os.path.join(SCRIPTS, "Main.gd")
+    # Node outcomes and item verbs moved out of Game when it was split up. The
+    # vocabulary checks below name a file and a function, so a move that is not
+    # mirrored here turns every arm into a false "not implemented" -- which is
+    # what happened, loudly, the first time this ran after the split.
+    outcomes = os.path.join(SCRIPTS, "game", "Outcomes.gd")
+    items_gd = os.path.join(SCRIPTS, "game", "Items.gd")
 
     def arms(path, name):
         body = func_body(path, name)
@@ -703,12 +709,12 @@ def main():
     reconcile(report, schema, const_array(rules, "_OP_ORDER"), "ops", "Rules._OP_ORDER")
     reconcile(report, schema, arms(rules, "passes"), "when_keys", "Rules.passes")
     reconcile(report, schema, arms(game, "apply_effects"), "hook_effects", "Game.apply_effects")
-    reconcile(report, schema, arms(game, "_apply_spite_effect"), "spite_effects",
-              "Game._apply_spite_effect")
-    reconcile(report, schema, arms(game, "use_item"), "item_uses", "Game.use_item")
+    reconcile(report, schema, arms(outcomes, "_apply_spite_effect"), "spite_effects",
+              "HJOutcomes._apply_spite_effect")
+    reconcile(report, schema, arms(items_gd, "use"), "item_uses", "HJItems.use")
     reconcile(report, schema, arms(meta, "wheel_met"), "wheel_reqs", "Meta.wheel_met")
     reconcile(report, schema, arms(game, "tap_node"), "node_types", "Game.tap_node")
-    reconcile(report, schema, arms(game, "_award"), "loot_types", "Game._award")
+    reconcile(report, schema, arms(outcomes, "_award"), "loot_types", "HJOutcomes._award")
     reconcile(report, schema, const_dict_keys(main_gd, "SCREENS"), "screens", "Main.SCREENS")
 
     hook_names = set()
@@ -735,7 +741,7 @@ def main():
 
     # An item `use` is data naming a code path, and the item's `where` decides
     # how bad an unimplemented one is. A "home" or "run" item is used by a button
-    # that calls Game.use_item, so a verb missing from that match is a dead
+    # that calls HJItems.use, so a verb missing from that match is a dead
     # button: an error. A "where": "auto" item is applied by code somewhere else
     # entirely, so a missing verb means the feature was never written -- still a
     # bug, but one that needs new code rather than a data edit, so it warns.
@@ -744,7 +750,7 @@ def main():
             if item.get("use") in vocab["item_uses"]:
                 continue
             where = "%s [items %s]" % (rel, item.get("id"))
-            message = ("use '%s' is not implemented (Game.use_item knows: %s)"
+            message = ("use '%s' is not implemented (HJItems.use knows: %s)"
                        % (item.get("use"), ", ".join(vocab["item_uses"])))
             if item.get("where") == "auto":
                 report.warn(where, message + " -- the item is on sale and inert")

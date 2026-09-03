@@ -8,9 +8,9 @@ JSON; adding a *kind* of content is the only thing that needs code.
 data/themes/*.json      palette, vocabulary, glyphs
 data/rulesets/*.json    run-wide modifiers and hooks
 data/movements/*.json   the movement library, grouped into purchasable packs
-data/areas/*.json       one authored node graph per chapter
+data/areas/*.json       the eight authored node graphs
 data/echoes/*.json      the story, in fragments
-data/content/           config, chapters, items, trinkets, loot, spite,
+data/content/           config, anomalies, items, trinkets, loot, spite,
                         achievements (the Wheel), rooms (the Mind Palace),
                         upgrades (traits)
 data/world/*.json       the overworld, as packed tile planes
@@ -26,7 +26,7 @@ data/schema.json        the shape of all of the above — see Validation, below.
 
 **ops**, applied in this order: `set`, `add`, `mul`, `min` (floor), `max` (ceiling).
 
-**conditions** (all listed must pass): `tier_gte`, `tier_lte`, `chapter_gte`,
+**conditions** (all listed must pass): `tier_gte`, `tier_lte`, `zone_gte`,
 `phase`, `region`, `kind`, `axis`, `has_relic`, `hp_below`.
 
 `"per_level": true` on a trait modifier multiplies by the purchased level.
@@ -63,9 +63,9 @@ optional `silent`.
   elapse before Confirm unlocks, so a 5-minute walk really does gate 5 minutes.
 - `scaling` — easier variants, offered on the task screen at no penalty.
 
-Packs carry `cost` and `min_chapter`, so the shop opens in tiers.
+Packs carry `cost` and `min_ring`, so the shop opens as you walk further out.
 
-**The starter pack must keep at least one movement on every axis.** A chapter
+**The starter pack must keep at least one movement on every axis.** An anomaly
 that asks for an axis with nothing unlocked would be unplayable; the self-test
 asserts this.
 
@@ -177,7 +177,7 @@ refusing to start is a worse answer than a slightly wrong number.
 
 2. **References.** Every node `next` names a node in its own area; every slot
    `attach` likewise (it becomes the generated side node's `side_of`, which
-   gates when the node opens); every chapter and anomaly `area` resolves; every
+   gates when the node opens); every world region and anomaly `area` resolves; every
    `loot` names a table; every `movement` is a real movement or a legal `$`
    token; every Palace adjacency key names a room; every overworld region and
    anomaly points at a real area; every prop `biome` is a real material *the

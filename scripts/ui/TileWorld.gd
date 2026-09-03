@@ -39,7 +39,7 @@ const FACINGS := {
 
 var world: HJWorld
 var run: HJRun
-var node_at: Dictionary = {}         ## Vector2i -> node id, this chapter's beats
+var node_at: Dictionary = {}         ## Vector2i -> node id, this anomaly's beats
 
 var _tiles: Texture2D
 var _variants: Texture2D
