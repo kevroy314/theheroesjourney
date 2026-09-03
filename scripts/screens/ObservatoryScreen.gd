@@ -24,9 +24,10 @@ func build() -> void:
 		["Tasks completed", Meta.stats.get("tasks", 0)],
 		["Scaled down", Meta.stats.get("scaled", 0)],
 		["Runs", Meta.stats.get("runs", 0)],
-		["Areas cleared", Meta.stats.get("clears", 0)],
+		["Runs cleared", Meta.stats.get("clears", 0)],
 		["Loops closed", Meta.loops],
-		["Furthest chapter", "%d of %d" % [Meta.chapters_reached, Content.chapter_count()]],
+		["Anomalies closed", Meta.anomalies_closed],
+		["Furthest ring", "%d of 4" % Meta.deepest_ring],
 		["Longest streak", "%d days" % Meta.best_streak],
 		["%s earned" % Palette.word("resolve"), Meta.stats.get("resolve_earned", 0)],
 	]:

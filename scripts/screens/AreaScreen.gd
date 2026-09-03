@@ -6,7 +6,7 @@ var _header: HJRunHeader
 var _graph: HJAreaGraph
 
 
-## Every chapter is a different place, so the area screen is keyed on the area
+## Every anomaly is a different place, so the area screen is keyed on the area
 ## rather than on the screen. Area ids and Palace screen ids can collide —
 ## "observatory" is both — but they are looked up in different registers, so the
 ## cold stone chamber and the warm room of instruments never get confused.
@@ -32,7 +32,6 @@ func build() -> void:
 		Game.resync_screen.call_deferred("area")
 		return
 
-	var chapter := run.chapter_def()
 	var v := page(12)
 
 	_header = HJUI.run_header(String(run.area.get("name", "Area")),

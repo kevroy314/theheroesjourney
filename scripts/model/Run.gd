@@ -4,10 +4,10 @@ extends RefCounted
 ## a run spans real days, so it has to survive the app being closed.
 
 ## Bumped when chapters were retired. from_dict returns null on a mismatch, so a
-## run saved under the old model is dropped rather than resumed into a game that
-## no longer has the shape it assumes — a half-migrated run would put the player
-## in a chapter that cannot advance, with a header counting toward eight of
-## something that no longer exists.
+## run saved under the old model is dropped rather than resumed into a game whose
+## shape it no longer assumes. Dropping the vestigial `chapter` field did not
+## need a bump: a field that stops being written is a field that stops being
+## read, and every other key still means what it did.
 const VERSION := 2
 
 var seed: int = 0
@@ -16,9 +16,9 @@ var theme_id: String = ""
 var ruleset_id: String = ""
 
 # --- position ---
-var chapter: int = 1                 ## legacy; the summary still reads it
 ## The deepest ring reached this run. Distance from town is difficulty, so this
-## is the run's progress — it replaces "which chapter am I on".
+## is the run's progress: there is no sequence to be at a point in, only a
+## distance you have been willing to walk.
 var zone: int = 0
 var area: Dictionary = {}            ## generated instance, see HJAreaGen
 var completed: Array = []            ## node ids finished
@@ -56,10 +56,6 @@ var finished: bool = false
 var outcome: String = ""             ## "" | "cleared" | "loop" | "abandoned"
 
 
-func chapter_def() -> Dictionary:
-	return Content.chapter(chapter)
-
-
 func node(id: String) -> Dictionary:
 	return area.get("nodes", {}).get(id, {})
 
@@ -78,7 +74,7 @@ func expired() -> bool:
 
 func ctx(extra: Dictionary = {}) -> Dictionary:
 	var base := {
-		"chapter": chapter,
+		"zone": zone,
 		"area": area.get("id", ""),
 		"trinkets": trinkets,
 		"tags": tags,
@@ -92,7 +88,7 @@ func to_dict() -> Dictionary:
 		"version": VERSION,
 		"seed": seed, "started_unix": started_unix,
 		"theme_id": theme_id, "ruleset_id": ruleset_id,
-		"chapter": chapter, "area": area,
+		"area": area,
 		"completed": completed, "locked": locked,
 		"deadline_unix": deadline_unix,
 		"grit": grit, "trinkets": trinkets, "echoes": echoes, "tags": tags,
@@ -114,7 +110,6 @@ static func from_dict(d: Dictionary) -> HJRun:
 	r.started_unix = int(d.get("started_unix", 0))
 	r.theme_id = String(d.get("theme_id", ""))
 	r.ruleset_id = String(d.get("ruleset_id", ""))
-	r.chapter = int(d.get("chapter", 1))
 	r.area = d.get("area", {})
 	r.completed = d.get("completed", [])
 	r.locked = d.get("locked", [])

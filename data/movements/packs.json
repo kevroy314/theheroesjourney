@@ -7,7 +7,7 @@
         "name": "Around the House",
         "cost": 40,
         "desc": "Standing work. Nothing that needs a floor you'd be embarrassed to lie on.",
-        "min_chapter": 1
+        "min_ring": 0
       },
       "movements": [
         {
@@ -58,7 +58,7 @@
         "name": "Floor Work",
         "cost": 60,
         "desc": "Holds instead of reps. Time is the unit, which changes how a set feels.",
-        "min_chapter": 2
+        "min_ring": 1
       },
       "movements": [
         {
@@ -122,7 +122,7 @@
         "name": "Out the Door",
         "cost": 90,
         "desc": "Movements that need shoes. These take real minutes, and the timer will hold you to them.",
-        "min_chapter": 3
+        "min_ring": 1
       },
       "movements": [
         {
@@ -172,7 +172,7 @@
         "name": "The Kitchen",
         "cost": 50,
         "desc": "Fuel as actions, never as numbers. Nothing here weighs anything.",
-        "min_chapter": 2
+        "min_ring": 1
       },
       "movements": [
         {
@@ -219,7 +219,7 @@
         "name": "Stillness",
         "cost": 110,
         "desc": "The hardest pack to start and the easiest to finish.",
-        "min_chapter": 5
+        "min_ring": 2
       },
       "movements": [
         {
@@ -267,7 +267,7 @@
         "name": "Nightfall",
         "cost": 70,
         "desc": "Sleep is a thing you do all evening, not a thing that happens to you at midnight.",
-        "min_chapter": 4
+        "min_ring": 2
       },
       "movements": [
         {
@@ -314,7 +314,7 @@
         "name": "Company",
         "cost": 60,
         "desc": "The axis everyone forgets is a health axis.",
-        "min_chapter": 3
+        "min_ring": 1
       },
       "movements": [
         {
@@ -363,7 +363,7 @@
         "name": "Iron",
         "cost": 140,
         "desc": "Needs equipment. Bought last by most people, and that is the correct order.",
-        "min_chapter": 6
+        "min_ring": 3
       },
       "movements": [
         {

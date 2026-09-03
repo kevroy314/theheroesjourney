@@ -114,7 +114,7 @@ func run_area_id() -> String:
 	var sector := String(run.anomaly.get("sector", ""))
 	if sector != "":
 		return sector
-	return String(run.chapter_def().get("area", "default"))
+	return String(run.area.get("id", "default"))
 
 
 ## The place this screen is standing in, named by the active theme and dialled

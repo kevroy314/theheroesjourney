@@ -2,7 +2,7 @@ class_name HJWorld
 extends RefCounted
 ## The world. One of them, loaded once.
 ##
-## Eight chapters used to mean eight generated maps with a wall round each. They
+## Eight areas used to mean eight generated maps with a wall round each. They
 ## are now eight *regions* of one continuous landscape: the bed you wake in is a
 ## room in a house, the house stands at the edge of a town, and the mountain is
 ## at the top of the same grid. Nothing stops you walking to the summit on day
@@ -223,7 +223,7 @@ func nearest_walkable(from: Vector2i, limit: int = 40) -> Vector2i:
 	return from
 
 
-## Where this chapter's nodes stand in the world.
+## Where this anomaly's nodes stand in the world.
 ##
 ## Placed on a ring around the region's anchor rather than in graph rows: the
 ## world already has a shape, and imposing a tidy lattice on it would put nodes
@@ -231,7 +231,11 @@ func nearest_walkable(from: Vector2i, limit: int = 40) -> Vector2i:
 ## its spot for as long as the run lasts.
 func place_nodes(run: HJRun) -> Dictionary:
 	var out: Dictionary = {}
-	var centre := anchor(String(run.chapter_def().get("area", "waking_room")))
+	# The anomaly you stepped into is the centre. Its nodes belong to the place
+	# you are standing, not to a region anchor picked from a sequence.
+	var centre := Vector2i(int(run.anomaly.get("x", -1)), int(run.anomaly.get("y", -1)))
+	if centre.x < 0:
+		centre = anchor(String(run.area.get("id", "")))
 	var ids: Array = run.area.get("order", [])
 	if ids.is_empty():
 		return out

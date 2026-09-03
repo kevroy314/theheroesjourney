@@ -57,8 +57,8 @@ func _pack_card(pack_id: String) -> PanelContainer:
 		return null
 
 	var owned := Meta.pack_unlocked(pack_id)
-	var needed := int(pack.get("min_chapter", 1))
-	var reached := Meta.chapters_reached >= needed
+	var needed := int(pack.get("min_ring", 0))
+	var reached := Meta.deepest_ring >= needed
 	var cost := Meta.price(int(pack.get("cost", 0)))
 	var afford := Meta.resolve >= cost
 

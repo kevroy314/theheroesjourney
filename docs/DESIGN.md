@@ -73,7 +73,7 @@ in that room, not in a lobby. The Bag is the one screen that lives in both
 worlds: your pack on the floor during a run, the Stores when you open it from
 the Palace, and it switches register to match.
 
-The two id spaces overlap on purpose — `observatory` is both a chapter and a
+The two id spaces overlap on purpose — `observatory` is both a world region and a
 Palace room — and the folders are what keep them apart. A cold stone chamber of
 instruments pointed down at the town is not the warm room where you read your
 own record, and nothing should ever be able to serve one for the other.

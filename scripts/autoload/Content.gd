@@ -15,7 +15,6 @@ var pack_order: Array = []
 var areas: Dictionary = {}        ## id -> area definition
 var echoes: Array = []            ## ordered story fragments
 var echo_reveals: Dictionary = {}
-var chapters: Array = []
 var trinkets: Dictionary = {}
 var items: Dictionary = {}
 var item_order: Array = []
@@ -87,8 +86,6 @@ func load_all() -> void:
 			continue
 		if doc.has("config"):
 			config.merge(doc["config"], true)
-		if doc.has("chapters"):
-			chapters.append_array(doc["chapters"])
 		if doc.has("upgrades"):
 			upgrades.append_array(doc["upgrades"])
 		if doc.has("loot"):
@@ -112,11 +109,10 @@ func load_all() -> void:
 			if not item_order.has(i["id"]):
 				item_order.append(i["id"])
 
-	chapters.sort_custom(func(a, b): return int(a.get("id", 0)) < int(b.get("id", 0)))
 	# Cheapest first, so the free starter pack heads the list in Camp.
 	pack_order.sort_custom(func(a, b): return int(packs[a].get("cost", 0)) < int(packs[b].get("cost", 0)))
 
-	if themes.is_empty() or chapters.is_empty():
+	if themes.is_empty() or areas.is_empty():
 		push_error("Content: data failed to load from %s" % DATA_ROOT)
 
 	_report(validate())
@@ -160,18 +156,6 @@ func ruleset(id: String) -> Dictionary:
 
 func movement(id: String) -> Dictionary:
 	return movements.get(id, {})
-
-
-## Chapter definition by 1-based id.
-func chapter(id: int) -> Dictionary:
-	for c in chapters:
-		if int(c.get("id", 0)) == id:
-			return c
-	return {}
-
-
-func chapter_count() -> int:
-	return chapters.size()
 
 
 func area(id: String) -> Dictionary:

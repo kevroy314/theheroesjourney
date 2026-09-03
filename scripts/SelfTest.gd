@@ -120,8 +120,9 @@ static func _content_checks(failures: Array) -> void:
 
 	_check(failures, "themes loaded", Content.themes.size() >= 1, str(Content.themes.keys()))
 	_check(failures, "rulesets loaded", Content.rulesets.size() >= 1, str(Content.rulesets.keys()))
-	_check(failures, "chapters loaded", Content.chapters.size() == 8, "%d chapters" % Content.chapters.size())
-	_check(failures, "every chapter has an area", _all_chapters_have_areas(), "")
+	_check(failures, "named areas loaded", Content.areas.size() == 8, "%d areas" % Content.areas.size())
+	_check(failures, "every named world region resolves to an area",
+		_all_regions_have_areas(), "")
 	_check(failures, "movements loaded", Content.movements.size() >= 8, "%d movements" % Content.movements.size())
 	_check(failures, "starter pack covers every axis", _starter_covers_axes(), "")
 	_check(failures, "echoes loaded", Content.echoes.size() >= 10, "%d echoes" % Content.echoes.size())
@@ -131,9 +132,12 @@ static func _content_checks(failures: Array) -> void:
 	_check(failures, "config loaded", Content.config.has("run.grit_mult"), "%d keys" % Content.config.size())
 
 
-static func _all_chapters_have_areas() -> bool:
-	for c in Content.chapters:
-		if Content.area(String(c.get("area", ""))).is_empty():
+## Every anchor the world generator writes must name an area that exists. This
+## used to check the chapter list; the world's own region table is the honest
+## replacement, because it is what `enter_anomaly` actually reads.
+static func _all_regions_have_areas() -> bool:
+	for id in HJWorld.shared().regions.keys():
+		if Content.area(String(id)).is_empty():
 			return false
 	return true
 
@@ -177,7 +181,7 @@ static func _play_one(host: Node, seed_value: int, failures: Array) -> Dictionar
 			break
 
 		# A node that cannot be completed would otherwise ping-pong forever.
-		var progress := run.completed.size() + run.chapter * 100
+		var progress := run.completed.size() + run.zone * 100 + run.anomalies_cleared.size() * 10
 		stuck = 0 if progress != last_progress else stuck + 1
 		last_progress = progress
 		if stuck > 40:
@@ -200,7 +204,7 @@ static func _play_one(host: Node, seed_value: int, failures: Array) -> Dictionar
 				var available := HJAreaGen.available_ids(run)
 				if available.is_empty():
 					_check(failures, "an area always has a legal move", false,
-						"seed %d chapter %d %s — %s" % [seed_value, run.chapter,
+						"seed %d ring %d %s — %s" % [seed_value, run.zone,
 							run.area.get("id", ""), _dump_nodes(run)])
 					Game.abandon_run()
 					break
@@ -334,7 +338,7 @@ static func _warden_checks(host: Node, failures: Array) -> void:
 	Game.run = null
 	Game.clear_saved_run()
 	Game.start_run(31337)
-	# The Summit is a place now, not the last chapter, so the way to test it is
+	# The Summit is a place, not the last of a sequence, so the way to test it is
 	# to walk into it — which for a harness means stepping onto its cell.
 	var summit := HJWorld.shared().anchor("summit")
 	Game.run.world_pos = summit
@@ -427,7 +431,7 @@ static func _persistence_checks(failures: Array) -> void:
 	Game.run.grit = 77
 	Game.save_run()
 
-	var chapter := Game.run.chapter
+	var zone := Game.run.zone
 	var completed := Game.run.completed.size()
 	var deadline := Game.run.deadline_unix
 
@@ -436,8 +440,9 @@ static func _persistence_checks(failures: Array) -> void:
 	_check(failures, "a run survives being closed", Game.run != null, "run did not reload")
 	if Game.run != null:
 		_check(failures, "reloaded run keeps its grit", Game.run.grit == 77, str(Game.run.grit))
-		_check(failures, "reloaded run keeps its place", Game.run.chapter == chapter and Game.run.completed.size() == completed,
-			"chapter %d, %d done" % [Game.run.chapter, Game.run.completed.size()])
+		_check(failures, "reloaded run keeps its place",
+			Game.run.zone == zone and Game.run.completed.size() == completed,
+			"ring %d, %d done" % [Game.run.zone, Game.run.completed.size()])
 		_check(failures, "reloaded run keeps its deadline", Game.run.deadline_unix == deadline, "")
 	Game.abandon_run()
 	Game.clear_saved_run()
@@ -734,7 +739,8 @@ static func _snapshot() -> Dictionary:
 		"palace_size": Meta.palace_size,
 		"last_active_day": Meta.last_active_day, "rest_used_day": Meta.rest_used_day,
 		"codex": Meta.codex.duplicate(), "axis_tasks": Meta.axis_tasks.duplicate(true),
-		"chapters_reached": Meta.chapters_reached, "loops": Meta.loops,
+		"deepest_ring": Meta.deepest_ring, "anomalies_closed": Meta.anomalies_closed,
+		"loops": Meta.loops,
 		"runs_today": Meta.runs_today.duplicate(true), "stats": Meta.stats.duplicate(true),
 		"seen_first_reset": Meta.seen_first_reset, "seen_warden": Meta.seen_warden,
 		"theme": Meta.selected_theme, "ruleset": Meta.selected_ruleset, "paused": Meta.paused,
@@ -756,7 +762,8 @@ static func _restore(s: Dictionary) -> void:
 	Meta.rest_used_day = s["rest_used_day"]
 	Meta.codex = s["codex"]
 	Meta.axis_tasks = s["axis_tasks"]
-	Meta.chapters_reached = s["chapters_reached"]
+	Meta.deepest_ring = s["deepest_ring"]
+	Meta.anomalies_closed = s["anomalies_closed"]
 	Meta.loops = s["loops"]
 	Meta.runs_today = s["runs_today"]
 	Meta.stats = s["stats"]

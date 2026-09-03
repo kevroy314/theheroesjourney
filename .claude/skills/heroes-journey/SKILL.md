@@ -43,7 +43,7 @@ Wheel node or Mind Palace adjacency, which are all the same modifier schema:
 
 `Rules.explain("key", ctx)` prints the base value and every source that moved it.
 
-**Content is JSON, not code.** New movement, chapter, item, room, echo, theme,
+**Content is JSON, not code.** New movement, area, item, room, echo, theme,
 ruleset → a file under `data/`. `Content.gd` merges by top-level key, so files
 can be split or renamed freely.
 
@@ -104,6 +104,20 @@ Godot scans that directory **non-recursively and skips subdirectories**, so a
   implementation never emits its result signal at all.
 
 ## Traps this project has already hit
+
+**A new `class_name` is invisible until you reimport.** `.godot/` is gitignored
+and `global_script_class_cache.cfg` is only rebuilt by an import pass, so a
+freshly added `class_name` parses as "Identifier not declared in the current
+scope" — and because autoloads fail to instantiate, the errors you actually read
+are `Nonexistent function 'boot' in base 'Nil'` repeated forever. Run
+`godot --headless --path . --import` after adding one, before `./test.sh`.
+
+**Anything reached through an untyped reference needs its type spelled out.** A
+helper holding `var g: Node` makes `g.rng` and `g.run` Variants, so
+`var roll := g.rng.randf() * total` is a *compile* error ("cannot infer the
+type"). The class then does not exist, `.new()` returns null, and every call
+site reports a nonexistent function a long way from the line at fault. Write
+`var roll: float = ...`.
 
 **Input fires twice.** `pointing/emulate_touch_from_mouse=true` means one press
 arrives as *both* `InputEventScreenTouch` and `InputEventMouseButton`. Any custom

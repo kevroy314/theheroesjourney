@@ -1,5 +1,5 @@
 {
-  "_comment": "Anomalies: the roguelite content. Each is a short task chain you walk into, not a chapter you work through. Difficulty is the ring you found it in — tools/make_world.py tags every spawn with a tier. Nodes use the same schema as data/areas/*.json, so HJAreaGen builds them unchanged.",
+  "_comment": "Anomalies: the roguelite content. Each is a short task chain you walk into, not a sequence you work through. Difficulty is the ring you found it in — tools/make_world.py tags every spawn with a tier. Nodes use the same schema as data/areas/*.json, so HJAreaGen builds them unchanged.",
 
   "anomalies": [
     { "id": "a_stall", "tier": 0, "weight": 3, "name": "A Stall in the Air",

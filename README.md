@@ -61,11 +61,13 @@ none of it done.
 
 ## The loop
 
-**Step → Area → Chapter → Run.**
+**Step → Node → Anomaly → Run.**
 
-- **Step** — one node. Usually a real-world action. The atom.
-- **Area** — one screen, one sitting. Under an hour, usually far less.
-- **Chapter** — a named place on the journey. Eight of them, bedroom to summit.
+- **Step** — a real step, counted by the phone. The budget everything spends.
+- **Node** — one beat of a task chain. Usually a real-world action. The atom.
+- **Anomaly** — one screen, one sitting. A short chain you walk into. Under an
+  hour, usually far less. Its difficulty is the ring of the world you found it
+  in: distance from town *is* difficulty.
 - **Run** — one attempt at the whole thing, spanning many real days.
 
 Two currencies: **Grit** is earned per step and lost when the loop resets;
@@ -75,9 +77,9 @@ A failed run still pays, which is what makes failure survivable.
 Deadlines are firm. Miss one and the loop resets — which is not a game-over
 screen, it is the plot.
 
-## Chapter 1 — The Waking Room
+## The Waking Room
 
-Build order was: this chapter, end to end, before anything else. The escalation
+Build order was: this area, end to end, before anything else. The escalation
 is the level design.
 
 ```
@@ -122,9 +124,9 @@ never scolds. Scaling down is a normal choice, and `Scaling Chalk` makes it free
 data/themes/*.json      palette, vocabulary, glyphs, name pools
 data/rulesets/*.json    run-wide modifiers and event hooks
 data/movements/*.json   the movement library, grouped into purchasable packs
-data/areas/*.json       one authored node graph per chapter, plus slot tables
+data/areas/*.json       the eight authored node graphs, plus slot tables
 data/echoes/*.json      the story, in fragments
-data/content/           config, chapters, items, trinkets, loot, spite, the Wheel
+data/content/           config, anomalies, items, trinkets, loot, spite, the Wheel
 ```
 
 ### Adding a movement
@@ -140,7 +142,7 @@ data/content/           config, chapters, items, trinkets, loot, spite, the Whee
 
 `axis` is one of `move · water · fuel · rest · mind · bond` — the six spokes of
 the Wheel. The starter pack deliberately carries one movement on **every** axis,
-so no chapter can become unplayable because a pack is unaffordable.
+so no anomaly can become unplayable because a pack is unaffordable.
 
 ### Adding a rule
 
@@ -152,7 +154,8 @@ and every read goes through the rule engine:
 ```
 
 ops: `set · add · mul · min · max`, applied in that order.
-conditions: `tier_gte · tier_lte · chapter_gte · phase · region · kind · axis · has_relic · hp_below`.
+conditions: `tier_gte · tier_lte · zone_gte · phase · region · kind · axis ·
+has_relic · hp_below · has_tag · lacks_tag`.
 
 The same schema drives traits, rulesets, trinkets and Wheel rewards. Hooks
 (`on_run_start`, `on_task_complete`, `on_area_enter`, `on_area_clear`) fire
@@ -201,7 +204,7 @@ is the whole game of it:
 | Room | What it is | Pays when next to |
 |---|---|---|
 | **The Atrium** | You. Free, placed from the start, and it does not move. | Hearth, Study |
-| **The Gym** | Movement wiki, unlock list and pack shop, tiered by chapter | Identity, Hearth |
+| **The Gym** | Movement wiki, unlock list and pack shop, tiered by ring | Identity, Hearth |
 | **The Identity** | The Wheel | Gym, Observatory |
 | **The Study** | The Codex | Atrium, Observatory |
 | **The Stores** | Items: what you hold and what you could buy | Workshop, Gym |
@@ -215,7 +218,7 @@ axis-conditioned — Gym next to Identity gives +12% Grit **on Move tasks only**
 via `"when": { "axis": "move" }`.
 
 The Gym is the movement shop, and packs open in tiers: each declares a
-`min_chapter`, so Out the Door needs Chapter 3 and Iron needs Chapter 6. Resolve
+`min_ring`, so a pack opens once you have walked that far out from town. Resolve
 alone will not buy you everything early.
 
 ## The Wheel
@@ -293,12 +296,20 @@ scripts/autoload/
   Rules.gd     the modifier pipeline + condition evaluator
   Meta.gd      persistent save: Resolve, unlocks, inventory, streak, Codex, Wheel
   Palette.gd   active theme
-  Notify.gd    deadline reminders — the seam for Android, a no-op on web
+  Notify.gd    deadline reminders
   Game.gd      run orchestrator; the only thing that mutates player state
+scripts/game/   what Game delegates to, so Game stays readable
+  Outcomes.gd  what a resolved node yields: loot, echoes, Spite, boons, the Warden
+  Items.gd     the verbs items perform
+  RunStore.gd  reading and writing the in-flight run
 scripts/model/  Clock, Run, AreaGen   (pure logic, no UI)
 scripts/screens/  one script per screen, built in code so themes can restyle them
 scripts/ui/     UI builders, Screen base, RunHeader, AreaGraph, Wheel
 ```
+
+`scripts/game/` reaches back through a reference to Game passed in at
+construction rather than the `Game` global, so each file declares what it needs
+in its constructor instead of hiding it in the body.
 
 Two things worth knowing before changing anything:
 

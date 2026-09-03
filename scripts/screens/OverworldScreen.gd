@@ -24,9 +24,9 @@ func build() -> void:
 	var run: HJRun = Game.run
 	# Deliberately not requiring an area. The overworld is where you are when you
 	# are between anomalies, and an empty area is the normal state out here —
-	# this screen was written when the area *was* the chapter, and the leftover
+	# this screen was written when the area *was* the whole sequence, and the leftover
 	# guard sent a player who had just walked out of an anomaly to the Journey,
-	# which advanced a chapter behind their back.
+	# which advanced the sequence behind their back.
 	if run == null or run.finished:
 		Game.resync_screen.call_deferred("overworld")
 		return

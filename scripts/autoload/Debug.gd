@@ -137,7 +137,9 @@ func unlock_everything() -> void:
 			Meta.unlocked.append(id)
 	for id in Content.item_order:
 		Meta.give_item(String(id))
-	Meta.chapters_reached = maxi(Meta.chapters_reached, Content.chapter_count())
+	Meta.deepest_ring = 4
+	Meta.anomalies_closed = maxi(Meta.anomalies_closed, 1)
+	Meta.seen_warden = true
 	Meta.save_game()
 	Game.rebuild_rules()
 	Events.meta_changed.emit()
@@ -196,7 +198,8 @@ func state_report(note: String = "") -> Dictionary:
 			"streak": Meta.streak,
 			"best_streak": Meta.best_streak,
 			"loops": Meta.loops,
-			"chapters_reached": Meta.chapters_reached,
+			"deepest_ring": Meta.deepest_ring,
+			"anomalies_closed": Meta.anomalies_closed,
 			"codex": "%d/%d" % [Meta.codex.size(), Content.echoes.size()],
 			"packs": Meta.unlocked,
 			"inventory": Meta.inventory,
@@ -210,7 +213,7 @@ func state_report(note: String = "") -> Dictionary:
 	}
 	if Game.run != null:
 		report["run"] = {
-			"chapter": Game.run.chapter,
+			"zone": Game.run.zone,
 			"area": Game.run.area.get("id", ""),
 			"seed": Game.run.seed,
 			"grit": Game.run.grit,

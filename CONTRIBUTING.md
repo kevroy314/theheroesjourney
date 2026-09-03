@@ -64,7 +64,7 @@ without a conversation.
 ruleset, trinket, Wheel node or Palace adjacency. Put it in
 `data/content/config.json` and read it with `Rules.value()`.
 
-**Content is JSON.** New movement, chapter, item, room, echo, theme, ruleset →
+**Content is JSON.** New movement, area, item, room, echo, theme, ruleset →
 a file under `data/`. Only a new *kind* of content needs code.
 
 **Screens are built in code** so a theme swap can restyle everything. No baked
