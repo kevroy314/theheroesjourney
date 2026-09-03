@@ -18,7 +18,6 @@
     "loot.echo_weight": 1.0,
     "loot.trinket_weight": 1.0,
     "shop.discount": 0.0,
-    "spite.chance": 0.22,
     "spite.kind_weight": 1.0,
     "steps.reward_per_node": 45,
     "steps.multiplier_per_node": 0.12,

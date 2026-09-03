@@ -96,6 +96,14 @@ func start_run(run_seed: int = 0, from_chapter: int = 1) -> void:
 
 	Palette.use(run.theme_id)
 	rebuild_rules()
+	# Second Wind, if one was spent on the loop that just closed.
+	if Meta.resume_at.x >= 0:
+		run.world_pos = Meta.resume_at
+		run.zone = Meta.deepest_ring
+		Meta.resume_at = Vector2i(-1, -1)
+		Meta.save_game()
+		say("You wake where you stood.", "good")
+
 	# New run, new legs. The stipend exists so the first room is reachable
 	# without having walked anywhere yet — you should never open the game to a
 	# world you cannot move in.
@@ -160,6 +168,14 @@ func end_run(outcome: String) -> void:
 	var rate := Rules.value("run.resolve_rate", ctx, 0.25)
 	var keep := Rules.value("run.loop_keep", ctx, 0.5)
 	var earned := Meta.bank(run.grit, rate, keep, cleared)
+
+	# Auto items act on the loop closing rather than on a tap.
+	if not cleared:
+		for id in Content.item_order:
+			var item := Content.item(String(id))
+			if String(item.get("where", "")) == "auto" and Meta.item_count(String(id)) > 0:
+				if use_item(String(id)):
+					Meta.take_item(String(id))
 
 	var first_reset := false
 	if not cleared and not Meta.seen_first_reset:
@@ -688,6 +704,16 @@ func use_item(id: String) -> bool:
 		return false
 
 	match String(item.get("use", "")):
+		"resume_run":
+			# Consumed when the loop closes rather than tapped — `where: "auto"`.
+			# The item was written for chapters ("begin again at the chapter you
+			# reached") and did nothing at all, because nothing implemented the
+			# verb. Under zone levels it means something better: the loop still
+			# resets the world, but you wake where you were standing instead of
+			# walking back out from town.
+			Meta.resume_at = run.world_pos if has_active_run() else Vector2i(-1, -1)
+			Meta.save_game()
+			say("Second Wind. You will wake where you stood.", "good")
 		"keep_streak":
 			if not Meta.spend_rest_token():
 				say("Nothing to protect today.", "warn")

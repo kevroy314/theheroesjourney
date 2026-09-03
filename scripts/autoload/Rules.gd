@@ -103,6 +103,16 @@ func passes(condition: Dictionary, ctx: Dictionary) -> bool:
 			"kind":
 				if String(ctx.get("kind", "")) != String(want):
 					return false
+			"has_tag":
+				# Nodes hand out tags with `grants` — the House gives "hydrated",
+				# the Observatory "anchored" or "settled" — and until now nothing
+				# could read one. They were written, serialised, and never
+				# consulted, so three pieces of authored content meant nothing.
+				if not ctx.get("tags", []).has(String(want)):
+					return false
+			"lacks_tag":
+				if ctx.get("tags", []).has(String(want)):
+					return false
 			"axis":
 				if String(ctx.get("axis", "")) != String(want):
 					return false
