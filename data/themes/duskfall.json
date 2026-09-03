@@ -4,7 +4,6 @@
   "desc": "The same day, seen at the other end. Everything is longer here.",
   "unlocked_by_default": false,
   "unlock_cost": 120,
-
   "colors": {
     "bg": "#131019",
     "panel": "#1D1826",
@@ -18,7 +17,6 @@
     "good": "#79C2A8",
     "warn": "#DFB964"
   },
-
   "labels": {
     "grit": "Embers",
     "resolve": "Ash",
@@ -28,20 +26,19 @@
     "streak": "Vigil",
     "area": "Hollow"
   },
-
   "glyphs": {
     "start": "@",
-    "task": "»",
-    "free": "·",
+    "task": "\u00bb",
+    "free": "\u00b7",
     "threshold": ">",
     "echo": "~",
     "cache": "$",
-    "mirror": "©",
-    "trinket": "¤",
+    "mirror": "\u00a9",
+    "trinket": "\u00a4",
     "spite": "&",
     "locked": "?",
-    "done": "+"
+    "done": "+",
+    "warden": "!"
   },
-
   "mountain_line": "The mountain keeps its one light. From here it looks like it is waiting."
 }

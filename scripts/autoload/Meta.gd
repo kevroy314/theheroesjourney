@@ -31,6 +31,10 @@ var chapters_reached: int = 0
 ## The deepest ring ever reached. Progression is now how far out you have been,
 ## not how many chapters you were handed.
 var deepest_ring: int = 0
+
+## Where Second Wind puts you next time. (-1,-1) is "nowhere owed" — the next
+## run starts in town like any other.
+var resume_at := Vector2i(-1, -1)
 var loops: int = 0                     ## how many times the loop has reset
 var runs_today: Dictionary = {}        ## day -> completed runs, for falloff
 
@@ -511,6 +515,7 @@ func save_game() -> void:
 		"last_active_day": last_active_day, "rest_used_day": rest_used_day,
 		"codex": codex, "axis_tasks": axis_tasks,
 		"chapters_reached": chapters_reached, "deepest_ring": deepest_ring,
+		"resume_x": resume_at.x, "resume_y": resume_at.y,
 		"loops": loops, "runs_today": runs_today,
 		"seen_first_reset": seen_first_reset, "seen_warden": seen_warden,
 		"paused": paused, "pause_started": pause_started,
@@ -567,6 +572,7 @@ func load_game() -> void:
 			axis_tasks = parsed.get("axis_tasks", {})
 			chapters_reached = int(parsed.get("chapters_reached", 0))
 			deepest_ring = int(parsed.get("deepest_ring", 0))
+			resume_at = Vector2i(int(parsed.get("resume_x", -1)), int(parsed.get("resume_y", -1)))
 			loops = int(parsed.get("loops", 0))
 			runs_today = parsed.get("runs_today", {})
 			seen_first_reset = bool(parsed.get("seen_first_reset", false))

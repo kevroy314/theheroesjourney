@@ -1,5 +1,5 @@
 {
-  "_comment": "Items buy time, comfort or information. None of them completes a task on the player's behalf — see the Warp Stone note below for the closest call.",
+  "_comment": "Items buy time, comfort or information. None of them completes a task on the player's behalf \u2014 see the Warp Stone note below for the closest call.",
   "items": [
     {
       "id": "rest_token",
@@ -22,7 +22,7 @@
       "id": "tonic",
       "name": "Tonic",
       "cost": 25,
-      "desc": "Cancels the next setback — a Snag, or Spite at their worst.",
+      "desc": "Cancels the next setback \u2014 a Snag, or Spite at their worst.",
       "use": "ward",
       "where": "run"
     },
@@ -30,7 +30,7 @@
       "id": "warp_stone",
       "name": "Warp Stone",
       "cost": 55,
-      "desc": "Walk straight to the door, abandoning whatever is left in the room. Needs at least one task already done — it ends a session early, it never starts one for you.",
+      "desc": "Walk straight to the door, abandoning whatever is left in the room. Needs at least one task already done \u2014 it ends a session early, it never starts one for you.",
       "use": "skip_to_threshold",
       "where": "run"
     },
@@ -70,7 +70,7 @@
       "id": "second_wind",
       "name": "Second Wind",
       "cost": 90,
-      "desc": "When the loop resets, begin again at the chapter you reached instead of the bed. Once.",
+      "desc": "When the loop resets, wake where you were standing instead of in town. Once.",
       "use": "resume_run",
       "where": "auto"
     }

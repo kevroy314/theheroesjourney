@@ -1,222 +1,727 @@
 {
   "_comment": "Declarative schema for everything under data/. Read by two checkers with different reach: scripts/autoload/Content.gd validates the merged runtime view (and can run on a player's device), tools/validate_data.py validates the files on disk and additionally scans the GDScript source for the vocabularies below. It lives here rather than as a const in Content.gd because both readers need it and a hand-synced second copy would drift; data/*.json is also the only path the export presets ship, so this is the only place the device pass can read it from. Content.load_all() globs the subdirectories, never data/ itself, so this file is not mistaken for content.",
-
   "_paths": "Locator grammar, shared by 'files' and 'runtime'. A path is dot-separated segments: 'name' takes a field, 'name[]' takes a field and expands the list, 'name{}' takes a field and expands the dictionary's values, '[]' and '{}' on their own expand what the previous segment produced (so 'loot{}.[]' is every entry of every loot table), and a bare '.' means the record itself. A 'runtime' path's first segment names a property on Content. A path that selects nothing is reported: a locator typo otherwise validates an empty set and looks like a pass.",
-
   "vocabulary": {
-    "_comment": "Words the engine implements. validate_data.py re-derives each of these from the GDScript source and fails if this list and the source disagree, so the schema cannot quietly go stale — that is the whole point of having a build-time tool as well as a runtime one.",
-
-    "ops": ["set", "add", "mul", "min", "max"],
-    "when_keys": ["tier_gte", "tier_lte", "phase", "region", "kind", "axis", "chapter_gte", "has_relic", "hp_below"],
-    "hooks": ["on_run_start", "on_area_enter", "on_area_clear", "on_task_complete"],
-    "hook_effects": ["grit", "item", "deadline", "log"],
-    "spite_effects": ["grit", "item", "steal_item", "trinket", "reveal_area", "hide_area", "deadline"],
-    "item_uses": ["keep_streak", "extend_deadline", "ward", "skip_to_threshold", "reveal_area", "full_scale", "guarantee_kind_spite", "reveal_echo"],
-    "item_where": ["home", "run", "auto"],
-    "wheel_reqs": ["axis_tasks", "all_axes_ring", "streak", "echoes_all", "loops", "chapter"],
-    "screens": ["title", "menu", "palace", "gym", "workshop", "stores", "hearth", "observatory", "area", "overworld", "worldmap", "task", "boon", "event", "summary", "codex", "wheel", "inventory"],
-
-    "node_types": ["task", "free", "threshold", "echo", "cache", "mirror", "trinket", "spite", "warden"],
-    "loot_types": ["grit", "echo", "trinket", "item"],
-    "side_types": ["task", "echo", "cache", "mirror", "trinket", "spite"],
-    "movement_tokens": ["$same"],
-    "movement_token_prefixes": ["$choose:", "$other:"],
-    "unit_tokens": ["$set"],
-
+    "_comment": "Words the engine implements. validate_data.py re-derives each of these from the GDScript source and fails if this list and the source disagree, so the schema cannot quietly go stale \u2014 that is the whole point of having a build-time tool as well as a runtime one.",
+    "ops": [
+      "set",
+      "add",
+      "mul",
+      "min",
+      "max"
+    ],
+    "when_keys": [
+      "tier_gte",
+      "tier_lte",
+      "phase",
+      "region",
+      "kind",
+      "axis",
+      "chapter_gte",
+      "has_relic",
+      "hp_below",
+      "has_tag",
+      "lacks_tag"
+    ],
+    "hooks": [
+      "on_run_start",
+      "on_area_enter",
+      "on_area_clear",
+      "on_task_complete"
+    ],
+    "hook_effects": [
+      "grit",
+      "item",
+      "deadline",
+      "log"
+    ],
+    "spite_effects": [
+      "grit",
+      "item",
+      "steal_item",
+      "trinket",
+      "reveal_area",
+      "hide_area",
+      "deadline"
+    ],
+    "item_uses": [
+      "keep_streak",
+      "extend_deadline",
+      "ward",
+      "skip_to_threshold",
+      "reveal_area",
+      "full_scale",
+      "guarantee_kind_spite",
+      "reveal_echo",
+      "resume_run"
+    ],
+    "item_where": [
+      "home",
+      "run",
+      "auto"
+    ],
+    "wheel_reqs": [
+      "axis_tasks",
+      "all_axes_ring",
+      "streak",
+      "echoes_all",
+      "loops",
+      "chapter"
+    ],
+    "screens": [
+      "title",
+      "menu",
+      "palace",
+      "gym",
+      "workshop",
+      "stores",
+      "hearth",
+      "observatory",
+      "area",
+      "overworld",
+      "worldmap",
+      "task",
+      "boon",
+      "event",
+      "summary",
+      "codex",
+      "wheel",
+      "inventory"
+    ],
+    "node_types": [
+      "task",
+      "free",
+      "threshold",
+      "echo",
+      "cache",
+      "mirror",
+      "trinket",
+      "spite",
+      "warden"
+    ],
+    "loot_types": [
+      "grit",
+      "echo",
+      "trinket",
+      "item"
+    ],
+    "side_types": [
+      "task",
+      "echo",
+      "cache",
+      "mirror",
+      "trinket",
+      "spite"
+    ],
+    "movement_tokens": [
+      "$same"
+    ],
+    "movement_token_prefixes": [
+      "$choose:",
+      "$other:"
+    ],
+    "unit_tokens": [
+      "$set"
+    ],
     "_dynamic_key_fields": "Data fields whose *value* is a Rules key resolved at runtime rather than written as a literal in the source. Game.gd rolls loot with Rules.value(String(entry['scaled_by'])), so a key that only ever appears in a scaled_by field is genuinely read even though no literal call names it. validate_data.py cross-checks this list against the non-literal Rules.value() call sites it finds, so adding a second dynamic reader without listing it here is itself an error.",
-    "dynamic_key_fields": ["scaled_by"]
+    "dynamic_key_fields": [
+      "scaled_by"
+    ]
   },
-
   "types": {
     "themes": {
-      "files": { "dir": "themes", "paths": ["."] },
-      "runtime": ["themes{}"],
-      "required": ["id", "name", "colors", "labels", "glyphs"],
-      "optional": ["desc", "unlocked_by_default", "unlock_cost", "mountain_line", "backdrops", "palace_backdrops", "palace_colors", "font_display"]
+      "files": {
+        "dir": "themes",
+        "paths": [
+          "."
+        ]
+      },
+      "runtime": [
+        "themes{}"
+      ],
+      "required": [
+        "id",
+        "name",
+        "colors",
+        "labels",
+        "glyphs"
+      ],
+      "optional": [
+        "desc",
+        "unlocked_by_default",
+        "unlock_cost",
+        "mountain_line",
+        "backdrops",
+        "palace_backdrops",
+        "palace_colors",
+        "font_display"
+      ]
     },
-
     "rulesets": {
-      "files": { "dir": "rulesets", "paths": ["."] },
-      "runtime": ["rulesets{}"],
-      "required": ["id", "name"],
-      "optional": ["desc", "unlocked_by_default", "unlock_cost", "modifiers", "hooks"]
+      "files": {
+        "dir": "rulesets",
+        "paths": [
+          "."
+        ]
+      },
+      "runtime": [
+        "rulesets{}"
+      ],
+      "required": [
+        "id",
+        "name"
+      ],
+      "optional": [
+        "desc",
+        "unlocked_by_default",
+        "unlock_cost",
+        "modifiers",
+        "hooks"
+      ]
     },
-
     "areas": {
-      "files": { "dir": "areas", "paths": ["."] },
-      "runtime": ["areas{}"],
-      "required": ["id", "name", "nodes"],
-      "optional": ["intro", "outro", "slots"]
+      "files": {
+        "dir": "areas",
+        "paths": [
+          "."
+        ]
+      },
+      "runtime": [
+        "areas{}"
+      ],
+      "required": [
+        "id",
+        "name",
+        "nodes"
+      ],
+      "optional": [
+        "intro",
+        "outro",
+        "slots"
+      ]
     },
-
     "anomalies": {
-      "_comment": "Anomalies are areas in every structural respect — same nodes, same slots — so the graph pass treats them together with areas and their ids share the area id space.",
-      "files": { "dir": "content", "paths": ["anomalies[]"] },
-      "runtime": ["anomalies[]"],
+      "_comment": "Anomalies are areas in every structural respect \u2014 same nodes, same slots \u2014 so the graph pass treats them together with areas and their ids share the area id space.",
+      "files": {
+        "dir": "content",
+        "paths": [
+          "anomalies[]"
+        ]
+      },
+      "runtime": [
+        "anomalies[]"
+      ],
       "id_space": "areas",
-      "required": ["id", "name", "tier", "weight", "nodes"],
-      "optional": ["intro", "outro", "slots"]
+      "required": [
+        "id",
+        "name",
+        "tier",
+        "weight",
+        "nodes"
+      ],
+      "optional": [
+        "intro",
+        "outro",
+        "slots"
+      ]
     },
-
     "nodes": {
-      "files": { "dir": "areas", "paths": ["nodes[]"], "also": [{ "dir": "content", "paths": ["anomalies[].nodes[]"] }] },
-      "runtime": ["areas{}.nodes[]", "anomalies[].nodes[]"],
+      "files": {
+        "dir": "areas",
+        "paths": [
+          "nodes[]"
+        ],
+        "also": [
+          {
+            "dir": "content",
+            "paths": [
+              "anomalies[].nodes[]"
+            ]
+          }
+        ]
+      },
+      "runtime": [
+        "areas{}.nodes[]",
+        "anomalies[].nodes[]"
+      ],
       "unique_ids": false,
-      "required": ["id", "type"],
-      "optional": ["label", "text", "task", "grit", "loot", "next", "grants", "exclusive_next", "side_of"],
-      "enum": { "type": "node_types" },
-      "refs": { "loot": "loot" }
+      "required": [
+        "id",
+        "type"
+      ],
+      "optional": [
+        "label",
+        "text",
+        "task",
+        "grit",
+        "loot",
+        "next",
+        "grants",
+        "exclusive_next",
+        "side_of"
+      ],
+      "enum": {
+        "type": "node_types"
+      },
+      "refs": {
+        "loot": "loot"
+      }
     },
-
     "tasks": {
-      "files": { "dir": "areas", "paths": ["nodes[].task"], "also": [{ "dir": "content", "paths": ["anomalies[].nodes[].task"] }] },
-      "runtime": ["areas{}.nodes[].task", "anomalies[].nodes[].task"],
-      "required": ["movement", "units"],
+      "files": {
+        "dir": "areas",
+        "paths": [
+          "nodes[].task"
+        ],
+        "also": [
+          {
+            "dir": "content",
+            "paths": [
+              "anomalies[].nodes[].task"
+            ]
+          }
+        ]
+      },
+      "runtime": [
+        "areas{}.nodes[].task",
+        "anomalies[].nodes[].task"
+      ],
+      "required": [
+        "movement",
+        "units"
+      ],
       "optional": [],
-      "token_ref": { "movement": "movements" },
-      "token_enum": { "units": "unit_tokens" }
+      "token_ref": {
+        "movement": "movements"
+      },
+      "token_enum": {
+        "units": "unit_tokens"
+      }
     },
-
     "slots": {
-      "files": { "dir": "areas", "paths": ["slots[]"], "also": [{ "dir": "content", "paths": ["anomalies[].slots[]"] }] },
-      "runtime": ["areas{}.slots[]", "anomalies[].slots[]"],
-      "required": ["chance", "table"],
-      "optional": ["attach"]
+      "files": {
+        "dir": "areas",
+        "paths": [
+          "slots[]"
+        ],
+        "also": [
+          {
+            "dir": "content",
+            "paths": [
+              "anomalies[].slots[]"
+            ]
+          }
+        ]
+      },
+      "runtime": [
+        "areas{}.slots[]",
+        "anomalies[].slots[]"
+      ],
+      "required": [
+        "chance",
+        "table"
+      ],
+      "optional": [
+        "attach"
+      ]
     },
-
     "slot_entries": {
-      "files": { "dir": "areas", "paths": ["slots[].table[]"], "also": [{ "dir": "content", "paths": ["anomalies[].slots[].table[]"] }] },
-      "runtime": ["areas{}.slots[].table[]", "anomalies[].slots[].table[]"],
-      "required": ["type", "w"],
-      "optional": ["label", "text", "movement", "units", "grit"],
-      "enum": { "type": "side_types" },
-      "token_ref": { "movement": "movements" },
-      "token_enum": { "units": "unit_tokens" }
+      "files": {
+        "dir": "areas",
+        "paths": [
+          "slots[].table[]"
+        ],
+        "also": [
+          {
+            "dir": "content",
+            "paths": [
+              "anomalies[].slots[].table[]"
+            ]
+          }
+        ]
+      },
+      "runtime": [
+        "areas{}.slots[].table[]",
+        "anomalies[].slots[].table[]"
+      ],
+      "required": [
+        "type",
+        "w"
+      ],
+      "optional": [
+        "label",
+        "text",
+        "movement",
+        "units",
+        "grit"
+      ],
+      "enum": {
+        "type": "side_types"
+      },
+      "token_ref": {
+        "movement": "movements"
+      },
+      "token_enum": {
+        "units": "unit_tokens"
+      }
     },
-
     "movements": {
-      "files": { "dir": "movements", "paths": ["movements[]", "packs[].movements[]"] },
-      "runtime": ["movements{}"],
-      "required": ["id", "name", "axis", "unit", "set", "seconds_per_unit"],
-      "optional": ["cue", "scaling", "pack"],
-      "refs": { "axis": "axes" }
+      "files": {
+        "dir": "movements",
+        "paths": [
+          "movements[]",
+          "packs[].movements[]"
+        ]
+      },
+      "runtime": [
+        "movements{}"
+      ],
+      "required": [
+        "id",
+        "name",
+        "axis",
+        "unit",
+        "set",
+        "seconds_per_unit"
+      ],
+      "optional": [
+        "cue",
+        "scaling",
+        "pack"
+      ],
+      "refs": {
+        "axis": "axes"
+      }
     },
-
     "packs": {
-      "files": { "dir": "movements", "paths": ["pack", "packs[].pack"] },
-      "runtime": ["packs{}"],
-      "required": ["id", "name", "cost"],
-      "optional": ["desc", "min_chapter"]
+      "files": {
+        "dir": "movements",
+        "paths": [
+          "pack",
+          "packs[].pack"
+        ]
+      },
+      "runtime": [
+        "packs{}"
+      ],
+      "required": [
+        "id",
+        "name",
+        "cost"
+      ],
+      "optional": [
+        "desc",
+        "min_chapter"
+      ]
     },
-
     "echoes": {
-      "files": { "dir": "echoes", "paths": ["echoes[]"] },
-      "runtime": ["echoes[]"],
-      "required": ["id", "order", "title", "text"],
+      "files": {
+        "dir": "echoes",
+        "paths": [
+          "echoes[]"
+        ]
+      },
+      "runtime": [
+        "echoes[]"
+      ],
+      "required": [
+        "id",
+        "order",
+        "title",
+        "text"
+      ],
       "optional": []
     },
-
     "chapters": {
-      "files": { "dir": "content", "paths": ["chapters[]"] },
-      "runtime": ["chapters[]"],
-      "required": ["id", "area", "name", "axes", "deadline_hours", "blurb", "scene"],
+      "files": {
+        "dir": "content",
+        "paths": [
+          "chapters[]"
+        ]
+      },
+      "runtime": [
+        "chapters[]"
+      ],
+      "required": [
+        "id",
+        "area",
+        "name",
+        "axes",
+        "deadline_hours",
+        "blurb",
+        "scene"
+      ],
       "optional": [],
-      "refs": { "area": "areas", "axes": "axes" }
+      "refs": {
+        "area": "areas",
+        "axes": "axes"
+      }
     },
-
     "trinkets": {
-      "files": { "dir": "content", "paths": ["trinkets[]"] },
-      "runtime": ["trinkets{}"],
-      "required": ["id", "name", "desc"],
-      "optional": ["modifiers", "hooks"]
+      "files": {
+        "dir": "content",
+        "paths": [
+          "trinkets[]"
+        ]
+      },
+      "runtime": [
+        "trinkets{}"
+      ],
+      "required": [
+        "id",
+        "name",
+        "desc"
+      ],
+      "optional": [
+        "modifiers",
+        "hooks"
+      ]
     },
-
     "items": {
-      "files": { "dir": "content", "paths": ["items[]"] },
-      "runtime": ["items{}"],
-      "required": ["id", "name", "cost", "desc", "use", "where"],
-      "optional": ["amount"],
-      "enum": { "where": "item_where" }
+      "files": {
+        "dir": "content",
+        "paths": [
+          "items[]"
+        ]
+      },
+      "runtime": [
+        "items{}"
+      ],
+      "required": [
+        "id",
+        "name",
+        "cost",
+        "desc",
+        "use",
+        "where"
+      ],
+      "optional": [
+        "amount"
+      ],
+      "enum": {
+        "where": "item_where"
+      }
     },
-
     "upgrades": {
-      "files": { "dir": "content", "paths": ["upgrades[]"] },
-      "runtime": ["upgrades[]"],
-      "required": ["id", "name", "desc", "max_level", "cost", "modifiers"],
+      "files": {
+        "dir": "content",
+        "paths": [
+          "upgrades[]"
+        ]
+      },
+      "runtime": [
+        "upgrades[]"
+      ],
+      "required": [
+        "id",
+        "name",
+        "desc",
+        "max_level",
+        "cost",
+        "modifiers"
+      ],
       "optional": []
     },
-
     "rooms": {
-      "files": { "dir": "content", "paths": ["rooms[]"] },
-      "runtime": ["rooms[]"],
-      "required": ["id", "name", "glyph", "cost", "screen", "desc", "adjacency"],
-      "optional": ["starter"],
-      "enum": { "screen": "screens" },
-      "enum_extra": { "screen": [""] },
-      "key_refs": { "adjacency": "rooms" }
+      "files": {
+        "dir": "content",
+        "paths": [
+          "rooms[]"
+        ]
+      },
+      "runtime": [
+        "rooms[]"
+      ],
+      "required": [
+        "id",
+        "name",
+        "glyph",
+        "cost",
+        "screen",
+        "desc",
+        "adjacency"
+      ],
+      "optional": [
+        "starter"
+      ],
+      "enum": {
+        "screen": "screens"
+      },
+      "enum_extra": {
+        "screen": [
+          ""
+        ]
+      },
+      "key_refs": {
+        "adjacency": "rooms"
+      }
     },
-
     "room_adjacency": {
-      "files": { "dir": "content", "paths": ["rooms[].adjacency{}"] },
-      "runtime": ["rooms[].adjacency{}"],
-      "required": ["desc", "modifiers"],
+      "files": {
+        "dir": "content",
+        "paths": [
+          "rooms[].adjacency{}"
+        ]
+      },
+      "runtime": [
+        "rooms[].adjacency{}"
+      ],
+      "required": [
+        "desc",
+        "modifiers"
+      ],
       "optional": []
     },
-
     "axes": {
-      "files": { "dir": "content", "paths": ["axes[]"] },
-      "runtime": ["achievements.axes[]"],
-      "required": ["id", "name", "angle", "desc"],
+      "files": {
+        "dir": "content",
+        "paths": [
+          "axes[]"
+        ]
+      },
+      "runtime": [
+        "achievements.axes[]"
+      ],
+      "required": [
+        "id",
+        "name",
+        "angle",
+        "desc"
+      ],
       "optional": []
     },
-
     "wheel_rings": {
-      "files": { "dir": "content", "paths": ["rings[]"] },
-      "runtime": ["achievements.rings[]"],
-      "required": ["ring", "count", "suffix", "resolve"],
+      "files": {
+        "dir": "content",
+        "paths": [
+          "rings[]"
+        ]
+      },
+      "runtime": [
+        "achievements.rings[]"
+      ],
+      "required": [
+        "ring",
+        "count",
+        "suffix",
+        "resolve"
+      ],
       "optional": []
     },
-
     "wheel_specials": {
-      "files": { "dir": "content", "paths": ["special[]", "centre"] },
-      "runtime": ["achievements.special[]", "achievements.centre"],
-      "required": ["id", "name", "desc", "req", "resolve"],
-      "optional": ["modifiers"],
+      "files": {
+        "dir": "content",
+        "paths": [
+          "special[]",
+          "centre"
+        ]
+      },
+      "runtime": [
+        "achievements.special[]",
+        "achievements.centre"
+      ],
+      "required": [
+        "id",
+        "name",
+        "desc",
+        "req",
+        "resolve"
+      ],
+      "optional": [
+        "modifiers"
+      ],
       "req_type_vocab": "wheel_reqs"
     },
-
     "spite_alters": {
-      "files": { "dir": "content", "paths": ["spite.alters[]"] },
-      "runtime": ["spite.alters[]"],
-      "required": ["id", "name", "line"],
+      "files": {
+        "dir": "content",
+        "paths": [
+          "spite.alters[]"
+        ]
+      },
+      "runtime": [
+        "spite.alters[]"
+      ],
+      "required": [
+        "id",
+        "name",
+        "line"
+      ],
       "optional": []
     },
-
     "spite_events": {
-      "files": { "dir": "content", "paths": ["spite.events[]"] },
-      "runtime": ["spite.events[]"],
-      "required": ["alter", "weight", "text", "effect"],
+      "files": {
+        "dir": "content",
+        "paths": [
+          "spite.events[]"
+        ]
+      },
+      "runtime": [
+        "spite.events[]"
+      ],
+      "required": [
+        "alter",
+        "weight",
+        "text",
+        "effect"
+      ],
       "optional": [],
-      "refs": { "alter": "spite_alters" },
+      "refs": {
+        "alter": "spite_alters"
+      },
       "effect_vocab": "spite_effects"
     },
-
     "loot_entries": {
-      "files": { "dir": "content", "paths": ["loot{}.[]"] },
-      "runtime": ["loot{}.[]"],
-      "required": ["type", "w"],
-      "optional": ["amount", "scaled_by"],
-      "enum": { "type": "loot_types" },
-      "refs": { "scaled_by": "config_keys" }
+      "files": {
+        "dir": "content",
+        "paths": [
+          "loot{}.[]"
+        ]
+      },
+      "runtime": [
+        "loot{}.[]"
+      ],
+      "required": [
+        "type",
+        "w"
+      ],
+      "optional": [
+        "amount",
+        "scaled_by"
+      ],
+      "enum": {
+        "type": "loot_types"
+      },
+      "refs": {
+        "scaled_by": "config_keys"
+      }
     }
   },
-
   "world": {
     "_comment": "data/world/overworld.json is not loaded by Content (World.gd reads it), so only the file-side tool checks it. The prop check is the one that has already bitten: a prop whose biome the generator never produces is correct, drawn, and invisible.",
-    "required": ["w", "h", "ring_width", "max_tier", "centre", "spawn", "regions", "anomalies", "tiles_b64_deflate", "elevation_b64_deflate", "props_b64_deflate", "blocked_b64_deflate", "cliffs_b64_deflate", "terrace_levels"],
+    "required": [
+      "w",
+      "h",
+      "ring_width",
+      "max_tier",
+      "centre",
+      "spawn",
+      "regions",
+      "anomalies",
+      "tiles_b64_deflate",
+      "elevation_b64_deflate",
+      "props_b64_deflate",
+      "blocked_b64_deflate",
+      "cliffs_b64_deflate",
+      "terrace_levels"
+    ],
     "region_refs": "areas",
     "anomaly_area_refs": "areas",
     "_scatter_excluded": "scatter_props() in tools/make_world.py refuses to place on these materials, so a prop declaring one of them as its biome can never appear even though the world is full of them.",
-    "scatter_excluded_materials": ["path_dirt", "door", "bridge"]
+    "scatter_excluded_materials": [
+      "path_dirt",
+      "door",
+      "bridge"
+    ]
   }
 }
