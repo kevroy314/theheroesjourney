@@ -441,7 +441,7 @@
         {
           "name": "biome",
           "type": "string",
-          "value": "forest"
+          "value": "grass_short"
         },
         {
           "name": "solid",
@@ -471,7 +471,7 @@
         {
           "name": "biome",
           "type": "string",
-          "value": "forest"
+          "value": "grass_short"
         },
         {
           "name": "solid",
@@ -531,7 +531,7 @@
         {
           "name": "biome",
           "type": "string",
-          "value": "forest"
+          "value": "grass_tall"
         },
         {
           "name": "solid",
@@ -561,7 +561,7 @@
         {
           "name": "biome",
           "type": "string",
-          "value": "forest"
+          "value": "grass_tall"
         },
         {
           "name": "solid",
@@ -591,7 +591,7 @@
         {
           "name": "biome",
           "type": "string",
-          "value": "forest"
+          "value": "grass_tall"
         },
         {
           "name": "solid",
@@ -771,7 +771,7 @@
         {
           "name": "biome",
           "type": "string",
-          "value": "water"
+          "value": "sand"
         },
         {
           "name": "solid",
@@ -2097,6 +2097,36 @@
           "name": "solid",
           "type": "bool",
           "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 70,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "tree_windswept"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "scree"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
         },
         {
           "name": "foot_w",
