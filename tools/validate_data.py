@@ -879,19 +879,36 @@ def world_pass(report, docs, schema):
                      "tiles plane is %d bytes, expected %d (w*h)" % (len(grid), width * height))
         return
 
-    # A prop scatters only onto cells that are of its biome, walkable, and not
-    # road or doorway -- see scatter_props() in tools/make_world.py. Counting raw
-    # cells of the material is not enough: it is what tools/add_prop.py does, and
-    # it passes `forest`, which has 8590 cells and is not walkable, so not one
-    # forest prop has ever been placed.
+    # A prop scatters only onto cells that are of its biome, walkable, and not a
+    # doorway or a bridge -- see scatter_props() in tools/make_world.py. Counting
+    # raw cells of the material is not enough: it is what tools/add_prop.py does,
+    # and it passes `forest`, which has 8590 cells and is not walkable, so not
+    # one forest prop has ever been placed.
+    #
+    # And a road is excluded for SOME props and not others, which is why there
+    # are two counts and not one. A prop marked `flat` is texture lying on the
+    # ground -- grit, a rut, fallen leaves -- and a lane takes it; anything that
+    # stands up off the ground does not go in a lane the player walks down. With
+    # a single count this pass could not tell "declares path_dirt and can never
+    # appear" from "declares path_dirt and appears on every lane in the vale",
+    # and it warned about the second.
     excluded = {order.index(name) for name in spec["scatter_excluded_materials"]
                 if name in order}
-    placeable = {}
-    for material_id, name in enumerate(order):
-        if not walkable.get(name, False) or material_id in excluded:
-            placeable[name] = 0
-        else:
-            placeable[name] = grid.count(material_id)
+    standing_excluded = excluded | {
+        order.index(name)
+        for name in spec.get("scatter_excluded_standing_materials", [])
+        if name in order}
+
+    def placeable_on(name, flat):
+        material_id = order.index(name)
+        if not walkable.get(name, False):
+            return 0
+        if material_id in (excluded if flat else standing_excluded):
+            return 0
+        return grid.count(material_id)
+
+    placeable = {name: placeable_on(name, False) for name in order}
+    placeable_flat = {name: placeable_on(name, True) for name in order}
 
     # Ground truth beats inference. The world file carries the prop plane the
     # generator actually produced, so the honest question is "did this prop get
@@ -917,19 +934,24 @@ def world_pass(report, docs, schema):
             continue
         if plane and prop["id"] in present:
             continue                      # observed in the world; nothing to say
-        if placeable[biome] == 0 or plane:
+        room = (placeable_flat if prop.get("flat") else placeable)[biome]
+        if room == 0 or plane:
             total = grid.count(order.index(biome))
             if total == 0:
                 reason = "the world contains no %s at all" % biome
             elif not walkable.get(biome, False):
                 reason = "%s exists (%d cells) but is not walkable, and scatter_props " \
                          "only places on walkable cells" % (biome, total)
-            else:
+            elif prop.get("flat"):
                 reason = "%s exists (%d cells) but scatter_props refuses to place on it" \
                          % (biome, total)
-            if plane and placeable[biome] != 0:
+            else:
+                reason = ("%s exists (%d cells) but this prop stands up off the "
+                          "ground, and scatter_props keeps everything but flat "
+                          "texture out of a lane" % (biome, total))
+            if plane and room != 0:
                 reason = ("%s has %d placeable cells but the generator placed none "
-                          "-- density too low, or crowded out" % (biome, placeable[biome]))
+                          "-- density too low, or crowded out" % (biome, room))
             report.warn("assets/tiles/tiles.json",
                         "prop '%s' does not appear in the world: %s" % (prop["id"], reason))
 

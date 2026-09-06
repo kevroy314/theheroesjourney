@@ -1249,11 +1249,14 @@
     ],
     "region_refs": "areas",
     "anomaly_area_refs": "areas",
-    "_scatter_excluded": "scatter_props() in tools/make_world.py refuses to place on these materials, so a prop declaring one of them as its biome can never appear even though the world is full of them.",
+    "_scatter_excluded": "scatter_props() in tools/make_world.py refuses to place on these materials outright, so a prop declaring one of them as its biome can never appear even though the world is full of them. A doorway and a bridge take nothing at all: one is a gate and the other is planking that nothing grows on.",
+    "_scatter_excluded_standing": "And these it refuses only to a prop that STANDS UP -- anything not marked `flat` in assets/tiles/tiles.json. A road takes grit, ruts and fallen leaves, which is what the path_dirt scatter set is authored for; it does not take a boulder, because the player walks down it. Split from the list above when the road stopped being excluded outright: with one list the validator could not tell a prop that will never appear from one that appears on every lane in the vale.",
     "scatter_excluded_materials": [
-      "path_dirt",
       "door",
       "bridge"
+    ],
+    "scatter_excluded_standing_materials": [
+      "path_dirt"
     ],
     "_prop_light": "Where light comes from. A prop entry in assets/tiles/tiles.json may carry a `light`, and that is the whole contract between the art side and the lighting pass: the art declares WHERE a source is and what colour it is, and never renders one. Nothing in the tileset reads the key back. A source declared wrong is invisible rather than wrong-looking, which is exactly the failure this file exists to catch, so all three fields are required once the key is present.",
     "prop_light": {

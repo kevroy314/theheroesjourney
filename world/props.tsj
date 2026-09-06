@@ -1,12 +1,12 @@
 {
   "columns": 8,
   "image": "../assets/tiles/props.png",
-  "imageheight": 2976,
+  "imageheight": 3072,
   "imagewidth": 512,
   "margin": 0,
   "name": "props",
   "spacing": 0,
-  "tilecount": 248,
+  "tilecount": 256,
   "tiledversion": "1.12.2",
   "tileheight": 96,
   "tiles": [
@@ -4156,6 +4156,216 @@
         {
           "name": "name",
           "type": "string",
+          "value": "path_dirt_bits_5"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_6"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_7"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_8"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "floor_stone_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "floor_stone"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 143,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "floor_stone_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "floor_stone"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "floor_stone_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "floor_stone"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 145,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
           "value": "grass_tuft_v2"
         },
         {
@@ -4181,7 +4391,7 @@
       ]
     },
     {
-      "id": 139,
+      "id": 146,
       "properties": [
         {
           "name": "name",
@@ -4211,7 +4421,7 @@
       ]
     },
     {
-      "id": 140,
+      "id": 147,
       "properties": [
         {
           "name": "name",
@@ -4241,7 +4451,7 @@
       ]
     },
     {
-      "id": 141,
+      "id": 148,
       "properties": [
         {
           "name": "name",
@@ -4271,7 +4481,7 @@
       ]
     },
     {
-      "id": 142,
+      "id": 149,
       "properties": [
         {
           "name": "name",
@@ -4301,7 +4511,7 @@
       ]
     },
     {
-      "id": 143,
+      "id": 150,
       "properties": [
         {
           "name": "name",
@@ -4331,7 +4541,7 @@
       ]
     },
     {
-      "id": 144,
+      "id": 151,
       "properties": [
         {
           "name": "name",
@@ -4361,7 +4571,7 @@
       ]
     },
     {
-      "id": 145,
+      "id": 152,
       "properties": [
         {
           "name": "name",
@@ -4391,7 +4601,7 @@
       ]
     },
     {
-      "id": 146,
+      "id": 153,
       "properties": [
         {
           "name": "name",
@@ -4421,7 +4631,7 @@
       ]
     },
     {
-      "id": 147,
+      "id": 154,
       "properties": [
         {
           "name": "name",
@@ -4451,7 +4661,7 @@
       ]
     },
     {
-      "id": 148,
+      "id": 155,
       "properties": [
         {
           "name": "name",
@@ -4481,7 +4691,7 @@
       ]
     },
     {
-      "id": 149,
+      "id": 156,
       "properties": [
         {
           "name": "name",
@@ -4511,7 +4721,7 @@
       ]
     },
     {
-      "id": 150,
+      "id": 157,
       "properties": [
         {
           "name": "name",
@@ -4541,7 +4751,7 @@
       ]
     },
     {
-      "id": 151,
+      "id": 158,
       "properties": [
         {
           "name": "name",
@@ -4571,7 +4781,7 @@
       ]
     },
     {
-      "id": 152,
+      "id": 159,
       "properties": [
         {
           "name": "name",
@@ -4601,7 +4811,7 @@
       ]
     },
     {
-      "id": 153,
+      "id": 160,
       "properties": [
         {
           "name": "name",
@@ -4631,7 +4841,7 @@
       ]
     },
     {
-      "id": 154,
+      "id": 161,
       "properties": [
         {
           "name": "name",
@@ -4661,7 +4871,7 @@
       ]
     },
     {
-      "id": 155,
+      "id": 162,
       "properties": [
         {
           "name": "name",
@@ -4691,7 +4901,7 @@
       ]
     },
     {
-      "id": 156,
+      "id": 163,
       "properties": [
         {
           "name": "name",
@@ -4721,7 +4931,7 @@
       ]
     },
     {
-      "id": 157,
+      "id": 164,
       "properties": [
         {
           "name": "name",
@@ -4751,7 +4961,7 @@
       ]
     },
     {
-      "id": 158,
+      "id": 165,
       "properties": [
         {
           "name": "name",
@@ -4781,7 +4991,7 @@
       ]
     },
     {
-      "id": 159,
+      "id": 166,
       "properties": [
         {
           "name": "name",
@@ -4811,7 +5021,7 @@
       ]
     },
     {
-      "id": 160,
+      "id": 167,
       "properties": [
         {
           "name": "name",
@@ -4841,7 +5051,7 @@
       ]
     },
     {
-      "id": 161,
+      "id": 168,
       "properties": [
         {
           "name": "name",
@@ -4871,7 +5081,7 @@
       ]
     },
     {
-      "id": 162,
+      "id": 169,
       "properties": [
         {
           "name": "name",
@@ -4901,7 +5111,7 @@
       ]
     },
     {
-      "id": 163,
+      "id": 170,
       "properties": [
         {
           "name": "name",
@@ -4931,7 +5141,7 @@
       ]
     },
     {
-      "id": 164,
+      "id": 171,
       "properties": [
         {
           "name": "name",
@@ -4961,7 +5171,7 @@
       ]
     },
     {
-      "id": 165,
+      "id": 172,
       "properties": [
         {
           "name": "name",
@@ -4991,7 +5201,7 @@
       ]
     },
     {
-      "id": 166,
+      "id": 173,
       "properties": [
         {
           "name": "name",
@@ -5021,7 +5231,7 @@
       ]
     },
     {
-      "id": 167,
+      "id": 174,
       "properties": [
         {
           "name": "name",
@@ -5051,7 +5261,7 @@
       ]
     },
     {
-      "id": 168,
+      "id": 175,
       "properties": [
         {
           "name": "name",
@@ -5081,7 +5291,7 @@
       ]
     },
     {
-      "id": 169,
+      "id": 176,
       "properties": [
         {
           "name": "name",
@@ -5111,7 +5321,7 @@
       ]
     },
     {
-      "id": 170,
+      "id": 177,
       "properties": [
         {
           "name": "name",
@@ -5141,7 +5351,7 @@
       ]
     },
     {
-      "id": 171,
+      "id": 178,
       "properties": [
         {
           "name": "name",
@@ -5171,7 +5381,7 @@
       ]
     },
     {
-      "id": 172,
+      "id": 179,
       "properties": [
         {
           "name": "name",
@@ -5201,7 +5411,7 @@
       ]
     },
     {
-      "id": 173,
+      "id": 180,
       "properties": [
         {
           "name": "name",
@@ -5231,7 +5441,7 @@
       ]
     },
     {
-      "id": 174,
+      "id": 181,
       "properties": [
         {
           "name": "name",
@@ -5261,7 +5471,7 @@
       ]
     },
     {
-      "id": 175,
+      "id": 182,
       "properties": [
         {
           "name": "name",
@@ -5291,7 +5501,7 @@
       ]
     },
     {
-      "id": 176,
+      "id": 183,
       "properties": [
         {
           "name": "name",
@@ -5321,7 +5531,7 @@
       ]
     },
     {
-      "id": 177,
+      "id": 184,
       "properties": [
         {
           "name": "name",
@@ -5351,7 +5561,7 @@
       ]
     },
     {
-      "id": 178,
+      "id": 185,
       "properties": [
         {
           "name": "name",
@@ -5381,7 +5591,7 @@
       ]
     },
     {
-      "id": 179,
+      "id": 186,
       "properties": [
         {
           "name": "name",
@@ -5411,7 +5621,7 @@
       ]
     },
     {
-      "id": 180,
+      "id": 187,
       "properties": [
         {
           "name": "name",
@@ -5441,7 +5651,7 @@
       ]
     },
     {
-      "id": 181,
+      "id": 188,
       "properties": [
         {
           "name": "name",
@@ -5471,7 +5681,7 @@
       ]
     },
     {
-      "id": 182,
+      "id": 189,
       "properties": [
         {
           "name": "name",
@@ -5501,7 +5711,7 @@
       ]
     },
     {
-      "id": 183,
+      "id": 190,
       "properties": [
         {
           "name": "name",
@@ -5531,7 +5741,7 @@
       ]
     },
     {
-      "id": 184,
+      "id": 191,
       "properties": [
         {
           "name": "name",
@@ -5561,7 +5771,7 @@
       ]
     },
     {
-      "id": 185,
+      "id": 192,
       "properties": [
         {
           "name": "name",
@@ -5591,7 +5801,7 @@
       ]
     },
     {
-      "id": 186,
+      "id": 193,
       "properties": [
         {
           "name": "name",
@@ -5621,7 +5831,7 @@
       ]
     },
     {
-      "id": 187,
+      "id": 194,
       "properties": [
         {
           "name": "name",
@@ -5651,7 +5861,7 @@
       ]
     },
     {
-      "id": 188,
+      "id": 195,
       "properties": [
         {
           "name": "name",
@@ -5681,7 +5891,7 @@
       ]
     },
     {
-      "id": 189,
+      "id": 196,
       "properties": [
         {
           "name": "name",
@@ -5711,7 +5921,7 @@
       ]
     },
     {
-      "id": 190,
+      "id": 197,
       "properties": [
         {
           "name": "name",
@@ -5741,7 +5951,7 @@
       ]
     },
     {
-      "id": 191,
+      "id": 198,
       "properties": [
         {
           "name": "name",
@@ -5771,7 +5981,7 @@
       ]
     },
     {
-      "id": 192,
+      "id": 199,
       "properties": [
         {
           "name": "name",
@@ -5801,7 +6011,7 @@
       ]
     },
     {
-      "id": 193,
+      "id": 200,
       "properties": [
         {
           "name": "name",
@@ -5831,7 +6041,7 @@
       ]
     },
     {
-      "id": 194,
+      "id": 201,
       "properties": [
         {
           "name": "name",
@@ -5861,7 +6071,7 @@
       ]
     },
     {
-      "id": 195,
+      "id": 202,
       "properties": [
         {
           "name": "name",
@@ -5891,7 +6101,7 @@
       ]
     },
     {
-      "id": 196,
+      "id": 203,
       "properties": [
         {
           "name": "name",
@@ -5921,7 +6131,7 @@
       ]
     },
     {
-      "id": 197,
+      "id": 204,
       "properties": [
         {
           "name": "name",
@@ -5951,7 +6161,7 @@
       ]
     },
     {
-      "id": 198,
+      "id": 205,
       "properties": [
         {
           "name": "name",
@@ -5981,7 +6191,7 @@
       ]
     },
     {
-      "id": 199,
+      "id": 206,
       "properties": [
         {
           "name": "name",
@@ -6011,7 +6221,7 @@
       ]
     },
     {
-      "id": 200,
+      "id": 207,
       "properties": [
         {
           "name": "name",
@@ -6041,7 +6251,7 @@
       ]
     },
     {
-      "id": 201,
+      "id": 208,
       "properties": [
         {
           "name": "name",
@@ -6071,7 +6281,7 @@
       ]
     },
     {
-      "id": 202,
+      "id": 209,
       "properties": [
         {
           "name": "name",
@@ -6101,7 +6311,7 @@
       ]
     },
     {
-      "id": 203,
+      "id": 210,
       "properties": [
         {
           "name": "name",
@@ -6131,7 +6341,7 @@
       ]
     },
     {
-      "id": 204,
+      "id": 211,
       "properties": [
         {
           "name": "name",
@@ -6161,7 +6371,7 @@
       ]
     },
     {
-      "id": 205,
+      "id": 212,
       "properties": [
         {
           "name": "name",
@@ -6191,7 +6401,7 @@
       ]
     },
     {
-      "id": 206,
+      "id": 213,
       "properties": [
         {
           "name": "name",
@@ -6221,7 +6431,7 @@
       ]
     },
     {
-      "id": 207,
+      "id": 214,
       "properties": [
         {
           "name": "name",
@@ -6251,7 +6461,7 @@
       ]
     },
     {
-      "id": 208,
+      "id": 215,
       "properties": [
         {
           "name": "name",
@@ -6281,7 +6491,7 @@
       ]
     },
     {
-      "id": 209,
+      "id": 216,
       "properties": [
         {
           "name": "name",
@@ -6311,7 +6521,7 @@
       ]
     },
     {
-      "id": 210,
+      "id": 217,
       "properties": [
         {
           "name": "name",
@@ -6341,7 +6551,7 @@
       ]
     },
     {
-      "id": 211,
+      "id": 218,
       "properties": [
         {
           "name": "name",
@@ -6371,7 +6581,7 @@
       ]
     },
     {
-      "id": 212,
+      "id": 219,
       "properties": [
         {
           "name": "name",
@@ -6401,7 +6611,7 @@
       ]
     },
     {
-      "id": 213,
+      "id": 220,
       "properties": [
         {
           "name": "name",
@@ -6431,7 +6641,7 @@
       ]
     },
     {
-      "id": 214,
+      "id": 221,
       "properties": [
         {
           "name": "name",
@@ -6461,7 +6671,7 @@
       ]
     },
     {
-      "id": 215,
+      "id": 222,
       "properties": [
         {
           "name": "name",
@@ -6491,7 +6701,7 @@
       ]
     },
     {
-      "id": 216,
+      "id": 223,
       "properties": [
         {
           "name": "name",
@@ -6521,7 +6731,7 @@
       ]
     },
     {
-      "id": 217,
+      "id": 224,
       "properties": [
         {
           "name": "name",
@@ -6551,7 +6761,7 @@
       ]
     },
     {
-      "id": 218,
+      "id": 225,
       "properties": [
         {
           "name": "name",
@@ -6581,7 +6791,7 @@
       ]
     },
     {
-      "id": 219,
+      "id": 226,
       "properties": [
         {
           "name": "name",
@@ -6611,7 +6821,7 @@
       ]
     },
     {
-      "id": 220,
+      "id": 227,
       "properties": [
         {
           "name": "name",
@@ -6641,7 +6851,7 @@
       ]
     },
     {
-      "id": 221,
+      "id": 228,
       "properties": [
         {
           "name": "name",
@@ -6671,7 +6881,7 @@
       ]
     },
     {
-      "id": 222,
+      "id": 229,
       "properties": [
         {
           "name": "name",
@@ -6701,7 +6911,7 @@
       ]
     },
     {
-      "id": 223,
+      "id": 230,
       "properties": [
         {
           "name": "name",
@@ -6731,7 +6941,7 @@
       ]
     },
     {
-      "id": 224,
+      "id": 231,
       "properties": [
         {
           "name": "name",
@@ -6761,7 +6971,7 @@
       ]
     },
     {
-      "id": 225,
+      "id": 232,
       "properties": [
         {
           "name": "name",
@@ -6791,7 +7001,7 @@
       ]
     },
     {
-      "id": 226,
+      "id": 233,
       "properties": [
         {
           "name": "name",
@@ -6821,7 +7031,7 @@
       ]
     },
     {
-      "id": 227,
+      "id": 234,
       "properties": [
         {
           "name": "name",
@@ -6851,7 +7061,7 @@
       ]
     },
     {
-      "id": 228,
+      "id": 235,
       "properties": [
         {
           "name": "name",
@@ -6881,7 +7091,7 @@
       ]
     },
     {
-      "id": 229,
+      "id": 236,
       "properties": [
         {
           "name": "name",
@@ -6911,7 +7121,7 @@
       ]
     },
     {
-      "id": 230,
+      "id": 237,
       "properties": [
         {
           "name": "name",
@@ -6941,7 +7151,7 @@
       ]
     },
     {
-      "id": 231,
+      "id": 238,
       "properties": [
         {
           "name": "name",
@@ -6971,7 +7181,7 @@
       ]
     },
     {
-      "id": 232,
+      "id": 239,
       "properties": [
         {
           "name": "name",
@@ -7001,7 +7211,7 @@
       ]
     },
     {
-      "id": 233,
+      "id": 240,
       "properties": [
         {
           "name": "name",
@@ -7031,7 +7241,7 @@
       ]
     },
     {
-      "id": 234,
+      "id": 241,
       "properties": [
         {
           "name": "name",
@@ -7061,7 +7271,7 @@
       ]
     },
     {
-      "id": 235,
+      "id": 242,
       "properties": [
         {
           "name": "name",
@@ -7091,7 +7301,7 @@
       ]
     },
     {
-      "id": 236,
+      "id": 243,
       "properties": [
         {
           "name": "name",
@@ -7121,7 +7331,7 @@
       ]
     },
     {
-      "id": 237,
+      "id": 244,
       "properties": [
         {
           "name": "name",
@@ -7151,7 +7361,7 @@
       ]
     },
     {
-      "id": 238,
+      "id": 245,
       "properties": [
         {
           "name": "name",
@@ -7181,7 +7391,7 @@
       ]
     },
     {
-      "id": 239,
+      "id": 246,
       "properties": [
         {
           "name": "name",
@@ -7211,7 +7421,187 @@
       ]
     },
     {
-      "id": 240,
+      "id": 247,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "window_stone"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 248,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "window_timber"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 249,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "sign_bracket"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 250,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "chimney_brick"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 251,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "wall_base"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 252,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "roof_ridge"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 253,
       "properties": [
         {
           "name": "name",

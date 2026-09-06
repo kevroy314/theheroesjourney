@@ -65,7 +65,15 @@ N = 32          # tile size, px
 BLACK = (0, 0, 0)
 
 VARIANTS = 3    # seeded alternates per overlay case
-BASE_VARIANTS = 3   # alternate fills per material, beyond the base
+# Alternate fills per material, beyond the base, chosen by hash(x, y) in
+# TileWorld._draw_cell. Raised from 3 to 5 for issue #51: with four fills to
+# choose from, a run of one material repeats a given cell every fourth cell on
+# average, which at seven and a half tiles of viewport is twice per screen and
+# well inside what the eye locks onto. Six breaks that up without costing
+# anything the player can measure -- the whole variant sheet is 33 materials
+# wide, so two more rows is 2,112 more pixels and no new code at all, which is
+# the reason this is the first lever pulled rather than a new material.
+BASE_VARIANTS = 5
 
 # Standard 8x8 ordered (Bayer) matrix. Values 0..63. 32 % 8 == 0, so it tiles.
 BAYER8 = [
@@ -209,7 +217,23 @@ MATERIALS = {
     # the building reads as an extrusion from the ground rather than a painted
     # rectangle." The *cap* is the material; the face lives in the overlay set
     # and is drawn on the cell below. See _wall_overlay().
-    "wall_timber":   dict(hue=_hue((C["panel_alt"], 1.0), (C["accent"], 0.55), (C["muted"], 0.4)), mean=74, spread=16, walk=False, family="captop"),
+    #
+    # THE MEAN WAS 74 AND IT WAS THE LOUDEST THING WRONG WITH THE TOWN. That
+    # number was chosen for one room seen from inside, where a pale cap against
+    # a board floor at 42 reads as a wall catching the light. Six of the
+    # fifteen buildings in the vale are walled in it, and photographed from
+    # outside at 32 px a cap 50 luma above its own roof does not read as a wall
+    # at all -- it reads as a pale PEN with a dark floor in it, while the stone,
+    # brick and plaster buildings beside it read as solid slabs. Two idioms in
+    # one street, and the brief was that the town should have shared
+    # architecture.
+    #
+    # 26 puts it with the other three (22, 24, 26), so every building in the
+    # parish is now the same thing: a dark wall course with a roof laid inside
+    # it, differing by material and not by whether it is light or dark. It also
+    # brings it back inside §2.6 point 6 -- dark means you cannot go there --
+    # which this one material had been violating on its own since it was added.
+    "wall_timber":   dict(hue=_hue((C["panel_alt"], 1.0), (C["accent"], 0.55), (C["muted"], 0.4)), mean=26, spread=18, walk=False, family="captop"),
     # --- appended for the town. Ids 29..32, nothing renumbered.
     #
     # ONE ROOF FOR A WHOLE TOWN IS THE TELL. Fifteen buildings drawn in the one
@@ -572,6 +596,12 @@ def f_paving(name, v, r, rng):
     for (x, y) in joint:
         if lab[y][(x - 1) % N] != lab[y][x] and lab[(y - 1) % N][x] != lab[y][x]:
             px(img, x + 1, y + 1, r["mid"])
+    # Dirt trodden into the joints and damp where the square never dries.
+    # Without it the market square is 117 identical cells of even grey, which is
+    # issue #51 wearing flagstones -- a slab pattern re-rolls per variant but
+    # the *tone* of every tile is the same, and tone is what the eye averages
+    # over a whole screen.
+    mottle(img, rng, 2, 8, 14, (r["dark"], r["mid"]))
     speckle(img, rng, 22, r["dark"])
     return img
 
@@ -579,8 +609,18 @@ def f_paving(name, v, r, rng):
 def f_turf(name, v, r, rng):
     """Walkable ground. Cold, close to black-green: the difference between this
     and the path is hue, not brightness, because brightness belongs to the
-    character and to the things standing on the ground."""
+    character and to the things standing on the ground.
+
+    The other half of issue #51. The grain here was always fine -- three sizes
+    of speckle -- and fine grain is exactly what a large field cannot use: at
+    32 px every cell's noise averages to the same value, so a meadow reads as
+    one flat colour with a seam every tile where the mottle happens to stop. The
+    patches below are deliberately BIGGER than the tile (r0 = 9 against the old
+    5), because a patch larger than the tile cannot resolve inside one cell and
+    so has to be finished by its neighbours -- which is the only way a wrapped
+    32 px texture can carry a feature the eye reads as larger than 32 px."""
     img = canvas(r["base"])
+    mottle(img, rng, 2, 9, 15, (r["dark"], r["mid"]))
     mottle(img, rng, 3, 5, 9, (r["dark"], r["mid"]))
     speckle(img, rng, 190, r["dark"])
     speckle(img, rng, 120, r["mid"])
@@ -614,18 +654,38 @@ def f_blades(name, v, r, rng):
 
 def f_trodden(name, v, r, rng):
     """The trodden road. Warm where the grass is cold, and a step lighter --
-    §2.6 point 5, the road and the roof used to differ by 0.7 luma."""
+    §2.6 point 5, the road and the roof used to differ by 0.7 luma.
+
+    THERE ARE NO CART RUTS IN HERE ANY MORE, and that is half of issue #51. Two
+    of them used to be drawn the full 32 px height of the tile, so every dirt
+    cell in the world carried the same pair of dark verticals at the same two
+    columns and they joined end to end down the map -- corduroy, at a period the
+    eye locks onto in one glance. It cannot be fixed by jittering the rut,
+    because the fault is structural: a rut is a DIRECTIONAL feature and a
+    texture that repeats in both axes cannot carry one. Roads here run east,
+    north and diagonally, so a vertical rut is wrong on two thirds of them
+    anyway. The ruts are props now -- see the `path_dirt` scatter set, which
+    lies along the lane it belongs to and can be turned.
+
+    What is left is what beaten earth actually is at 32 px: worn and loose
+    patches at a scale LARGER than the tile, so neighbouring cells differ in
+    where the ground is packed rather than in nothing at all, plus grit."""
     img = canvas(r["base"])
     dither(img, r["dark"], r["base"], lambda x, y: 0.55)
-    for rx in (9 + v * 2, 22 - v):
-        wob = 0
-        for y in range(N):
-            wob += rng.choice((-1, 0, 0, 0, 1))
-            wob = max(-1, min(1, wob))
-            px(img, rx + wob, y, r["deep"])
-            px(img, rx + wob + 1, y, r["dark"])
-    speckle(img, rng, 34, r["lit"])
-    speckle(img, rng, 22, r["dark"])
+    # Two scales of patch, both wrapped toroidally. The big ones carry the
+    # variant apart from its neighbours; the small ones stop the big ones
+    # reading as a single lobe.
+    mottle(img, rng, 3, 7, 13, (r["dark"], r["mid"]))
+    mottle(img, rng, 4, 3, 6, (r["deep"], r["lit"]))
+    # Hollows where the water stands after rain. Drawn with blob() rather than
+    # mottle() because a hollow has a lit rim on the north and a dark one on the
+    # south, which is what makes it read as depth rather than as a smudge.
+    for _ in range(2 + v % 3):
+        blob(img, rng, rng.randrange(N), rng.randrange(N), rng.randint(3, 6),
+             r["dark"], r["mid"], r["deep"])
+    speckle(img, rng, 40, r["lit"])
+    speckle(img, rng, 26, r["dark"])
+    speckle(img, rng, 14, r["deep"])
     return img
 
 
@@ -1693,12 +1753,25 @@ def overlay_tile(mat, kind, mask, variant):
         elif lip == "wet":
             pxa(img, x, y, r["mid"] if lit_side else r["deep"])
         elif lip == "verge":
-            # A road has no crisp edge; it has a swept verge and loose gravel.
-            # So the lip is broken on purpose and the scatter does the work.
-            pxa(img, x, y, r["mid"] if lit_side else r["dark"])
+            # A LANE HAS TO READ AS A LANE. This was one broken line of mid and
+            # dark and nothing else, on the argument that a road has no crisp
+            # edge -- which is true of a track across open country and wrong in
+            # a village, where what is either side of the lane is a trodden yard
+            # of very nearly the same colour. Photographed at 32 px per cell the
+            # dirt streets simply were not findable: "no verge, no kerb, no edge
+            # treatment, so there is no way to tell a street from a bare patch."
+            #
+            # What the eye actually uses is the SHOULDER -- the ridge of packed
+            # earth the traffic pushes up at the edge of the metalling, lit on
+            # its north-west face and shadowed where the lane drops away behind
+            # it. Two rows: the shoulder itself on the lane's last cell, and a
+            # dark hairline immediately outside it. The loose gravel still
+            # scatters past that, so the edge is defined without being cut.
+            pxa(img, x, y, r["tip"] if lit_side else r["mid"])
             for dx, dy, _d in outs:
-                if rng.random() < 0.30:
-                    pxa(img, x + dx, y + dy, r["deep"])
+                pxa(img, x + dx, y + dy, r["deep"])
+                if rng.random() < 0.42:
+                    pxa(img, x + dx * 2, y + dy * 2, r["dark"])
         elif lip == "crack":
             pxa(img, x, y, r["deep"])
         elif lip == "thresh":
@@ -1928,6 +2001,12 @@ PP = {
     # is a stain rather than a mound.
     "snowpile": mkramp(_hue((C["muted"], 1.0), (C["accent_2"], 0.4)), 88, 26),
     "dustpile": mkramp(_hue((C["accent"], 1.0), (C["warn"], 0.9), (C["muted"], 0.3)), 84, 24),
+    # Fired clay, for the chimneys. `stone` is the wrong ramp for a stack -- a
+    # chimney is the one part of a thatched cottage that is not thatch or timber
+    # and it is brick everywhere, because it is the part that has to survive a
+    # fire. It is the wall_brick material's hue lifted into the prop range, so a
+    # brick building's stack and its walls are recognisably the same clay.
+    "brick":   mkramp(_hue((C["danger"], 1.0), (C["line"], 0.95), (C["muted"], 0.25)), 52, 40),
 }
 
 
@@ -2954,6 +3033,38 @@ def b_scatter(img, rng, p):
                 put(cx, j, PP["leaf"]["dark"])
             for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, 1), (0, -1)):
                 put(cx + dx, cy + dy, pal["tip"] if dx == 0 and dy == 0 else pal["base"])
+    elif kind == "rut":
+        # A wheel rut, which is where the dirt tile's two dead-vertical ruts
+        # went (see f_trodden). It lives here rather than in the fill for one
+        # reason: `slope` is a parameter, so the same twelve lines make a rut
+        # that lies east, one that lies north-east and one that lies north, and
+        # the placement can put whichever suits the lane down without the
+        # texture committing every dirt cell in the world to the same bearing.
+        # `dir` is the unit the rut walks in, so the bearing is data and the
+        # geometry is one loop. (1, 0) lies east, (1, 1) north-east, (0, 1)
+        # north; the gauge is measured across it.
+        ux, uy = p.get("dir", (1, 0))
+        run = p.get("run", 18)
+        for gauge in (-4, 4):                  # a cart has two wheels
+            for i in range(-run // 2, run // 2 + 1):
+                x = i * ux - gauge * uy
+                y = i * uy + gauge * ux
+                put(x, y, pal["deep"])
+                put(x, y + 1, pal["dark"])
+    elif kind == "stain":
+        # A damp patch: no edge, no highlight, just ground a shade darker where
+        # water stands or where something was spilled. Deliberately the dullest
+        # prop in the set -- it exists to break the AVERAGE tone of a large flat
+        # area, which is the part of issue #51 that grain cannot touch.
+        for i in range(n):
+            cx, cy = rng.randint(-10, 10), rng.randint(1, 8)
+            rr = rng.randint(3, 6)
+            for dy in range(-rr, rr + 1):
+                span = int(rr * math.sqrt(max(0.0, 1.0 - (dy / float(rr)) ** 2)))
+                for dx in range(-span, span + 1):
+                    if (dx + dy * 2) % 3 == 0:
+                        continue               # broken, so it reads as damp
+                    put(cx + dx, cy + dy, pal["dark"] if dy < 0 else pal["deep"])
     return 0
 
 
@@ -3252,6 +3363,191 @@ def b_structure(img, rng, p):
                         c = PP[pal]["deep"]
                     pp_(img, dx, top - dy, c)
         return 15
+    if kind == "window_shut":
+        # A WINDOW IN A TOWN WALL, and the whole reason issue "blank facades"
+        # exists: fifteen buildings presented a ten-tile run of one material
+        # with a single door in it, which is a warehouse, not a street.
+        #
+        # Two things about this sprite are deliberate and neither is obvious.
+        #
+        # It is drawn LOW IN THE SLOT, dy 0..23, for the same reason
+        # `window_lit` is: it is anchored on the WALL cell, and a wall cell is
+        # 32 px of cap with the vertical face painted on the cell below it. Draw
+        # above 24 and the window climbs onto the roof.
+        #
+        # THE GLASS IS DARK. `window_lit` glows because it is seen from inside a
+        # room that is lit; this one is seen from the street, and glass seen
+        # from outside in daylight is the darkest thing on the wall -- it is a
+        # hole. What makes it a LIT window at night is the `light` block in the
+        # catalogue and nothing here: Lighting.lamp_gain() is zero while the sun
+        # is up and full at midnight, so one sprite is correct at both ends of
+        # the day and there is no second piece of art to keep in step.
+        # THE SURROUND IS ALWAYS PALE, because every wall in the parish is now
+        # dark (22-28) and a window is a hole with a dressing round it -- the
+        # dressing is the only part that can carry the shape. What `frame`
+        # chooses is which pale: cold grey dressed stone at 62 for the stone,
+        # brick and plaster buildings, warm timber at 68 for the framed ones.
+        # Same aperture, same mullion, same transom, so the rhythm is one town;
+        # different dressing and shutters, so they are different buildings.
+        surround = PP["pale"] if p.get("frame", "stone") == "stone" else PP["timber"]
+        glass = mix(C["bg"], BLACK, 0.42)
+        for dy in range(5, 20):                    # the aperture, and it is dark
+            for dx in range(-9, 10):
+                pp_(img, dx, dy, glass)
+        for dy in range(15, 20):                   # what the sky puts back in it
+            for dx in range(-8, -2):
+                if (dx + dy) % 2:
+                    pp_(img, dx, dy, PP["pale"]["dark"])
+        for dy in range(5, 20):                    # the jambs, three px so they read
+            for dx in (-12, -11, -10, 10, 11, 12):
+                pp_(img, dx, dy,
+                    surround["lit"] if dx < 0 else surround["dark"])
+        for dx in range(-13, 14):                  # the lintel over it
+            pp_(img, dx, 20, surround["base"])
+            pp_(img, dx, 21, surround["mid"])
+            pp_(img, dx, 22, surround["tip"])      # and it catches the light
+        for dx in range(-14, 15):                  # the sill under it
+            pp_(img, dx, 4, surround["mid"])
+            pp_(img, dx, 3, surround["base"])
+            pp_(img, dx, 2, surround["deep"])
+        for dy in range(5, 20):                    # one mullion, two lights
+            for dx in (-1, 0):
+                pp_(img, dx, dy, surround["base"])
+        for dx in range(-9, 10):                   # and a transom across them
+            pp_(img, dx, 13, surround["base"])
+        if p.get("shutters"):
+            # A timber building gets its shutters folded back against the wall.
+            # This is the cheapest possible statement of "different buildings
+            # are made of different things": same aperture, same rhythm, and a
+            # silhouette you can tell apart at seven and a half tiles.
+            for side in (-1, 1):
+                for dx in range(3):
+                    for dy in range(4, 21):
+                        c = PP["timber"]["mid"] if (dy + dx) % 4 else PP["timber"]["dark"]
+                        pp_(img, side * (14 + dx) - (2 if side > 0 else 0), dy,
+                            c if side < 0 else PP["timber"]["dark"])
+                for dy in (4, 20):
+                    for dx in range(3):
+                        pp_(img, side * (14 + dx) - (2 if side > 0 else 0), dy,
+                            PP["timber"]["deep"])
+        return 0
+    if kind == "sign_bracket":
+        # A hanging sign on a wall bracket, over a shopfront door. `sign_shop`
+        # already exists and is NOT this: that one is a post standing on the
+        # pavement and it is solid, so it cannot go on a wall and could not be
+        # put over a doorway without blocking the doorway. A bracket has no
+        # post, blocks nothing, and is the form a shop sign actually takes when
+        # the shop is on the street rather than set back off it.
+        #
+        # Low in the slot, like the window, and for the same reason.
+        for dy in range(20, 24):                   # the arm, out of the wall
+            for dx in range(-13, 6):
+                pp_(img, dx, dy, metal["mid"] if dy == 21 else metal["deep"])
+        for dx in range(-12, -8):                  # the knee brace under it
+            pp_(img, dx, 20 - (dx + 13), metal["dark"])
+        for dx in (-9, 3):                         # the two hangers
+            for dy in range(16, 21):
+                pp_(img, dx, dy, metal["dark"])
+        for dy in range(4, 17):                    # the board
+            for dx in range(-11, 6):
+                c = wood["base"]
+                if dy in (4, 16) or dx in (-11, 5):
+                    c = wood["deep"]
+                elif dx < -7:
+                    c = wood["lit"]
+                pp_(img, dx, dy, c)
+        for dy in range(7, 15, 3):                 # the writing nobody can read
+            for dx in range(-9, 4):
+                if (dx + dy) % 3:
+                    pp_(img, dx, dy, PP["gold"]["lit"])
+        return 0
+    if kind == "chimney":
+        # A stack on a roof. Unlike everything else on this list it is ALLOWED
+        # to grow north out of its cell: a chimney seen in this projection is a
+        # thing standing up off a slope, and clipping it to 32 px would make it
+        # a vent. Two cells of rise is what reads at seven and a half tiles of
+        # viewport without hiding the ridge behind it.
+        pal = PP[p.get("pal", "brick")]
+        w = p.get("w", 6)
+        top = p.get("h", 30)
+        for dy in range(top):                      # the shaft
+            for dx in range(-w, w + 1):
+                c = pal["base"]
+                if dx < -w + 2:
+                    c = pal["lit"]
+                elif dx > w - 2:
+                    c = pal["deep"]
+                if dy % 4 == 0 and abs(dx) < w:    # the courses
+                    c = pal["dark"]
+                pp_(img, dx, dy, c)
+        for k in range(3):                         # the corbelled cap
+            for dx in range(-w - 2 + k, w + 3 - k):
+                pp_(img, dx, top + k, pal["mid"] if k < 2 else pal["lit"])
+        for dx in range(-w + 1, w):                # the flue, going down
+            pp_(img, dx, top + 3, mix(C["bg"], BLACK, 0.5))
+        for dy in range(6):                        # soot down the lee side
+            pp_(img, w, top - 4 - dy, pal["deep"])
+        return w + 2
+    if kind == "roof_ridge":
+        # THE RIDGE, and it is the cheapest volume in the game. Photographed at
+        # 32 px per cell the town was "a scatter of dark boxes": every roof is a
+        # flat rectangle of one texture, so nothing says which way it slopes or
+        # that it slopes at all. A roof reads as a roof because of one line --
+        # the lead flashing along the top, lit, with the south slope falling
+        # into shadow behind it -- and that is five rows of pixels.
+        #
+        # Full cell width and drawn flush to both edges, so a run of these
+        # laid along the middle row of a roof joins into one unbroken ridge
+        # rather than into a row of tick marks.
+        #
+        # Lead, not the roof's own material, and deliberately: it is the same
+        # on thatch, slate, pantile and shingle, which makes it the piece of
+        # shared construction that says four different roofs are one town.
+        cap = PP["metal"]
+        for dx in range(-16, 16):
+            for dy in range(8, 16):                # the south slope, in shadow
+                pp_(img, dx, dy, SHADOW, SHADOW_A)
+            pp_(img, dx, 16, OUTLINE)              # the line under the flashing
+            pp_(img, dx, 17, cap["dark"])
+            pp_(img, dx, 18, cap["lit"])
+            pp_(img, dx, 19, cap["tip"])           # and the top of it, in the sun
+            pp_(img, dx, 20, cap["mid"])
+            pp_(img, dx, 21, cap["deep"])
+        for dx in range(-16, 16, 6):               # the capping, laid in units
+            pp_(img, dx, 19, cap["base"])
+            pp_(img, dx, 20, cap["dark"])
+        return 0
+    if kind == "wall_base":
+        # WEAR WHERE THE WALL MEETS THE GROUND. Anchored on the ground cell
+        # SOUTH of a wall, because that is the cell the wall's vertical face is
+        # painted on -- see _wall_overlay, which draws WALL_FACE_H rows of face
+        # at the top of the cell below the cap. So this draws in dy 14..31, high
+        # in its own cell, and lands ON the face rather than beside it.
+        #
+        # Never solid and never outlined: it is a stain, and the player walks
+        # over it. The one prop in the town that is allowed to be drawn on a
+        # pavement the player uses.
+        damp = mix(C["bg"], BLACK, 0.30)
+        moss = PP["leaf"]
+        for dx in range(-14, 15):                  # the splash line
+            h = 4 + (abs((dx * 7) % 11) - 5) // 2
+            for dy in range(h):
+                pp_(img, dx, 31 - dy, damp)
+        for i in range(5):                         # streaks running down it
+            sx = -12 + i * 6 + (i % 2)
+            for dy in range(rng.randint(5, 12)):
+                pp_(img, sx, 31 - dy, damp)
+                pp_(img, sx + 1, 31 - dy, damp)
+        for i in range(7):                         # moss in the angle
+            mx = rng.randint(-13, 12)
+            for dy in range(rng.randint(1, 3)):
+                pp_(img, mx, 15 + dy, moss["dark"])
+                pp_(img, mx + 1, 15 + dy, moss["deep"])
+        for i in range(6):                         # and what fell off the wall
+            bx, by = rng.randint(-12, 12), rng.randint(10, 14)
+            pp_(img, bx, by, stone["dark"])
+            pp_(img, bx + 1, by, stone["deep"])
+        return 0
     if kind == "sign_shop":
         # A shop sign on a bracket. This is how a building says what it sells
         # without a label: the tavern, the store, the smith and the inn each get
@@ -3481,11 +3777,21 @@ def _p(pid, build, biome, density, solid=False, foot=(1, 1), shadow=True,
 
     THE LIGHT CONTRACT. A prop entry in assets/tiles/tiles.json may carry
 
-        "light": { "radius": 4.5, "color": "#FFC880", "flicker": 0.15 }
+        "light": { "radius": 4.5, "color": "#FFC880", "flicker": 0.15,
+                   "kind": "lamp" }
 
         radius   in tiles, float -- how far the pool reaches
         color    hex, the colour AT THE SOURCE; the falloff is the renderer's
         flicker  0.0 to 1.0, 0 is steady
+        kind     optional; "lamp" (default), "fire" or "window" -- WHEN it
+                 burns, not how bright it is. A lamp is put out at dawn and lit
+                 again at dusk, a fire burns at every hour, a window is lit only
+                 while somebody is home. The art says which behaviour a source
+                 has for the same reason it says where the source is: a stove
+                 that stopped glowing at noon would be a bug nobody could trace
+                 back to a missing word. scripts/ui/Lighting.gd owns what each
+                 word does; data/schema.json holds the vocabulary and
+                 tools/validate_data.py reconciles the two.
 
     Nothing in the tileset draws it. §3 of docs/AESTHETIC-EDA.md: "light is the
     atmosphere, and it is radial and coloured", and "a glow with a visible lamp
@@ -3501,6 +3807,25 @@ def _p(pid, build, biome, density, solid=False, foot=(1, 1), shadow=True,
     out of step with the first."""
     entry = dict(id=pid, build=build, biome=biome, density=density, solid=solid,
                  foot=list(foot), shadow=shadow, outline=outline, params=params)
+    # THE FLAT CONTRACT. A prop entry in assets/tiles/tiles.json carries
+    #
+    #     "flat": true
+    #
+    # for a prop that is texture lying ON the ground rather than a thing
+    # standing up off it -- grit, ruts, leaves, a damp patch, a rug. It is not a
+    # fourth declaration to keep in step with the other three; it is derived
+    # from them, and from exactly the three that already say it: something with
+    # no collision, no cast shadow and no outline has no volume, and having no
+    # volume is what "flat" means.
+    #
+    # It is emitted rather than left to be re-derived because the reader is in
+    # another tool. scatter_props() in tools/make_world.py needs it to decide
+    # what may stand in a lane the player walks down -- texture may, a boulder
+    # may not -- and `shadow` and `outline` are not in the manifest at all,
+    # while `build` is absent from anything tools/add_prop.py appended. A prop
+    # with no `flat` key reads as false, which is the safe answer: it keeps
+    # everything off the road that was ever off the road.
+    entry["flat"] = not (solid or shadow or outline)
     if light is not None:
         entry["light"] = dict(light)
     if sway is not None:
@@ -3580,7 +3905,14 @@ PROPS = [
     _p("crystal", "shard", "ice", 0.014, pal="ice", n=5, spread=9, h=16),
 
     # --- road -----------------------------------------------------------------
-    _p("milestone", "monument", "path_dirt", 0.012, kind="menhir", pal="stone", h=13, w=5, runes=3),
+    # 0.012 split three ways left each variant at 0.004, and a `path_dirt` prop
+    # that stands up can only be offered to a cell BESIDE a road that has
+    # already refused every prop of its own biome -- so at that density whether
+    # a given milestone appears anywhere in 65,536 cells is luck, and
+    # validate_data reported one of the three missing. A milestone is a
+    # navigation aid on a long road; three times as many is still one every
+    # forty tiles of lane and it stops the answer depending on the seed.
+    _p("milestone", "monument", "path_dirt", 0.036, kind="menhir", pal="stone", h=13, w=5, runes=3),
     _p("signpost", "post", "path_dirt", 0.008, h=24, board=(10, 8)),
     _p("wayside_shrine", "monument", "path_dirt", 0.004, solid=True, kind="shrine"),
     _p("rut_stone", "boulder", "path_dirt", 0.014, pal="stone", w=7, h=5, cracks=2),
@@ -3602,7 +3934,7 @@ PROPS = [
     _p("cart", "structure", "placed", 0.0, solid=True, kind="cart"),
     _p("market_stall", "structure", "placed", 0.0, solid=True, kind="stall"),
     _p("lamppost", "structure", "placed", 0.0, solid=True, kind="lamppost",
-       light=dict(radius=6.0, color="#FFC880", flicker=0.12), sway=dict(amount=0.5, speed=1.55, mode='breathe')),
+       light=dict(radius=6.0, color="#FFC880", flicker=0.12, kind="lamp"), sway=dict(amount=0.5, speed=1.55, mode='breathe')),
     _p("bench", "structure", "placed", 0.0, solid=True, kind="bench"),
     _p("standing_stone", "monument", "placed", 0.0, solid=True, kind="menhir", pal="stone", h=34, w=8, runes=8),
 
@@ -3613,7 +3945,7 @@ PROPS = [
     _p("bookshelf", "furniture", "placed", 0.0, solid=True, kind="shelf"),
     _p("chest", "box", "placed", 0.0, solid=True, w=13, h=13, d=8, lid=True, square=True),
     _p("floor_lamp", "furniture", "placed", 0.0, kind="lamp",
-       light=dict(radius=4.5, color="#FFC880", flicker=0.08), sway=dict(amount=0.5, speed=1.8, mode='breathe')),
+       light=dict(radius=4.5, color="#FFC880", flicker=0.08, kind="lamp"), sway=dict(amount=0.5, speed=1.8, mode='breathe')),
     _p("plant_pot", "furniture", "placed", 0.0, solid=True, kind="pot", sway=dict(amount=0.6, speed=0.55)),
     _p("rug", "furniture", "placed", 0.0, shadow=False, outline=False, kind="rug"),
 
@@ -3621,25 +3953,25 @@ PROPS = [
     # §"the asset backlog": a furniture set for a real house (bed, table,
     # chairs, stove, counter, shelf) and the evidence-of-use props under it.
     _p("stove", "furniture", "placed", 0.0, solid=True, kind="stove",
-       light=dict(radius=4.0, color="#FF8C42", flicker=0.35)),
+       light=dict(radius=4.0, color="#FF8C42", flicker=0.35, kind="fire")),
     _p("counter", "furniture", "placed", 0.0, solid=True, kind="counter"),
     _p("shelf_open", "furniture", "placed", 0.0, solid=True, kind="shelf_open"),
     _p("chair_pulled", "furniture", "placed", 0.0, solid=True, kind="chair_pulled"),
     _p("window_lit", "structure", "placed", 0.0, shadow=False, kind="window",
-       light=dict(radius=5.0, color="#FFD9A0", flicker=0.0),
+       light=dict(radius=5.0, color="#FFD9A0", flicker=0.0, kind="window"),
        # bars=2 is not a guess: the sprite below draws one vertical mullion
        # across a pane spanning -10..10, so the aperture is two panes and the
        # beam is two bands.
        shaft=dict(length=9.0, width=0.34, spread=0.1, bars=2,
                   color="#FFEFD2", intensity=0.95)),
     _p("candle", "clutter", "placed", 0.0, shadow=False, kind="candle",
-       light=dict(radius=2.5, color="#FFC880", flicker=0.45), sway=dict(amount=0.9, speed=2.8, mode='breathe')),
+       light=dict(radius=2.5, color="#FFC880", flicker=0.45, kind="fire"), sway=dict(amount=0.9, speed=2.8, mode='breathe')),
     _p("cup", "clutter", "placed", 0.0, shadow=False, kind="cup"),
     _p("boots", "clutter", "placed", 0.0, shadow=False, kind="boots"),
     _p("book_open", "clutter", "placed", 0.0, shadow=False, kind="book"),
     _p("bottle", "clutter", "placed", 0.0, shadow=False, kind="bottle"),
     _p("street_lamp", "structure", "placed", 0.0, solid=True, kind="street_lamp",
-       light=dict(radius=7.5, color="#FFD08A", flicker=0.10), sway=dict(amount=0.6, speed=1.35, mode='breathe')),
+       light=dict(radius=7.5, color="#FFD08A", flicker=0.10, kind="lamp"), sway=dict(amount=0.6, speed=1.35, mode='breathe')),
     # Not solid. An animal that walks is not a wall: marking these solid baked a
     # 1 into the world's `blocked` plane exactly where the dog was lying, so he
     # could walk off his own cell and never back onto it. The live critter is
@@ -3698,6 +4030,14 @@ SCATTER_BUDGET = 0.050          # scatter props per walkable cell of the biome
 SCATTER_OFFSETS = [(-10, 2), (8, 5), (-4, 11), (12, 8), (2, 14), (-13, 6),
                    (5, 0), (-7, 9)]
 
+# Per-biome multiplier on that budget. Issue #51 is not evenly distributed: the
+# world's biggest UNBROKEN expanses of one material are the dirt lanes, the town
+# green and the market square, and those are also the three the player spends
+# the whole first act standing on. A blanket rise would make the tundra and the
+# desert noisy to fix a fault they do not have, so the budget is spent where the
+# corduroy actually is. Anything absent here is 1.0 and unchanged.
+SCATTER_WEIGHT = {"path_dirt": 3.0, "grass_short": 1.2, "floor_stone": 1.8}
+
 SCATTER_SETS = {
     "grass_short": [("pebbles", "stone", 3), ("tuft", "leaf", 4),
                     ("leaves", "leaf_dry", 4), ("bloom", "flower", 1),
@@ -3725,16 +4065,44 @@ SCATTER_SETS = {
                     ("leaves", "leaf_dry", 3), ("crack", "stone", 2)],
     "ice":         [("crack", "ice", 3), ("pebbles", "ice", 2),
                     ("pebbles", "snowpile", 2)],
-    "path_dirt":   [("pebbles", "stone", 3), ("crack", "stone", 2),
-                    ("twig", "bark", 2), ("leaves", "leaf_dry", 2)],
+    # Three bearings of rut, because the lanes run east, north and diagonally
+    # and a rut that lies across its own road is worse than no rut at all.
+    # `pale` for the grit rather than `stone`: stone's mean is 46 and so is
+    # path_dirt's, so a pebble on a lane was the same value as the lane and 242
+    # of them were placed and none of them could be seen. Scatter has to differ
+    # from the ground it is scattered on or it is a more expensive way of
+    # drawing nothing.
+    "path_dirt":   [("pebbles", "pale", 3), ("crack", "bark", 2),
+                    ("twig", "bark", 2), ("leaves", "leaf_dry", 2),
+                    ("stain", "bark", 2), ("rut", "bark", 1),
+                    ("rut", "bark", 1), ("rut", "bark", 1)],
+    # The market square and High Street. A flagstone surface collects exactly
+    # three things and they are all here: grit in the joints, what blew in and
+    # lodged against the kerb, and the damp that never dries out of the north
+    # side of a square.
+    "floor_stone": [("pebbles", "pale", 3), ("leaves", "leaf_dry", 3),
+                    ("stain", "bark", 2)],
+}
+
+# The bearing of each rut in the dirt set, in the order they appear above. Kept
+# beside the set rather than inside it because every other scatter member is
+# (kind, palette, count) and widening that tuple for one kind would make nine
+# rows carry a field eight of them ignore.
+SCATTER_PARAMS = {
+    ("path_dirt", 6): dict(dir=(1, 0), run=22),
+    ("path_dirt", 7): dict(dir=(1, 1), run=15),
+    ("path_dirt", 8): dict(dir=(0, 1), run=18),
 }
 
 for _biome, _set in SCATTER_SETS.items():
     for _i, (_kind, _pal, _n) in enumerate(_set):
         _ox, _oy = SCATTER_OFFSETS[_i % len(SCATTER_OFFSETS)]
         PROPS.append(_p("%s_bits_%d" % (_biome, _i + 1), "scatter", _biome,
-                        SCATTER_BUDGET / len(_set), shadow=False, outline=False,
-                        kind=_kind, pal=_pal, n=_n, ox=_ox, oy=_oy))
+                        SCATTER_BUDGET * SCATTER_WEIGHT.get(_biome, 1.0)
+                        / len(_set),
+                        shadow=False, outline=False,
+                        kind=_kind, pal=_pal, n=_n, ox=_ox, oy=_oy,
+                        **SCATTER_PARAMS.get((_biome, _i + 1), {})))
         PROP_ORDER.append(PROPS[-1]["id"])
 
 
@@ -3813,7 +4181,7 @@ for _pid, _kw in (
     # is a heap that leans, not a palisade.
     ("leaf_wall", dict(build="structure", solid=True, kind="leaf_wall")),
     ("campfire", dict(build="structure", solid=True, kind="campfire",
-                      light=dict(radius=5.5, color="#FF8C42", flicker=0.40))),
+                      light=dict(radius=5.5, color="#FF8C42", flicker=0.40, kind="fire"))),
     # Evidence that people live here.
     ("trash_can", dict(build="structure", solid=True, kind="trash_can")),
     ("haystack", dict(build="structure", solid=True, kind="haystack")),
@@ -3821,13 +4189,86 @@ for _pid, _kw in (
                           sway=dict(amount=1.3, speed=0.55))),
     ("sign_shop", dict(build="structure", solid=True, kind="sign_shop",
                        sway=dict(amount=0.8, speed=0.9))),
+
+    # --- the town's facades ---------------------------------------------------
+    #
+    # Every one of these is anchored on a cell of a BUILDING rather than on
+    # ground -- a wall course, a roof, or the strip of pavement the wall's face
+    # is painted on. None of them is solid: the cell underneath a window is a
+    # wall and already impassable, and making the prop solid too would put a
+    # second 1 in the collision plane for no gain and one more way to be wrong.
+    # dress_facades() in tools/make_world.py is the only thing that places them,
+    # and it proves the material under each one before it does.
+    #
+    # WHY TWO WINDOWS AND NOT ONE. The window is the piece that repeats most --
+    # about a hundred and fifty of them across fifteen buildings -- and §6 of
+    # docs/AESTHETIC-EDA.md is explicit that anything appearing more than ten
+    # times on a screen needs more than one silhouette. It is also where the
+    # town's shared-architecture-different-material rule is easiest to say: the
+    # aperture, the mullion and the transom are identical on both, so the
+    # RHYTHM is one town, and the surround is dressed stone on the stone and
+    # brick buildings and a shuttered timber frame on the timber and plaster
+    # ones, so the MATERIAL is fifteen different buildings.
+    # `kind: "window"` is the whole of "lit at night and dark by day", and it is
+    # a better answer than "lamp" for a house: HJLighting.gain_for() scales a
+    # window by an OCCUPIED ramp as well as by the dusk switch, so the parish
+    # goes dark building by building through the small hours instead of all at
+    # once at dawn. That is one word in the catalogue and no code anywhere.
+    ("window_stone", dict(build="structure", solid=False, kind="window_shut",
+                          outline=False, frame="stone",
+                          light=dict(radius=3.2, color="#FFC880", flicker=0.06,
+                                     kind="window"))),
+    ("window_timber", dict(build="structure", solid=False, kind="window_shut",
+                           outline=False, frame="timber", shutters=True,
+                           light=dict(radius=3.2, color="#FFC880", flicker=0.06,
+                                      kind="window"))),
+    # The shopfront sign. Swings, because it hangs.
+    ("sign_bracket", dict(build="structure", solid=False, kind="sign_bracket",
+                          outline=False, sway=dict(amount=1.1, speed=0.7))),
+    # ONE chimney for the whole parish, which is the opposite of the argument
+    # the four roofs were added under and is right for the same reason. A roof
+    # is what a building could afford; a chimney is what a chimney has to be
+    # made of, and every one of them in a village -- over thatch, over slate,
+    # over a timber frame -- is brick, because it is the part of the house whose
+    # job is to survive a chimney fire. A stone stack and a clay stack here
+    # would be variety chosen for variety, which reads as a palette swap. It is
+    # also the shared piece the roofs cannot be: one silhouette repeated on
+    # fifteen roofs is a large part of what makes them one town.
+    ("chimney_brick", dict(build="structure", solid=False, kind="chimney",
+                           pal="brick", w=6, h=30)),
+    # And the damp at the foot of it all.
+    ("wall_base", dict(build="structure", solid=False, kind="wall_base",
+                       shadow=False, outline=False)),
+    # The ridge. No outline: an outline round a band that is meant to join up
+    # with the identical band in the next cell draws a black line between them.
+    ("roof_ridge", dict(build="structure", solid=False, kind="roof_ridge",
+                        shadow=False, outline=False)),
 ):
     _build = _kw.pop("build")
     PROPS.append(_p(_pid, _build, "placed", 0.0,
                     solid=_kw.pop("solid"),
+                    shadow=_kw.pop("shadow", True),
+                    outline=_kw.pop("outline", True),
                     light=_kw.pop("light", None), sway=_kw.pop("sway", None),
                     **_kw))
     PROP_ORDER.append(_pid)
+
+# THE PROP PLANE IS ONE BYTE A CELL, so plane ids run 1..255 and 0 means
+# nothing is there. Overflowing it is not a soft failure: tools/make_world.py
+# packs the plane with `bytes(bytearray(...))` and dies with
+# "ValueError: byte must be in range(0, 256)" from inside encode_plane, several
+# hundred lines and one tool away from the list that overflowed. Two slots are
+# left for tools/add_prop.py's authored tail, which is appended after this file
+# has run and is therefore invisible here.
+#
+# When this fires the answer is almost never "make the limit bigger" -- it is
+# that a variant that appears once, or a scatter member that says nothing the
+# other five in its set do not, has been added. #83's second prop plane is the
+# real fix and it buys another 255, not more than that.
+AUTHORED_TAIL = 2
+assert len(PROP_ORDER) + AUTHORED_TAIL <= 255, (
+    "%d props + %d authored will not fit in a one-byte prop plane"
+    % (len(PROP_ORDER), AUTHORED_TAIL))
 
 PROP_BY_ID = {p["id"]: p for p in PROPS}
 PROP_COLS = 8
@@ -4473,12 +4914,16 @@ def manifest(overlay_rows, cliff_rows, prop_rows):
                 "radius": "tiles, float",
                 "color": "hex, the colour at the source",
                 "flicker": "0.0-1.0, 0 is steady",
+                "kind": ("optional; 'lamp' (default) is put out at dawn and lit "
+                         "at dusk, 'fire' burns at every hour, 'window' is lit "
+                         "only while somebody is home"),
             },
             "list": [
                 dict({"id": pid, "index": i, "plane": i + 1,
                       "biome": PROP_BY_ID[pid]["biome"],
                       "density": PROP_BY_ID[pid]["density"],
                       "solid": PROP_BY_ID[pid]["solid"],
+                      "flat": PROP_BY_ID[pid]["flat"],
                       "foot": PROP_BY_ID[pid]["foot"]},
                      **({"light": PROP_BY_ID[pid]["light"]}
                         if "light" in PROP_BY_ID[pid] else {}),

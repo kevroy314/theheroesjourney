@@ -392,6 +392,25 @@ def solid_ids():
     return {T[n] for n in names if n in T}
 
 
+def standing_planes():
+    """Prop plane ids that DRAW ABOVE THEIR OWN CELL.
+
+    A prop's art is 64x96 in a 32px cell and is painted north to south, so a
+    prop on (x, y) covers (x, y-1) and (x, y-2) as well -- which is how a bench
+    at (6,12) came to be painted over two thirds of the dog at (6,11). That is
+    only true of props that stand up. A prop the catalogue marks `flat` -- grit,
+    a rut, fallen leaves, a damp patch -- is drawn in the bottom few rows of the
+    slot and covers nothing but the cell it is on.
+
+    The distinction has to be made or the burial check is wrong in the direction
+    that costs a build: it refused to let Spite stand on his own doorstep
+    because a twig had blown into the road one cell south of him.
+    """
+    path = os.path.join(ROOT, "assets", "tiles", "tiles.json")
+    catalogue = json.load(open(path))["props"]["list"]
+    return {p["plane"] for p in catalogue if not p.get("flat")}
+
+
 # --- geometry, shared by the water, the borders and the streets ----------------
 #
 # All five of these are pure functions of integers. They exist so that a river,
@@ -689,7 +708,49 @@ STREETS = [
     ("sheep_walk",  [(130, 161), (130, 170), (132, 177)], 1, "path_dirt"),
 ]
 
-SQUARE = (132, 132, 13, 9)
+## The market square, and it now REACHES HIGH STREET.
+##
+## It used to start at y = 132, two rows below the street's south kerb, and the
+## two rows between them were left as whatever the terrain pass had put there --
+## a full-width band of grass straight across the middle of the paving, visible
+## in .scratch/town-141-130.png and the single most obvious thing wrong with the
+## town square. The square is not a rectangle that happens to sit near the
+## street; docs/PROCGEN-RESEARCH.md §2.1 has it exactly: "a market is not a
+## special case: it is a cell where several lanes meet, widened by two". So it
+## is widened from the street it is a widening OF, and the two rows come back.
+SQUARE = (132, 130, 13, 11)
+
+## Metalled beats unmetalled where two roads cross.
+##
+## `streets` is a dict and the old loop simply assigned into it, so at a
+## junction the winner was whichever street came later in STREETS -- which put a
+## three-cell notch of mud across the paving of High Street where the north lane
+## and the alley met it, for no reason anybody chose. A village metals its
+## through route and the lanes join it; the junction takes the better surface.
+PAVING = {"path_dirt": 0, "floor_stone": 1}
+
+## GRASS VERGES, stated rather than left over.
+##
+## Kevin's note on the old square was that it read as a car park, and the answer
+## then was to pave almost nothing. That went too far and left accidental
+## stripes instead. The answer here is the one a real square has: paving that is
+## CONTINUOUS, with a kerb, and something green on the other side of the kerb
+## that is there on purpose. These rectangles are subtracted from the paved set
+## after it has been closed, so they are the only places inside the square's
+## bounding box where the flagstones stop, and each is a strip TWO cells wide
+## along the full run of the square rather than a patch: a verge that starts
+## and stops is the accidental stripe again with a comment on it.
+##
+## Both sit between the square and a dirt lane -- the alley on the west, the
+## shop row on the east -- which is exactly where a village puts its green:
+## metalling is expensive and you stop laying it where the lane takes over.
+##
+## Cells that are already built, watered or hedged are dropped, so a verge can
+## never punch a hole in a wall or the river.
+VERGES = [
+    (130, 130, 2, 11),        # the west shoulder, between the alley and the square
+    (145, 130, 2, 11),        # the east shoulder, between the square and the shop row
+]
 
 BRIDGES = [("town_bridge", (114, 149, 7, 4)),
            ("north_bridge", (130, 100, 5, 6))]
@@ -784,7 +845,8 @@ def vale_plan():
     for (name, pts, half, material) in STREETS:
         run = _grow(_poly(pts), half) if half else set(_poly(pts))
         for c in run:
-            streets[c] = material
+            if PAVING[material] >= PAVING.get(streets.get(c), -1):
+                streets[c] = material
     for c in _rect(*SQUARE):
         streets[c] = "floor_stone"
 
@@ -819,6 +881,80 @@ def vale_plan():
         built |= b["foot"]
     for s in sheds:
         built |= s["foot"]
+
+    # THE PAVED AREA IS CLOSED, NOT ASSEMBLED.
+    #
+    # Two independent gaps, both visible on screen and neither in anybody's
+    # plan. `_grow(polyline, 1)` is a plus-shaped dilation, so wherever High
+    # Street turns a diagonal the plus of one cell and the plus of the next
+    # touch only at a corner and leave a notch in the kerb; and a dirt lane laid
+    # across the paving used to win the cell outright.
+    #
+    # A morphological closing at a gap of exactly ONE fixes both and can invent
+    # paving nowhere else: a cell joins only if paving already lies on both
+    # sides of it, so the set fills its own single-cell concavities and stops.
+    #
+    # Read from a SNAPSHOT and applied once. The first version let each new cell
+    # seed the next and ran three passes at a gap of two, which is a dilation
+    # wearing a closing's name -- it paved nine rows of the town centre
+    # including the yards between the mill and the inn. A closing has to be a
+    # fixed-point of the set it started from or it is just growth.
+    paved = {c for c, m in streets.items() if m == "floor_stone"}
+    off_limits = built | water | barrier | bridges
+    for (x, y) in sorted(paved):
+        for (ax, ay), (bx, by) in (((0, -1), (0, 1)), ((-1, 0), (1, 0))):
+            gap = (x + ax, y + ay)
+            if (gap in paved or gap in off_limits
+                    or not (0 <= gap[0] < W and 0 <= gap[1] < H)):
+                continue
+            if (gap[0] + ax, gap[1] + ay) in paved:
+                streets[gap] = "floor_stone"
+
+    # ...and then the verges are taken back out, so that where the green
+    # survives it is because somebody drew a kerb there.
+    for r in VERGES:
+        for c in _rect(*r):
+            if c in off_limits:
+                continue
+            streets.pop(c, None)
+
+    # AND THE PAVING IS PROVEN CONTINUOUS, not eyeballed.
+    #
+    # The defect this whole block exists to fix -- a full-width band of grass
+    # straight across the market square -- is invisible in the tile histogram
+    # and was found by a person walking the town on a phone. A flood fill over
+    # the paved set is the cheap version of that walk: if High Street and the
+    # square are one surface, every flagstone reaches every other flagstone,
+    # and if a verge or a closing bug ever cuts the square in half again this
+    # says so at generation time instead of six screenshots later.
+    #
+    # Deliberately ONE component and not "few": the vale has exactly one paved
+    # surface in it, so a second component is a fragment somebody did not mean
+    # -- which is what the two orphaned flagstones by the brook were.
+    paved = {c for c, m in streets.items() if m == "floor_stone"}
+    islands = []
+    seen = set()
+    for c in sorted(paved):
+        if c in seen:
+            continue
+        lump, stack = set(), [c]
+        while stack:
+            here = stack.pop()
+            if here in seen or here not in paved:
+                continue
+            seen.add(here)
+            lump.add(here)
+            stack += [(here[0] + dx, here[1] + dy) for dx, dy in ORTHOGONAL]
+        islands.append(sorted(lump))
+    islands.sort(key=len, reverse=True)
+    if len(islands) > 1:
+        raise SystemExit(
+            "the paving is in %d pieces, not one: %s. High Street and the "
+            "market square are one surface and the player walks from one onto "
+            "the other; a stripe of grass across the middle of it is the fault "
+            "this pass exists to prevent."
+            % (len(islands), "; ".join("%d cells at %s" % (len(i), i[0])
+                                       for i in islands)))
 
     return dict(water=water, barrier=barrier, bridges=bridges, streets=streets,
                 extension_roof=extension_roof,
@@ -1412,7 +1548,7 @@ def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
 
     blocked = set()
 
-    def free(x, y, foot):
+    def free(x, y, foot, flat):
         for fy in range(foot[1]):
             for fx in range(foot[0]):
                 cx, cy = x + fx, y - fy
@@ -1420,9 +1556,34 @@ def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
                     return False
                 if not world.walkable(cx, cy):
                     return False
-                # Never on a road or in a doorway: those are the two places the
-                # player is guaranteed to be walking through.
-                if world.at(cx, cy) in (T["path_dirt"], T["door"], T["bridge"]):
+                # Never in a doorway and never on a bridge: those are the two
+                # places the player is guaranteed to be walking through, and a
+                # bridge is planking that nothing grows on.
+                if world.at(cx, cy) in (T["door"], T["bridge"]):
+                    return False
+                # A ROAD TAKES FLAT SCATTER AND NOTHING ELSE.
+                #
+                # This used to refuse a road outright, on the reasonable ground
+                # that a boulder in the lane is a boulder in the lane. The
+                # consequence nobody noticed is that the `path_dirt` scatter set
+                # -- grit, ruts, dry leaves, the damp patch -- could never once
+                # be placed on a road, because it is authored FOR roads and
+                # roads were the one material it was forbidden. So the lanes
+                # were 376 cells of bare tile with nothing on them at all, which
+                # is half of why they read as a stain rather than as a street.
+                #
+                # The rule that was actually wanted is about what a prop IS, not
+                # about where it is: a prop that is not solid, casts no shadow
+                # and has no outline is texture lying ON the ground rather than
+                # anything standing up off it, and texture belongs on a road.
+                # `flat` is the catalogue's own word for it -- see the flat
+                # contract in _p() -- and it is read rather than re-derived
+                # here because the three declarations it comes from (`solid`,
+                # `shadow`, `outline`) are not all in the manifest, and because
+                # a second derivation of the same rule in a second tool is a
+                # second chance to disagree with it. Absent means false, which
+                # keeps everything off the road that was ever off the road.
+                if world.at(cx, cy) == T["path_dirt"] and not flat:
                     return False
                 # And never on a doorstep. The door cell is refused above, but
                 # the cell you land on when you come out of it is ordinary grass
@@ -1457,7 +1618,8 @@ def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
                 if rng.random() >= prop["density"]:
                     continue
                 foot = prop["foot"]
-                if not free(x, y, foot):
+                flat = bool(prop.get("flat"))
+                if not free(x, y, foot, flat):
                     break
                 plane[y][x] = prop["plane"]
                 if prop["solid"]:
@@ -1683,6 +1845,281 @@ def town_props(plan):
     add("bramble", (160, 134), (159, 124))
     add("washing_line", (159, 133))
     return out
+
+
+## WHAT DRESSES A FACADE.
+##
+## The complaint that produced this: "every building presents a ten-plus-tile
+## expanse of one wall material with a single door and nothing else". It is
+## exactly right, and it is the single biggest reason the town does not read as
+## a town -- fourteen buildings had between them fourteen features, one door
+## each.
+##
+## The answer is NOT fifteen bespoke elevations. What makes it one town is that
+## every facade is dressed by the same rule -- windows on one rhythm, a lintel
+## and a sill on every one of them, a stack on every roof, damp at every foot --
+## and what makes them fourteen different buildings is that the rule reads the
+## material off the building it is dressing. That is the same division the roofs
+## already make (see the table in make_tiles.py): shared construction, different
+## material.
+##
+##   wall material   window          because
+##   wall_stone      window_stone    rubble walls take dressed stone surrounds
+##   wall_brick      window_stone    the two BUILT buildings, same dressings
+##   wall_plaster    window_stone    plaster over a stone plinth
+##   wall_timber     window_timber   a frame takes a shuttered frame, and warm
+##                                   timber dressings rather than cold stone
+##                                   ones -- the aperture, the mullion and the
+##                                   transom are identical either way, so what
+##                                   differs is the dressing and the shutters
+##
+## The chimney is deliberately NOT in the table. Every stack in the parish is
+## brick, over thatch and slate alike, because it is the one part of a house
+## whose job is to survive a chimney fire -- see the note in make_tiles.py. It
+## is also the piece of shared silhouette the four roofs cannot be.
+FACADE_KIT = {
+    "wall_stone":   "window_stone",
+    "wall_brick":   "window_stone",
+    "wall_plaster": "window_stone",
+    "wall_timber":  "window_timber",
+}
+CHIMNEY = "chimney_brick"
+
+## The ridge cap. Neutral lead on every roof in the parish, so four roof
+## materials share one line -- see the note on the sprite in make_tiles.py.
+RIDGE = "roof_ridge"
+
+## Who trades, and therefore hangs a board over the door. `sign_shop` already
+## stands on the pavement outside five of these; the bracket is the other half
+## of the same sentence and it goes ON the building, which is where a sign goes
+## when the shop is hard on the street.
+SHOPFRONTS = ("mill", "commonhouse", "innkeeper", "store", "tavern",
+              "tinkerer", "tavernkeep")
+
+## Every third cell. Two is a curtain wall of glass and four reads as a barn
+## with a hole in it; three at 32 px is one window per metre and a bit, which is
+## about right for a house whose windows are shuttered.
+WINDOW_PITCH = 3
+
+## And every fourth cell of the ground under a south wall gets its damp. Sparser
+## than the windows on purpose -- weather is not periodic and a stain under
+## every window would read as a second rhythm arguing with the first.
+STAIN_PITCH = 4
+
+
+def _facade_runs(b):
+    """The wall courses of one building that a player actually looks at, as
+    lists of cells in order along the run.
+
+    Two of the four sides, never all four, and the reason is in the renderer.
+    A wall cell is the CAP of the wall seen from above; the vertical face that
+    makes it read as a wall at all is painted by the overlay set on the cell
+    BELOW it -- and the cell below a north, east or west wall cell is another
+    wall or the roof, neither of which has a rank in the precedence stack and
+    so neither of which takes an overlay. Only the SOUTH course throws a face
+    onto open ground, so only the south course reads as an elevation. That plus
+    the side the door is on, which is the frontage by definition, is the whole
+    of what is worth dressing; windows on the other two would be windows lying
+    flat on a roofline.
+    """
+    x, y, w, h = b["x"], b["y"], b["w"], b["h"]
+    sides = {
+        "S": [(i, y + h - 1) for i in range(x, x + w)],
+        "N": [(i, y) for i in range(x, x + w)],
+        "W": [(x, j) for j in range(y, y + h)],
+        "E": [(x + w - 1, j) for j in range(y, y + h)],
+    }
+    dx, dy = b["door"]
+    front = ("S" if dy == y + h - 1 else "N" if dy == y
+             else "E" if dx == x + w - 1 else "W")
+    return [sides[k] for k in dict.fromkeys((front, "S"))]
+
+
+def facade_props(plan):
+    """Every window, sign, chimney and stain in the town, derived.
+
+    Fourteen buildings times two faces is twenty-eight runs, and a hand-written
+    list of twenty-eight runs is twenty-eight chances to put a window one cell
+    inside a wall. So
+    what is hand-written here is the RULE and the geometry comes out of
+    vale_plan's rectangles, which is the same discipline furnish_house imposed
+    on the house after it built its internal wall twice and put a chair in it.
+
+    No RNG. Every choice below is index arithmetic on the run, so this pass
+    consumes no draws and cannot reshuffle anything downstream of it -- which
+    matters, because there is one stream for the whole world and a new pass that
+    draws from it moves every anomaly in the map (see the world-generator
+    skill, "One RNG stream").
+
+    Returns (prop id, x, y, what the cell must be) quadruples. The last field is
+    the contract dress_facades checks: `wall` means a wall course, `roof` a
+    roof, `ground` a walkable cell outside the building.
+
+    THE FIRST TWO ARE MANDATORY AND THE THIRD IS NOT, and the difference is not
+    laziness. A window and a stack are structure: the rectangle says where the
+    wall is, so a window that misses it means the plan and the stamp disagree
+    and that is a build failure. A stain is WEATHER, and the cell south of a
+    south wall is ordinary generated world -- it is the river behind the
+    tinkerer's, the thicket behind the mayor's, or the bench somebody already
+    put there. Weather does not fall on the river. So `ground` may be refused
+    per cell, and dress_facades reports how many were refused so that losing
+    all of them would still show up in the build report.
+    """
+    out = []
+    doorsteps = {b["doorstep"] for b in plan["buildings"]}
+    # Nobody's standing room is dressed over. A townsperson is placed beside a
+    # door by main(), and while none of these props is solid, a stain under
+    # somebody's feet is still a stain nobody chose.
+    reserved = doorsteps | {(d[0] + o[0], d[1] + o[1]) for (_k, d, o) in TOWNSFOLK}
+
+    for b in plan["buildings"]:
+        window = FACADE_KIT[b["wall"]]
+        door = b["door"]
+
+        for run in _facade_runs(b):
+            # The corners are structure, not wall: a window in the quoin of a
+            # building is a window in the corner of two walls at once.
+            body = run[1:-1]
+            if not body:
+                continue
+            # Centre the rhythm on the run rather than starting at one end, so a
+            # facade is symmetrical about itself and two buildings of different
+            # widths still look like they were built by the same mason.
+            span = ((len(body) - 1) // WINDOW_PITCH) * WINDOW_PITCH
+            start = (len(body) - 1 - span) // 2
+            for k in range(start, len(body), WINDOW_PITCH):
+                c = body[k]
+                # A window does not go in the door, nor immediately beside it:
+                # the jamb of the door and the jamb of the window would be the
+                # same two pixels and the pair reads as one wide hole.
+                if max(abs(c[0] - door[0]), abs(c[1] - door[1])) <= 1:
+                    continue
+                out.append((window, c[0], c[1], "wall"))
+
+            # The sign hangs on the wall next to the door, on the frontage, on
+            # whichever side of it has room. Only the run containing the door.
+            if b["id"] in SHOPFRONTS and door in run:
+                i = run.index(door)
+                for j in (i - 1, i + 1):
+                    if 0 < j < len(run) - 1 and not any(
+                            q[1:3] == run[j] for q in out):
+                        out.append(("sign_bracket", run[j][0], run[j][1], "wall"))
+                        break
+
+        # THE RIDGE AND THE CHIMNEYS SHARE A ROW, because they do on a building:
+        # a stack comes up through the ridge, not through the middle of a slope.
+        # One row, worked out once, and the stacks are punched out of the ridge
+        # run rather than laid on top of it -- one prop per cell means the two
+        # cannot both have the cell and the chimney is the one that wins.
+        ry = b["y"] + max(2, b["h"] // 2)
+        stacks = [b["x"] + max(1, b["w"] // 3)]
+        if b["w"] >= 10:
+            # Anything ten cells or more across gets two, one over each end. A
+            # hall with one hearth in the middle of it is a hall with one room.
+            stacks = [b["x"] + 2, b["x"] + b["w"] - 3]
+        for sx in stacks:
+            out.append((CHIMNEY, sx, ry, "roof"))
+        for rx in range(b["x"] + 1, b["x"] + b["w"] - 1):
+            if rx in stacks:
+                continue
+            out.append((RIDGE, rx, ry, "roof"))
+
+        # AND THE DAMP AT THE FOOT OF IT. On the ground cell south of the south
+        # wall, which is the cell the wall's vertical face is painted on -- see
+        # `wall_base` in make_tiles.py, which draws in the top half of its own
+        # cell for exactly that reason.
+        south = [(i, b["y"] + b["h"]) for i in range(b["x"] + 1, b["x"] + b["w"] - 1)]
+        for k in range(1, len(south), STAIN_PITCH):
+            c = south[k]
+            if c in reserved:
+                continue
+            out.append(("wall_base", c[0], c[1], "ground"))
+
+    # THE OUTBUILDINGS GET A RIDGE AND NOTHING ELSE. A shed seen from above is
+    # a roof -- it has no wall course and no door, which is why stamp_town does
+    # not give it one -- but it still has a top, and nine sheds with no ridge
+    # beside fifteen buildings with one is the two-idioms problem in miniature.
+    for shed in plan["sheds"]:
+        ry = shed["y"] + shed["h"] // 2
+        for rx in range(shed["x"], shed["x"] + shed["w"]):
+            out.append((RIDGE, rx, ry, "roof"))
+    return out
+
+
+def dress_facades(world, plane, plan):
+    """Put the facade down, and refuse to lose a piece of it.
+
+    The same contract as furnish_house and stock_town, and the same reason: a
+    `placed` prop has no density, so the validator's "this prop never appears"
+    warning is blind to it and a window that silently failed to land would be a
+    blank wall nobody could explain.
+
+    It adds one check those two do not have, and it is the one that would have
+    caught the previous pass's mistake in a different costume: **every prop here
+    declares what the cell under it must be, and the cell is read out of the
+    world to see.** A window that is not on this building's own wall material,
+    a chimney that is not on its own roof, a stain that is not on walkable
+    ground -- each is a placement worked out from a rectangle that has drifted
+    from what was actually stamped, which is precisely the class of error that
+    put an NPC inside his own front wall.
+    """
+    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
+    catalogue = {p["id"]: p for p in manifest["props"]["list"]}
+    problems = []
+    placed = 0
+    weathered = 0
+    wanted_ground = 0
+    for (name, x, y, wants) in facade_props(plan):
+        # Weather may be refused; structure may not. Everything that goes wrong
+        # below produces a sentence either way -- what `optional` decides is
+        # whether the sentence is a build failure or a stain that did not fall.
+        optional = wants == "ground"
+        wanted_ground += 1 if optional else 0
+        material = ORDER[world.at(x, y)]
+        why = None
+        prop = catalogue.get(name)
+        if prop is None:
+            why = "%s is not in the catalogue" % name
+        elif prop["solid"]:
+            # A facade prop is a picture on a surface that is already solid, or
+            # a stain on a pavement the player walks over. Either way it must
+            # not be the thing that decides collision: the wall already does
+            # that, and a solid prop on a walkable cell would put an invisible
+            # post in the street.
+            why = "%s is solid and cannot dress a facade" % name
+        elif wants == "wall" and not material.startswith("wall_"):
+            why = "%s at (%d,%d) wants a wall and found %s" % (name, x, y, material)
+        elif wants == "roof" and not material.startswith("roof"):
+            why = "%s at (%d,%d) wants a roof and found %s" % (name, x, y, material)
+        elif wants == "ground" and not world.walkable(x, y):
+            why = "%s at (%d,%d) wants ground and found %s" % (name, x, y, material)
+        elif world.at(x, y) == T["door"]:
+            why = "%s at (%d,%d) is standing in a doorway" % (name, x, y)
+        elif plane[y][x]:
+            here = next((p["id"] for p in catalogue.values()
+                         if p["plane"] == plane[y][x]), "?")
+            why = "%s at (%d,%d) lands on %s" % (name, x, y, here)
+        if why is not None:
+            if not optional:
+                problems.append(why)
+            continue
+        plane[y][x] = prop["plane"]
+        placed += 1
+        weathered += 1 if optional else 0
+    if problems:
+        raise SystemExit("the town's facades are wrong:\n  " + "\n  ".join(problems))
+    # ...and losing ALL the weather is a bug even though losing some of it is
+    # not. If the geometry ever drifts so that the cell south of every south
+    # wall is a wall, this is what says so instead of a town that quietly stops
+    # being damp.
+    if wanted_ground and weathered * 2 < wanted_ground:
+        raise SystemExit(
+            "only %d of %d wall stains found open ground under a wall. The "
+            "cell south of a south wall is where the wall's face is painted, "
+            "so this many refusals means the building rectangles and what was "
+            "actually stamped have drifted apart."
+            % (weathered, wanted_ground))
+    return placed
 
 
 def stock_town(world, plane, plan, rng):
@@ -1972,6 +2409,22 @@ def main():
     made = {(x, y) for y in range(H) for x in range(W)
             if world.at(x, y) in (T["path_dirt"], T["floor_stone"],
                                   T["bridge"], T["door"])}
+    # AND SO IS A BUILDING. The terrace is derived from the elevation field and
+    # knows nothing about what has been built on it, so a contour that happened
+    # to cross the town ran an unclimbable rock face straight over three roofs:
+    # (132-136, 165) and (141-144, 167) inside the mayor's, (120-123, 166)
+    # inside the tinkerer's, with one piece hanging off the east wall over open
+    # ground. _draw_cliff paints after the terrain and before the props, so it
+    # lands squarely on the roof and there is no z-order that could save it.
+    #
+    # It is the same fault the road cutting fixed and it takes the same fix:
+    # somebody who builds a house on a slope digs the slope out first. The
+    # footprints go into `graded` alongside the roads, which BREAKS the run
+    # rather than blanking cells out of it -- see cliff_plane's docstring for
+    # why blanking would fail the byte-identical round trip.
+    made |= vale["built"] | {(x, y)
+                             for y in range(plan["y0"], plan["y0"] + plan["h"])
+                             for x in range(plan["x0"], plan["x0"] + plan["w"])}
     cliffs = cliff_plane(steps, elev, graded=made)
     faces = {(x, y) for y in range(H) for x in range(W) if cliffs[y][x]}
 
@@ -1981,9 +2434,24 @@ def main():
     # and a hand-made list is the wrong one to drop.
     props = [[0] * W for _ in range(H)]
     town_prop_count = stock_town(world, props, vale, rng)
+    dressed = dress_facades(world, props, vale)
     doorsteps = {b["doorstep"] for b in vale["buildings"]}
     doorsteps |= {plan["door_outside"], plan["spite"]}
-    scatter_props(world, elev, rng, reach, props, keep_clear=doorsteps)
+    # THE INSIDE OF THE HOUSE IS NOT SCATTERED, IT IS FURNISHED.
+    #
+    # `floor_stone` is the market square AND the house's hall floor, and the
+    # scatter set written for the square -- grit in the joints, leaves against
+    # the kerb -- was therefore offered to the hall as well, where it landed on
+    # the cell a crate belongs on and failed the build. Which is the right
+    # failure and the wrong fix: furnish_house owns every cell inside the
+    # building and nothing else may put anything there, whatever the floor is
+    # made of. Stated once here rather than by keeping the two material
+    # vocabularies apart, because they should not have to be kept apart.
+    house_cells = {(x, y)
+                   for y in range(plan["y0"], plan["y0"] + plan["h"])
+                   for x in range(plan["x0"], plan["x0"] + plan["w"])}
+    scatter_props(world, elev, rng, reach, props,
+                  keep_clear=doorsteps | house_cells)
     furnish_house(world, props, plan)
 
     # The collision plane is *derived* from the finished prop plane rather than
@@ -2011,9 +2479,6 @@ def main():
     # bare terrain underneath it.
     world.blocked = blocked
     reach = reachable(world, spawn)
-    house_cells = {(x, y)
-                   for y in range(plan["y0"], plan["y0"] + plan["h"])
-                   for x in range(plan["x0"], plan["x0"] + plan["w"])}
 
     # Nothing procedural within sight of the house.
     #
@@ -2064,9 +2529,12 @@ def main():
         return (c in reach and c not in house_cells
                 and c != plan["door_outside"])
 
+    # Only a prop that STANDS UP can bury him -- see standing_planes().
+    standing = standing_planes()
+
     def clear_south(c):
         x, y = c[0], c[1] + 1
-        return not (0 <= x < W and 0 <= y < H and props[y][x])
+        return not (0 <= x < W and 0 <= y < H and props[y][x] in standing)
 
     spite = (next((c for c in ring if standable(c)
                    and not props[c[1]][c[0]] and clear_south(c)
@@ -2286,6 +2754,14 @@ def main():
     #     barricade with barricade necessarily south of it, and it has no
     #     sprite of its own to bury. Over-applying it forbids the one placement
     #     the town's whole boundary depends on.
+    #
+    #     It applies only to props that STAND UP, too, and that is the second
+    #     way over-applying it costs a build. The rule comes from the 96px slot
+    #     a prop is drawn in; a prop the catalogue marks `flat` is drawn in the
+    #     bottom few rows of that slot and paints nothing above its own cell.
+    #     Once lanes started taking grit, the first thing this check did was
+    #     refuse to let Spite stand on his own doorstep because a twig had blown
+    #     into the road one cell south of him.
     drawn_over = []
     animals = {"dog", "cat", "spite"}
     for entry in interactables:
@@ -2301,7 +2777,8 @@ def main():
         if entry["type"] in animals and (ix, iy) in blocked:
             drawn_over.append("%s at (%d,%d) is standing on something solid"
                               % (entry["type"], ix, iy))
-        if entry["type"] in animals and iy + 1 < H and props[iy + 1][ix]:
+        if (entry["type"] in animals and iy + 1 < H
+                and props[iy + 1][ix] in standing):
             # props_by_plane() is {plane: {solid, foot}} -- no id, no plane
             # key. Written against a shape that does not exist, so the report
             # crashed with a KeyError at the exact moment it had something to
@@ -2390,9 +2867,13 @@ def main():
           "%d cells of boundary"
           % (len(vale["buildings"]), len(vale["sheds"]), len(vale["streets"]),
              len(vale["water"]), len(vale["barrier"])))
-    print("  %d town props placed by hand; the fort gate is at %s and %d "
-          "anomalies are inside the vale"
-          % (town_prop_count, vale["gate"], len(in_vale)))
+    print("  %d town props placed by hand, %d facade pieces on the buildings "
+          "(windows, signs, ridges, stacks and stains)"
+          % (town_prop_count, dressed))
+    print("  the fort gate is at %s and %d anomalies are inside the vale"
+          % (vale["gate"], len(in_vale)))
+    print("  %d cells of paving in one connected surface"
+          % sum(1 for m in vale["streets"].values() if m == "floor_stone"))
     print("  sealed under four-way AND eight-way movement with the gate shut; "
           "opens to %d outside cells when it is not" % len(outside(reach)))
     house_anom = [a for a in anomalies if a.get("area") == "waking_room"][0]
