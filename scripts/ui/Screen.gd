@@ -114,7 +114,15 @@ func run_area_id() -> String:
 	var sector := String(run.anomaly.get("sector", ""))
 	if sector != "":
 		return sector
-	return String(run.area.get("id", "default"))
+	var area := String(run.area.get("id", ""))
+	if area != "":
+		return area
+	# Out on the overworld there is no anomaly and no area, and every screen
+	# fell back to the bedroom — so a conversation in the town square was drawn
+	# against the player's own bed. The world knows where they are standing,
+	# and a region id doubles as an area id, so it answers this directly.
+	var here := HJWorld.shared().place_id(run.world_pos)
+	return here if here != "" else "default"
 
 
 ## The place this screen is standing in, named by the active theme and dialled

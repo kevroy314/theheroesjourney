@@ -58,7 +58,15 @@ func build() -> void:
 	if mood != "":
 		naming.add_child(HJUI.label(_mood_line(String(beat.get("speaker", "")), mood),
 			HJUI.FS_TINY, "muted"))
-	who.add_child(naming)
+	# The name sat straight on the backdrop, and a speaker whose accent is
+	# "muted" — Tobin's is — disappeared entirely wherever the art behind it
+	# was pale. It reads over a window now because it has a ground of its own,
+	# which is the same answer the line of dialogue below it already used.
+	var plate := HJUI.panel("panel")
+	plate.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	plate.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	plate.add_child(naming)
+	who.add_child(plate)
 	v.add_child(who)
 
 	# --- what they said ---

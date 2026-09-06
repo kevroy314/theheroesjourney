@@ -87,6 +87,15 @@ func _ready() -> void:
 	add_child(HJDebugOverlay.new())
 	Debug.knob_changed.connect(_on_knob_changed)
 
+	# Before Game.boot(), and it returns rather than falling through. A world
+	# shot wants the autoloads and the world file and nothing else: booting would
+	# load the player's run, possibly trip a deadline and write the save, for a
+	# tool whose whole contract is that it never touches any of that. See the
+	# header of scripts/WorldShot.gd.
+	if HJWorldShot.requested():
+		call_deferred("_run_worldshot")
+		return
+
 	Game.boot()
 	_restyle()
 	_apply_brightness()
@@ -166,6 +175,11 @@ func _selftest_requested() -> bool:
 
 func _run_selftest() -> void:
 	var code: int = await HJSelfTest.run_all(self)
+	get_tree().quit(code)
+
+
+func _run_worldshot() -> void:
+	var code: int = await HJWorldShot.run_shot(self)
 	get_tree().quit(code)
 
 

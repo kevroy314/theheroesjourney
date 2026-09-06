@@ -228,20 +228,8 @@ func place_name(cell: Vector2i) -> String:
 	if inside >= 0:
 		var named := _indoor_names[inside] if inside < _indoor_names.size() else ""
 		return named if named != "" else "Home"
-	var best := ""
-	var best_d := 1 << 30
-	for id in regions:
-		var at: Vector2i = regions[id]
-		var d: int = absi(at.x - cell.x) + absi(at.y - cell.y)
-		if d < best_d:
-			best_d = d
-			best = String(id)
+	var best := place_id(cell)
 	if best == "":
-		return "Outside"
-	# Far from everything named is its own answer. Claiming you are in the
-	# Observatory because it is the closest anchor forty tiles away is worse
-	# than admitting the map has nothing to say about here.
-	if best_d > 24:
 		return "Outside"
 	# `place`, not `name`. A region id doubles as an area id, and an area's name
 	# belongs to the *memory* you walk into — `waking_room` is called "The
@@ -250,6 +238,26 @@ func place_name(cell: Vector2i) -> String:
 	# spot is called when you are merely near it.
 	var area := Content.area(best)
 	return String(area.get("place", area.get("name", best)))
+
+
+## Which named region this cell belongs to, or "". A region id doubles as an
+## area id, which is what lets a caller reach for that area's backdrop: a
+## conversation in the town square was drawn against the bedroom because the
+## only question anyone asked was which *anomaly* the run was in, and standing
+## in the town you are in none.
+func place_id(cell: Vector2i) -> String:
+	var best := ""
+	var best_d := 1 << 30
+	for id in regions:
+		var at: Vector2i = regions[id]
+		var d: int = absi(at.x - cell.x) + absi(at.y - cell.y)
+		if d < best_d:
+			best_d = d
+			best = String(id)
+	# Far from everything named is its own answer. Claiming you are in the
+	# Observatory because it is the closest anchor forty tiles away is worse
+	# than admitting the map has nothing to say about here.
+	return "" if best_d > 24 else best
 
 
 ## Which building this cell is inside, or -1. Separate from `is_indoors` so a

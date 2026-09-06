@@ -17,11 +17,15 @@ extends RefCounted
 ##
 ## The contract a prop entry may carry:
 ##
-##     "light": { "radius": 4.5, "color": "#FFC880", "flicker": 0.15 }
+##     "light": { "radius": 4.5, "color": "#FFC880", "flicker": 0.15,
+##                "kind": "lamp" }
 ##
 ##   radius   in tiles, float
 ##   color    hex, the colour *at the source*
 ##   flicker  0.0-1.0, 0 is a steady lamp and 1 is a guttering candle
+##   kind     what SORT of light it is, and therefore when it burns. Optional;
+##            "lamp" if absent, because a lamp is the common case and the
+##            behaviour the pass had before kinds existed. See `gain_for()`.
 ##
 ## Absent, the prop emits nothing and the world renders as it always did.
 
@@ -225,21 +229,121 @@ const GLOW := 0.34
 const LAMP_DUSK := 0.62
 
 
+## --- what sort of light it is ----------------------------------------------------
+##
+## WHY A KIND AND NOT A SECOND NUMBER PER PROP
+##
+## "Fade the lamps out by day" is one rule, and it belongs here so that every
+## light-flagged prop inherits it without the art having to remember. But it is
+## not true of every light, and the counter-examples are not edge cases — they
+## are the three lights the town actually has:
+##
+##   * a street lamp is lit by somebody at dusk and put out at dawn. In full sun
+##     it is a cold lump of brass. This is the one the ramp already meant.
+##   * a hearth, a forge, a stove, a campfire is a FIRE. Nobody puts the kitchen
+##     range out because the sun came up. It is washed out at noon the way any
+##     small source is next to daylight, but it never goes to nothing, and under
+##     a roof at midday it is still the brightest thing in the room.
+##   * a lit window is not a light at all, it is EVIDENCE OF AN OCCUPANT. It says
+##     somebody is home. On at dusk when they come in, banked to one lamp when
+##     they go to bed, dark all day when the house is empty — and a street of
+##     windows that all behave that way is most of what makes a town read as
+##     inhabited rather than as a diorama.
+##
+## Three behaviours, so three words, declared by the art in the same catalogue
+## that already declares radius and colour. The alternative — a `day_gain` float
+## on every emitter — pushes the model out to 30 prop entries that would then
+## disagree with each other the first time anyone added a lamp.
+##
+## The vocabulary is reconciled against data/schema.json in both directions by
+## tools/validate_data.py, reading the `match` in `gain_for()` below. A fourth
+## kind means a fourth arm there and a fourth word in the schema, and the
+## validator fails until both exist.
+
+## What a light is if it does not say. "lamp" is the behaviour every emitter in
+## the tileset had before kinds existed, so an entry that stays silent renders
+## exactly as it did — which is the only safe default for a key being added to a
+## contract that already has readers.
+const DEFAULT_KIND := "lamp"
+
+## The daylight switch, against the sun's height rather than against the ambient
+## ramp — and that split is the fix for the defect this whole section exists for.
+##
+## The ramp is a *mood*: it is symmetric about noon, it never reaches zero until
+## 0.52, and at 0.45 it still reports mix 0.09, which the old single curve turned
+## into a quarter-strength lamp. A quarter of a street lamp at a quarter past
+## eleven in the morning is exactly the "burning in full sun" tell. The sun's
+## elevation is not a mood, it is a fact, and it says plainly that by mid-morning
+## there is no lamp on earth competing with it.
+##
+## So: the ramp keeps saying how DARK it is (which is what separates dusk from
+## midnight, and the elevation cannot — it is flat zero all night), and the
+## elevation says how much of that the sun takes back. Neither term can do the
+## other's job, which is why there are two.
+const SUN_WASH_LOW := 0.05     ## below this the sun has lost; lamps burn freely
+const SUN_WASH_HIGH := 0.45    ## above this it has won outright
+
+## What a fire is worth once the sun has washed it out completely. Not zero: a
+## forge at noon still glows, and a stove in a kitchen is the reason the room is
+## not black. Sized so that outdoors at midday it is a warm smudge you have to
+## be next to, and indoors — where the wash is suppressed entirely, see below —
+## it is untouched.
+const FIRE_BY_DAY := 0.35
+
+## When there is somebody behind the window, 0..1. Keyframed on the hour, same
+## idiom as AMBIENT above, because "who is home" is a schedule and a schedule is
+## a table — writing it as arithmetic would be four smoothsteps nobody could
+## read back as a day in a person's life.
+const OCCUPIED := [
+	[0.00, 0.20],   # the small hours: one lamp left burning at the back
+	[0.18, 0.20],
+	[0.24, 1.00],   # up before the sun; the kitchen window is the first lit
+	[0.34, 1.00],
+	[0.42, 0.00],   # out for the day, and the house goes dark behind them
+	[0.62, 0.00],
+	[0.72, 1.00],   # home, and the whole street comes on within the half hour
+	[0.90, 1.00],
+	[0.97, 0.20],   # abed
+	[1.00, 0.20],
+]
+
+
 ## What a lamp is worth at this hour.
 ##
-## A street light blazing at noon is the single most obviously wrong thing this
-## system can do, and no amount of ramp tuning hides it — the sun is simply
-## brighter than the lamp. Tied to the ambient rather than to the clock directly
-## so the two can never disagree: as the world stops needing lighting, the lamps
-## stop providing it, and at noon (mix 0) the gain is exactly zero and the whole
-## pass becomes a no-op.
+## The depth-of-night term, and the base every kind is scaled from. Tied to the
+## ambient rather than to the clock directly so the two can never disagree: as
+## the world stops needing lighting, the lamps stop providing it, and at noon
+## (mix 0) this is exactly zero and the whole pass becomes a no-op.
 ##
-## The cost of doing it this way is that an interior lamp also fades at midday,
-## because nothing here knows about roofs yet. When the house has an inside,
-## this is where a "sheltered" term belongs.
+## On its own this was never enough — see SUN_WASH_LOW. `gain_for()` is what
+## callers with a kind in hand should ask; this is still the honest answer for
+## the lights that have no kind because no prop declares them: the anomalies and
+## the character's own.
 static func lamp_gain() -> float:
 	_resample()
 	return _cache_gain
+
+
+## What a light of this kind is worth at this hour, 0..1.
+##
+## The one place the three behaviours are spelled out, so a prop becomes a fire
+## by gaining a word in assets/tiles/tiles.json and nothing else changes.
+## tools/validate_data.py reads these arms as the engine's half of the
+## `light_kinds` vocabulary; keep them string literals on their own lines.
+static func gain_for(kind: String) -> float:
+	_resample()
+	match kind:
+		"lamp":
+			return _cache_lamp
+		"fire":
+			return _cache_fire
+		"window":
+			return _cache_window
+	# A word the manifest invented and this file has never heard of. The
+	# validator refuses to let one ship, so reaching here means somebody hand-
+	# edited tiles.json — and a lamp that behaves like a lamp is a better answer
+	# than a lamp that does not light.
+	return _cache_lamp
 
 
 ## The sampled ramp, recomputed only when the hour actually moves. Three calls a
@@ -249,6 +353,13 @@ static var _cache_indoors := false
 static var _cache_mix: float = 0.0
 static var _cache_colour: Color = Color.BLACK
 static var _cache_gain: float = 0.0
+## The three kinds, resolved with the rest of the ramp rather than on demand.
+## `gain_for()` is asked once per emitter per frame and a town corner holds a
+## dozen; working the sun's height out a dozen times for a value that changes
+## once per clock tick is the same waste the ambient cache was written to stop.
+static var _cache_lamp: float = 0.0
+static var _cache_fire: float = 0.0
+static var _cache_window: float = 0.0
 
 
 static func _resample() -> void:
@@ -292,6 +403,57 @@ static func _settle(mix: float, colour: Color) -> void:
 	# to; it reaches full only once the sky is gone.
 	_cache_gain = smoothstep(0.0, 0.20, _cache_mix) * lerpf(
 		LAMP_DUSK, 1.0, smoothstep(0.20, 0.78, _cache_mix))
+
+	# And the third: how much of that the sun takes straight back off again.
+	#
+	# Zero indoors, deliberately, and this is the "sheltered" term the comment on
+	# lamp_gain() used to promise. The sun does not reach under a roof, so a
+	# floor lamp and a stove keep burning at noon in a room the ambient has
+	# already floored at INTERIOR_MIX — which is the case the very first minute
+	# of the game is made of. It is coarse in the same way `indoors` itself is:
+	# it is a fact about where the CHARACTER is standing, not about each light,
+	# so standing in the house also spares the street lamps outside it. That is
+	# the same approximation the whole-frame darkening already makes, and it
+	# fails in the same direction — toward the room you are actually looking at.
+	var wash := 0.0 if indoors else _wash_at(time_of_day)
+	# A lamp somebody lights at dusk and puts out at dawn. The wash IS the
+	# switch, and because it is a smoothstep over a stretch of the sun's climb
+	# rather than a threshold on the clock, coming on and going out both take a
+	# few minutes of game time instead of happening between two frames.
+	_cache_lamp = _cache_gain * (1.0 - wash)
+	# A fire does not care what time it is. It is still smaller than the sun.
+	_cache_fire = _cache_gain * lerpf(1.0, FIRE_BY_DAY, wash)
+	# A window is a lamp behind glass that is only lit while somebody is in.
+	_cache_window = _cache_lamp * _ramp(OCCUPIED, time_of_day)
+
+
+## Linear sample of a keyframed [time, value] table on the 0..1 day. Sorted, and
+## the last stop must repeat the first's value at 1.0 so the day loops.
+static func _ramp(table: Array, at: float) -> float:
+	var u := fposmod(at, 1.0)
+	var previous: Array = table[0]
+	for stop in table:
+		var entry: Array = stop
+		var when: float = float(entry[0])
+		if u <= when:
+			var was: float = float(previous[0])
+			var span: float = maxf(when - was, 0.0001)
+			return lerpf(float(previous[1]), float(entry[1]),
+				clampf((u - was) / span, 0.0, 1.0))
+		previous = entry
+	return float(previous[1])
+
+
+## How thoroughly the sun drowns a small light right now, 0 (not at all) to 1
+## (completely). The public form; `_wash_at` is the same curve without a clock
+## read, for the ramp that is already holding the hour still.
+static func sun_wash() -> float:
+	_advance()
+	return _wash_at(time_of_day)
+
+
+static func _wash_at(u: float) -> float:
+	return smoothstep(SUN_WASH_LOW, SUN_WASH_HIGH, sin(PI * _arc_at(u)))
 
 
 ## How much of the ambient replaces the art right now, 0..1.
@@ -354,6 +516,11 @@ static func _claim(plane: int, spec: Variant) -> void:
 		"radius": radius,
 		"colour": _colour(String(light.get("color", "#FFFFFF"))),
 		"flicker": clampf(float(light.get("flicker", 0.0)), 0.0, 1.0),
+		# Read as written and resolved at draw time rather than mapped to an
+		# enum here: `gain_for()` is the single place that knows what a word
+		# means, and an unknown one has to survive as far as that so it can fall
+		# back to a lamp instead of failing the load of the whole manifest.
+		"kind": String(light.get("kind", DEFAULT_KIND)),
 	}
 	_max_radius = maxf(_max_radius, radius)
 
@@ -441,6 +608,7 @@ static func index_world(world: HJWorld) -> void:
 					"colour": spec["colour"],
 					"flicker": float(spec["flicker"]),
 					"phase": phase_for(cell),
+					"kind": String(spec["kind"]),
 				}
 				if _buckets.has(key):
 					(_buckets[key] as Array).append(entry)
@@ -614,7 +782,18 @@ const SHAFT_COLOUR := Color(1.0, 0.906, 0.761)     ## #FFE7C2, first light
 ## through the night so nothing downstream has to special-case darkness.
 static func sun_arc() -> float:
 	_advance()
-	return clampf((fposmod(time_of_day, 1.0) - 0.25) / 0.5, 0.0, 1.0)
+	return _arc_at(time_of_day)
+
+
+## The same curve for an hour handed in, with no clock read.
+##
+## Split out because the ambient ramp needs the sun from *inside* `_resample()`,
+## which has already advanced the clock a few lines earlier — calling the public
+## accessor there would advance it a second time in the middle of sampling it,
+## and the whole point of the ramp cache is that the hour holds still while it
+## is being read.
+static func _arc_at(u: float) -> float:
+	return clampf((fposmod(u, 1.0) - 0.25) / 0.5, 0.0, 1.0)
 
 
 ## How high the sun stands, 0 on either horizon and 1 at noon.

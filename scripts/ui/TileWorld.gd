@@ -38,6 +38,22 @@ const FACINGS := {
 
 var world: HJWorld
 var run: HJRun
+## What this instance actually draws at. ZOOM is the game's value and what every
+## screen wants; the worldshot tool drops it to 1 so a whole town fits in one
+## off-screen buffer rather than nine times the pixels — see scripts/WorldShot.gd.
+##
+## Per-instance rather than a mutable override of the constant, because
+## HJLightOverlay reads ZOOM back off this script's constant map and HJTapWalk
+## reads it off the class: both mean "what the game draws at", and both must go
+## on seeing 3 while a shot is in flight.
+var zoom: int = ZOOM
+## Parks the camera at a fixed world-pixel origin instead of following the
+## character. Vector2.INF — every instance in the running game — means follow.
+##
+## The worldshot is the only caller. A shot is of a rectangle somebody named, and
+## the follow rule would slide it to wherever the figure happens to be standing,
+## so the tool would be asking for one region and being handed another.
+var camera_lock := Vector2.INF
 var node_at: Dictionary = {}         ## Vector2i -> node id, this anomaly's beats
 
 var _tiles: Texture2D
@@ -186,10 +202,15 @@ func cell() -> Vector2i:
 ## and mid-stride the camera is up to a whole tile from the cell the character
 ## legally occupies, which is enough to send a tap one cell wide.
 func camera_px() -> Vector2:
-	var scale := float(TILE * ZOOM)
+	# Locked, so nothing below runs. Returned before the clamps on purpose: a
+	# shot may legitimately ask for a rectangle that runs off the edge of the
+	# map, and clamping it back would silently answer a different question.
+	if camera_lock.x < INF:
+		return camera_lock
+	var scale := float(TILE * zoom)
 	var view := size
 	var extent := Vector2(world.w, world.h) * scale
-	var focus := (_character_px() + Vector2(TILE, TILE) * 0.5) * float(ZOOM)
+	var focus := (_character_px() + Vector2(TILE, TILE) * 0.5) * float(zoom)
 	var cam := focus - view * 0.5
 	cam.x = clampf(cam.x, 0.0, maxf(0.0, extent.x - view.x))
 	cam.y = clampf(cam.y, 0.0, maxf(0.0, extent.y - view.y))
@@ -207,7 +228,7 @@ func camera_px() -> Vector2:
 ## character legally occupies, which is enough to send a tap one cell wide. The
 ## rule lives here, where the camera does.
 func cell_at_point(local: Vector2) -> Vector2i:
-	var per_tile := float(TILE * ZOOM)
+	var per_tile := float(TILE * zoom)
 	var cam := camera_px()
 	return Vector2i(
 		int(floor((local.x + cam.x) / per_tile)),
@@ -279,7 +300,7 @@ func _character_px() -> Vector2:
 func _draw() -> void:
 	if world == null or not world.loaded or _tiles == null:
 		return
-	var scale := float(TILE * ZOOM)
+	var scale := float(TILE * zoom)
 	_mnow = float(Time.get_ticks_msec()) * 0.001
 	_mgain = HJMotion.gain()
 
@@ -540,7 +561,7 @@ func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 			# world rather than float on the grid.
 			var origin := Vector2(x * TILE + TILE / 2 - PROP_W / 2,
 				y * TILE + TILE - PROP_H)
-			var at := origin * float(ZOOM) - cam
+			var at := origin * float(zoom) - cam
 			# A prop that declares no motion, or motion switched off, takes the
 			# single untransformed blit it always took. This is the whole of the
 			# "degrade" clause: there is no branch inside the common path, only
@@ -548,7 +569,7 @@ func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 			var spec: Dictionary = HJMotion.for_plane(plane) if _mgain > 0.0 else {}
 			if spec.is_empty():
 				draw_texture_rect_region(_props,
-					Rect2(at, Vector2(PROP_W, PROP_H) * float(ZOOM)),
+					Rect2(at, Vector2(PROP_W, PROP_H) * float(zoom)),
 					Rect2((slot % PROP_COLS) * PROP_W, (slot / PROP_COLS) * PROP_H,
 						PROP_W, PROP_H))
 			else:
@@ -572,7 +593,7 @@ func _draw_portals(y: int, cam: Vector2, first_x: int, last_x: int) -> void:
 		var cell := Vector2i(e.x, e.y)
 		if _cleared.has(cell):
 			continue
-		_portals.draw_at(self, cell, e.z, cam, TILE, ZOOM, _mnow,
+		_portals.draw_at(self, cell, e.z, cam, TILE, zoom, _mnow,
 			cell == _cell and not _moving)
 
 
@@ -615,9 +636,9 @@ func _draw_critter(view: Dictionary, cam: Vector2) -> void:
 	# Standing on the cell's bottom edge, so a taller figure grows upward out of
 	# the ground rather than sinking into it. Same rule as the character.
 	var origin := (at * float(TILE) + Vector2(float(TILE - fw) * 0.5,
-		float(TILE - fh))) * float(ZOOM) - cam
+		float(TILE - fh))) * float(zoom) - cam
 	draw_texture_rect_region(tex,
-		Rect2(origin, Vector2(fw, fh) * float(ZOOM)),
+		Rect2(origin, Vector2(fw, fh) * float(zoom)),
 		Rect2(int(view["col"]) * fw, int(view["row"]) * fh, fw, fh))
 
 
@@ -637,8 +658,8 @@ func _draw_character(cam: Vector2) -> void:
 	# exactly like a prop, which is why this is called from inside the Y-sorted
 	# scenery pass rather than after it.
 	var dst := Rect2(
-		(px + Vector2((TILE - FRAME_W) * 0.5, TILE - FRAME_H)) * float(ZOOM) - cam,
-		Vector2(FRAME_W, FRAME_H) * float(ZOOM))
+		(px + Vector2((TILE - FRAME_W) * 0.5, TILE - FRAME_H)) * float(zoom) - cam,
+		Vector2(FRAME_W, FRAME_H) * float(zoom))
 	draw_texture_rect_region(_player, dst,
 		Rect2(col * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H))
 
@@ -669,7 +690,7 @@ static func _profile(u: float) -> float:
 ## hide and nothing to fudge. The transform must be cleared afterwards — it is
 ## renderer state, and the character is drawn from inside the same loop.
 func _draw_prop_moving(slot: int, at: Vector2, spec: Dictionary, cell: Vector2i) -> void:
-	var z := float(ZOOM)
+	var z := float(zoom)
 	var top: int = int(spec["top"])
 	var base: int = int(spec["base"])
 	var span := float(maxi(base - top, 1))
@@ -714,7 +735,7 @@ func _draw_prop_moving(slot: int, at: Vector2, spec: Dictionary, cell: Vector2i)
 ## shader would need, and correctly ordered underneath the props and the
 ## character for free, which a child CanvasItem is not.
 func _draw_shimmer(x: int, y: int, dst: Rect2) -> void:
-	var z := float(ZOOM)
+	var z := float(zoom)
 	for i in range(HJMotion.GLINTS):
 		var g := HJMotion.glint(x, y, i, _mnow, TILE)
 		if g.w <= 0.0:
@@ -731,11 +752,18 @@ func _draw_shimmer(x: int, y: int, dst: Rect2) -> void:
 ## Keyed, so calling it again with the same key moves the light rather than
 ## stacking a second one. This is the seam for anything that lights the world
 ## dynamically; nothing uses it yet, and the prop path does not go through it.
+## `kind` is one of HJLighting's light kinds and defaults to "fire", which is
+## not the manifest's default and is deliberate: a prop that says nothing is a
+## lamp because that is what the tileset's lamps are, but a light a script
+## switched on has already been decided to be burning, and having the hour put
+## it back out again would be the caller's instruction being silently ignored.
+## A caller that wants a lamp on a photocell can say so.
 func add_light(key: String, cell: Vector2i, radius: float,
-		colour: Color = Color(1.0, 0.78, 0.5), flicker_amount: float = 0.0) -> void:
+		colour: Color = Color(1.0, 0.78, 0.5), flicker_amount: float = 0.0,
+		kind: String = "fire") -> void:
 	_dynamic[key] = {
 		"cell": cell, "radius": radius, "colour": colour,
-		"flicker": clampf(flicker_amount, 0.0, 1.0),
+		"flicker": clampf(flicker_amount, 0.0, 1.0), "kind": kind,
 	}
 
 
@@ -763,6 +791,11 @@ func _light_pass(cam: Vector2, scale: float, first: Vector2i, last: Vector2i) ->
 	var per_tile := scale
 	# Broad daylight: no lamp is worth gathering, so nothing below runs and the
 	# overlay writes nothing at all.
+	#
+	# This is the depth-of-night term alone, and it is the right gate for the
+	# whole pass because every light kind is this scaled DOWN by something —
+	# there is no kind that can be lit at an hour when this is zero. What each
+	# prop is actually worth comes from HJLighting.gain_for(its kind) below.
 	var gain := HJLighting.lamp_gain()
 
 	if gain > 0.002:
@@ -774,8 +807,14 @@ func _light_pass(cam: Vector2, scale: float, first: Vector2i, last: Vector2i) ->
 			for source in bucket:
 				var entry: Dictionary = source
 				var cell: Vector2i = entry["cell"]
+				# The prop's own kind, not the global gain: this is where a
+				# street lamp goes out at dawn while the forge two doors down
+				# keeps burning. Asked per emitter because that is the only
+				# granularity that can tell them apart, and it costs a cached
+				# dictionary read — the hour is resolved once for the frame.
 				_emit(Vector2(cell.x + 0.5, cell.y + 0.5) * float(TILE),
-					float(entry["radius"]), entry["colour"], cam, per_tile, gain,
+					float(entry["radius"]), entry["colour"], cam, per_tile,
+					HJLighting.gain_for(String(entry["kind"])),
 					float(entry["flicker"]), float(entry["phase"]), now)
 
 		# Anomalies. Not props and not in the manifest — the world generator
@@ -794,7 +833,8 @@ func _light_pass(cam: Vector2, scale: float, first: Vector2i, last: Vector2i) ->
 			var entry: Dictionary = _dynamic[key]
 			var cell: Vector2i = entry["cell"]
 			_emit(Vector2(cell.x + 0.5, cell.y + 0.5) * float(TILE),
-				float(entry["radius"]), entry["colour"], cam, per_tile, gain,
+				float(entry["radius"]), entry["colour"], cam, per_tile,
+				HJLighting.gain_for(String(entry["kind"])),
 				float(entry["flicker"]), HJLighting.phase_for(cell), now)
 
 		# The character's own. Placed off the interpolated position rather than
@@ -825,7 +865,7 @@ func _emit(world_px: Vector2, radius_tiles: float, colour: Color,
 		flicker_amount: float, phase: float, now: float) -> void:
 	if radius_tiles <= 0.0 or gain <= 0.002:
 		return
-	var at := world_px * float(ZOOM) - cam
+	var at := world_px * float(zoom) - cam
 	var radius := radius_tiles * per_tile
 	# Off-screen by more than its own reach: gathered by the bucket, discarded
 	# here. Buckets are sixteen tiles square, so most of what one returns is
