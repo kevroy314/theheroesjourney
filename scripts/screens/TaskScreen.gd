@@ -3,8 +3,19 @@ extends HJScreen
 ##
 ## The app cannot know whether you did the push-up, and pretending otherwise
 ## produces either surveillance or theatre. So: committing is one tap, confirming
-## is a deliberate hold, and the hold stays disabled until enough time has
-## plausibly passed. A speed bump for honesty, never an accusation.
+## is a deliberate gesture, and that gesture stays disabled until enough time
+## has plausibly passed. A speed bump for honesty, never an accusation.
+##
+## Two independent things guard the confirm and it is worth keeping them apart:
+##
+##   the wait     has enough time passed for this to be true — Game.task_seconds,
+##                scaled by HJPrefs.gate_mult, switchable off in Settings
+##   the gesture  did you deliberately say yes — HJGestures, chosen by the
+##                movement's axis, and never switchable off, because without it
+##                a mis-tap finishes a workout
+##
+## This screen owns the bar, the button and the one call to Game.complete_task.
+## It does not know which gesture is running.
 
 ## The one screen that is deliberately nowhere. Everything else in the game is
 ## a place you are standing; this is the moment you set the phone down and do
@@ -27,13 +38,12 @@ static func _pending_is_choice() -> bool:
 
 var _movement: Dictionary = {}
 var _scale_index: int = -1        ## -1 = full movement, 0+ = index into scaling
-var _hold: float = 0.0
-var _holding: bool = false
+var _gesture: HJGesture = null    ## how this task is confirmed; see HJGestures
 
 var _timer_label: Label
 var _timer_bar: ProgressBar
 var _confirm: Button
-var _hold_bar: ProgressBar
+var _gesture_bar: ProgressBar
 var _scale_row: VBoxContainer
 var _field: LineEdit                ## the name question, when there is one
 var _field_button: Button           ## the option that field belongs to
@@ -243,25 +253,36 @@ func _build_active(node: Dictionary) -> void:
 		scale_panel.add_child(_scale_row)
 		body.add_child(scale_panel)
 
-	# The plausibility gate.
-	var gate := HJUI.panel("panel")
-	var gv := HJUI.vbox(8)
-	_timer_label = HJUI.label("", HJUI.FS_SMALL, "muted")
-	gv.add_child(_timer_label)
-	_timer_bar = HJUI.bar(0, 1, "accent", 14)
-	gv.add_child(_timer_bar)
-	gate.add_child(gv)
-	body.add_child(gate)
+	# The plausibility gate. Absent entirely when the player has turned timers
+	# off — an empty progress bar that is always full is worse than no bar, and
+	# the screen should look like what it is doing.
+	var wait := _required_seconds()
+	if wait > 0:
+		var gate := HJUI.panel("panel")
+		var gv := HJUI.vbox(8)
+		_timer_label = HJUI.label("", HJUI.FS_SMALL, "muted")
+		gv.add_child(_timer_label)
+		_timer_bar = HJUI.bar(0, 1, "accent", 14)
+		gv.add_child(_timer_bar)
+		gate.add_child(gv)
+		body.add_child(gate)
 
-	# Confirm: a hold, so a workout cannot be finished by drumming a thumb.
-	_hold_bar = HJUI.bar(0, 1, "good", 8)
-	v.add_child(_hold_bar)
+	# Confirm: a gesture, so a workout cannot be finished by a mis-tap. Which
+	# gesture is data — the movement's axis picks it unless the movement or the
+	# player says otherwise.
+	_gesture = HJGestures.make(HJGestures.for_movement(_movement))
 
-	_confirm = HJUI.button("Hold to confirm", "primary", false)
-	_confirm.button_down.connect(func() -> void: _holding = true)
-	_confirm.button_up.connect(func() -> void:
-		_holding = false
-		_hold = 0.0)
+	_gesture_bar = HJUI.bar(0, 1, "good", 8)
+	v.add_child(_gesture_bar)
+
+	if _gesture.hint() != "":
+		v.add_child(HJUI.label(_gesture.hint(), HJUI.FS_TINY, "muted", HORIZONTAL_ALIGNMENT_CENTER))
+
+	_confirm = HJUI.button(_gesture.label(), "primary", false)
+	# button_down / button_up rather than `pressed`: a gesture needs to know
+	# about the press as it happens, not once it is over.
+	_confirm.button_down.connect(func() -> void: _on_press(true))
+	_confirm.button_up.connect(func() -> void: _on_press(false))
 	v.add_child(_confirm)
 
 	var couldnt := HJUI.button("I couldn't do this one", "quiet")
@@ -271,6 +292,11 @@ func _build_active(node: Dictionary) -> void:
 
 	set_process(true)
 	_update_gate()
+
+	# Once in the lifetime of a save, and only in front of a wait long enough to
+	# be worth complaining about: the timers are a choice. Tapping the toast
+	# lands in Settings with that row lit up, and Back comes straight back here.
+	HJPrefs.hint_timers(wait)
 
 
 func _headline(units: int, unit_name: String) -> String:
@@ -289,9 +315,16 @@ func _scale_button(text: String, index: int) -> Button:
 	return b
 
 
+## The wait, after the player's own setting has had its say.
+##
+## Game.task_seconds is the honest number; HJPrefs.gate_mult is how much of it
+## is enforced, resolved through Rules like every other tunable. This screen is
+## the only reader of task_seconds, so scaling it here is not a second source of
+## truth — it is the only one.
 func _required_seconds() -> int:
 	var run: HJRun = Game.run
-	return Game.task_seconds(run.node(run.pending_node), _movement)
+	var full := Game.task_seconds(run.node(run.pending_node), _movement)
+	return int(round(full * HJPrefs.gate_mult(run.ctx())))
 
 
 func _elapsed() -> int:
@@ -299,38 +332,54 @@ func _elapsed() -> int:
 	return maxi(0, HJClock.now() - run.pending_started)
 
 
+## A press only reaches the gesture once the wait is over. Holding the button
+## down through the last seconds of the countdown must not bank progress the
+## player did not deliberately make.
+func _on_press(down: bool) -> void:
+	if _gesture == null or _confirm == null or _confirm.disabled:
+		return
+	_gesture.press(down)
+
+
 func _process(delta: float) -> void:
 	if _confirm == null or not is_instance_valid(_confirm):
 		return
 	_update_gate()
+	if _gesture == null:
+		return
 
-	if _holding and not _confirm.disabled:
-		_hold += delta
-		var need := Rules.value("task.hold_seconds", {}, 1.2)
-		HJUI.set_bar(_hold_bar, _hold, need, "good")
-		if _hold >= need:
-			_holding = false
-			_hold = 0.0
-			set_process(false)
-			_complete(false)
-	elif _hold > 0.0:
-		_hold = 0.0
-		HJUI.set_bar(_hold_bar, 0, 1, "good")
+	if _confirm.disabled:
+		if _gesture.progress > 0.0:
+			_gesture.reset()
+			HJUI.set_bar(_gesture_bar, 0.0, 1.0, "good")
+		return
+
+	_gesture.tick(delta)
+	HJUI.set_bar(_gesture_bar, _gesture.progress, 1.0, "good")
+	if _gesture.done:
+		_gesture.reset()
+		set_process(false)
+		_complete(false)
 
 
 func _update_gate() -> void:
 	var need := _required_seconds()
 	var elapsed := _elapsed()
-	HJUI.set_bar(_timer_bar, elapsed, need, "good" if elapsed >= need else "accent")
-	if elapsed >= need:
-		_timer_label.text = "Ready when you are."
-		_timer_label.add_theme_color_override("font_color", Palette.c("good"))
+	var open := elapsed >= need
+	if _timer_bar != null and is_instance_valid(_timer_bar):
+		HJUI.set_bar(_timer_bar, elapsed, need, "good" if open else "accent")
+	if _timer_label != null and is_instance_valid(_timer_label):
+		if open:
+			_timer_label.text = "Ready when you are."
+			_timer_label.add_theme_color_override("font_color", Palette.c("good"))
+		else:
+			_timer_label.text = "Confirm unlocks in %s" % HJClock.format_remaining(need - elapsed)
+			_timer_label.add_theme_color_override("font_color", Palette.c("muted"))
+	if open:
 		if _confirm.disabled:
 			_confirm.disabled = false
-			_confirm.text = "Hold to confirm"
+		_confirm.text = _gesture.label() if _gesture != null else "Confirm"
 	else:
-		_timer_label.text = "Confirm unlocks in %s" % HJClock.format_remaining(need - elapsed)
-		_timer_label.add_theme_color_override("font_color", Palette.c("muted"))
 		_confirm.text = "Go on, then"
 
 

@@ -66,6 +66,7 @@ free-floating hex -- see COOL / WARM / SKIN / SHADOW.
 """
 import hashlib
 import json
+import math
 import os
 
 from PIL import Image, ImageDraw, ImageFont
@@ -857,7 +858,10 @@ def main():
         if ws is not None:
             save(ws, "_player_walk.png")
 
+    write_animals(save, grounds)
+
     # Prove the contract rather than assert it.
+    print()
     print("player.png  %dx%d  =  %d cols x %d rows of %dx%d"
           % (sheet.width, sheet.height, len(FRAMES), len(FACINGS), FW, FH))
     print("rows %s / cols %s / walk order %s" % (FACINGS, FRAMES, WALK_ORDER))
@@ -915,6 +919,434 @@ def main():
     print("wrote %d files, md5 %s" % (len(written), h.hexdigest()))
     if not ok:
         raise SystemExit("CONTRACT FAILED")
+
+
+
+
+# --- the animals ---------------------------------------------------------------
+#
+# The dog and the cat, 4 directions x 4 columns of 32x32.
+#
+# Authored, not generated, and the pipeline skill's own finding is the reason:
+# the image model cannot hold an identity across frames, so a walk cycle asked
+# for as a sheet comes back as a contact sheet of four different animals. That
+# is fatal here in a way it is not for a one-off prop -- the whole point of a
+# walk cycle is that it is the *same* animal in a different pose. So this is the
+# same authored-pixels path the player takes, at zero quota, and every frame is
+# the previous frame with two legs moved.
+#
+# The layout is deliberately the player's, one column wider:
+#
+#   rows    down, up, left, right     -- the order in HJTileWorld.FACINGS, which
+#                                        HJCritters.FACING_ROW repeats
+#   col 0   neutral                   -- what a still animal shows, no lookup
+#   col 1   step A       } the walk plays 1, 0, 2, 0, the same CYCLE as the
+#   col 2   step B       } player, for the same reason: no neutral between the
+#                          two steps is a limp
+#   col 3   fidget                    -- ear cocked and tail up. A perfectly
+#                                        still animal is furniture, so the
+#                                        renderer drops this in for a quarter of
+#                                        a second every few seconds while idle.
+#
+# 32x32 rather than the player's 32x48, with about 18 rows of animal inside it,
+# so the dog comes up to the 44-row traveller's knee.
+#
+# Two things learned the hard way while drawing these, both recorded because
+# they are not obvious and both cost a rewrite:
+#
+#   THE RIM CLOSES SMALL GAPS. The eight-connected near-black rim every sprite
+#   in this project carries is what makes one figure legible on eighteen
+#   grounds, and it fills any hole two pixels or narrower from both sides. Four
+#   separately drawn legs one or two pixels apart therefore render as one solid
+#   skirt. Hence two legs per profile with five pixels between them, which is
+#   also what actually reads at this size.
+#
+#   PARAMETRIC ELLIPSES DO NOT MAKE AN ANIMAL. A head disc and a body disc of
+#   similar radius merge into one lozenge with ears. So these are pose tables of
+#   half-widths per row -- geometry only, shaded generically afterwards -- which
+#   is exactly the split the player's sculpt() uses and for the same reason: the
+#   silhouette and the lighting are edited separately.
+#
+# `right` is the mirror of `left`, as the player's is, so the two cannot drift.
+
+AW, AH = 32, 32
+APAW = 27                            # the row a planted paw ends on, always
+AGROUND = 30                         # the shadow's last row
+ACX = 15.5
+APOSES = ["neutral", "step_a", "step_b", "fidget"]
+
+# Two ramps, deliberately far apart in value: the dog is a warm mid-brown and
+# the cat is pale and cool, so at 32 pixels on a phone you can tell which animal
+# you are looking at from value alone, before any shape reads. Same construction
+# as COOL above -- mixed from the theme, never a free hex.
+DOG_FUR = [
+    mix(C["accent"], C["line"], 0.16),   # 0  lit
+    mix(C["accent"], C["line"], 0.42),   # 1  base
+    mix(C["accent"], C["bg"], 0.56),     # 2  mid
+    mix(C["accent"], C["bg"], 0.74),     # 3  dark
+    mix(C["accent"], C["bg"], 0.88),     # 4  deep
+]
+CAT_FUR = [
+    mix(C["muted"], C["text"], 0.58),
+    mix(C["muted"], C["text"], 0.20),
+    C["muted"],
+    mix(C["line"], C["muted"], 0.58),
+    mix(C["line"], C["bg"], 0.28),
+]
+DOG_EYE = mix(C["bg"], BLACK, 0.30)
+CAT_EYE = mix(C["accent"], C["text"], 0.45)
+
+
+def blob(cx, y0, widths, k=1):
+    """(y, x0, x1, ramp index) spans from a column of half-widths.
+
+    Geometry only. One number per row is enough to draw a head, a rump or a
+    muzzle, and keeping it to one number is what makes these tables editable."""
+    out = []
+    for i, w in enumerate(widths):
+        if w < 0:
+            continue
+        out.append((y0 + i, int(round(cx - w)), int(round(cx + w)), k))
+    return out
+
+
+def wedge(tip_x, tip_y, height, k, lean=0):
+    """An ear: a triangle one pixel wide at the tip, widening downward."""
+    out = []
+    for i in range(height):
+        half = i // 2
+        x = tip_x + int(round(lean * i))
+        out.append((tip_y + i, x - half, x + half, k))
+    return out
+
+
+def curl(points, k=1):
+    return [(y, x, x, k) for (x, y) in points]
+
+
+# --- the pose tables ------------------------------------------------------------
+#
+# Every span is (row, x0, x1, ramp index). Parts are listed in draw order, so a
+# head listed after a body is in front of it. Legs are separate because they are
+# the only thing a pose changes.
+
+def dog_parts(cocked=False):
+    """`cocked` is the idle fidget: one ear up a pixel and the tail up two. It
+    is built into the tables rather than applied afterwards, because shifting
+    "everything above row 13" also shifts the top of the body and flattens the
+    silhouette into a bar -- which is what the first attempt did."""
+    fur = 1
+    e = 1 if cocked else 0
+    t = 2 if cocked else 0
+    side = (
+        wedge(9, 9 - e, 4, 2, lean=0.4)                              # the ear
+        + blob(18.5, 14, [4.5, 6, 6.5, 6.5, 6.5, 6.5, 6, 5, 3.5], fur)   # body
+        + curl([(24, 15), (25, 14 - t), (26, 13 - t), (27, 11 - t),
+                (28, 9 - t), (28, 7 - t)], 2)                            # tail
+        + blob(8.5, 12, [3, 4, 4.5, 4.5, 4.5, 4.5, 4, 3], fur)           # head
+        + [(16, 2, 5, 2), (17, 2, 5, 2), (18, 3, 5, 3)]                  # snout
+    )
+    # No tail in the front view. Seen head-on a dog's tail is behind it, and
+    # every attempt to show it either collided with the far ear or floated off
+    # the silhouette as a stub the rim could not reach.
+    down = (
+        blob(15.5, 10, [3.5, 4.5, 5.5, 5.5, 5.5, 4.5, 3.5], 2)           # shoulders
+        + wedge(10, 8, 6, 2, lean=-0.15) + wedge(21, 8 - e, 6, 3, lean=0.15)
+        + blob(15.5, 14, [3.5, 5.5, 6.5, 6.5, 6.5, 6.5, 5.5, 4.5], fur)  # head
+        + blob(15.5, 22, [2.5, 2.5], 2)                                  # muzzle
+    )
+    up = (
+        wedge(10, 8, 6, 2, lean=-0.15) + wedge(21, 8 - e, 6, 3, lean=0.15)
+        + blob(15.5, 11, [3.5, 5.5, 6.5, 6.5, 6.5, 5.5, 4.5], 2)         # skull
+        + blob(15.5, 17, [3.5, 4.5, 5.5, 5.5, 5.5, 4.5, 3.5], fur)       # rump
+        + curl([(20, 23), (21, 21 - t), (22, 19 - t), (23, 17 - t),
+                (23, 15 - t)], 1)                                        # tail
+    )
+    return dict(side=side, down=down, up=up)
+
+
+def cat_parts(cocked=False):
+    fur = 1
+    e = 1 if cocked else 0
+    t = 2 if cocked else 0
+    side = (
+        wedge(9, 10 - e, 5, 2, lean=0.3)
+        + blob(18.5, 16, [3.5, 5, 5.5, 5.5, 5.5, 5, 3.5], fur)
+        + curl([(24, 18), (25, 16 - t), (26, 14 - t), (27, 12 - t),
+                (28, 10 - t), (28, 8 - t), (27, 7 - t)], 2)
+        + blob(9.5, 14, [2.5, 3.5, 3.5, 3.5, 3.5, 2.5], fur)
+        + [(17, 4, 7, 2), (18, 5, 7, 3)]
+    )
+    # A cat facing you keeps its tail up and visible past its own shoulder --
+    # which is the one place on the silhouette it does not collide with an ear.
+    down = (
+        curl([(21, 14), (22, 12 - t), (23, 10 - t), (23, 8 - t)], 2)
+        + blob(15.5, 13, [2.5, 3.5, 4.5, 4.5, 3.5, 2.5], 2)
+        + wedge(11, 10, 7, 2, lean=-0.1) + wedge(20, 10 - e, 7, 3, lean=0.1)
+        + blob(15.5, 16, [3.5, 4.5, 5.5, 5.5, 5.5, 4.5, 3.5], fur)
+        + blob(15.5, 22, [2.0, 2.0], 2)
+    )
+    up = (
+        wedge(11, 10, 7, 2, lean=-0.1) + wedge(20, 10 - e, 7, 3, lean=0.1)
+        + blob(15.5, 13, [3.5, 4.5, 5.5, 5.5, 4.5, 3.5], 2)
+        + blob(15.5, 18, [3.5, 4.5, 5.5, 5.5, 4.5, 3.5], fur)
+        + curl([(20, 23), (21, 21 - t), (22, 19 - t), (23, 17 - t),
+                (23, 15 - t), (22, 13 - t), (21, 12 - t)], 1)
+    )
+    return dict(side=side, down=down, up=up)
+
+
+# Legs, per pose: (x0, x1, top, bottom). A lifted paw is drawn SHORT -- it stops
+# above APAW rather than being drawn somewhere new -- and the other leg of the
+# pair stays planted, so the paw row of the frame as a whole never moves. That
+# is the player's rule, and it is what stops the animal bobbing.
+def _legpair(front_x, hind_x, w, top, pose):
+    lifted = APAW - 2
+    front = (front_x, front_x + w - 1, top, APAW)
+    hind = (hind_x, hind_x + w - 1, top - 1, APAW)
+    if pose == "step_a":
+        front = (front_x + 1, front_x + w, top, lifted)
+    elif pose == "step_b":
+        hind = (hind_x - 1, hind_x + w - 2, top - 1, lifted)
+    return [front, hind]
+
+
+ANIMALS = {
+    "dog": dict(fur=DOG_FUR, eye=DOG_EYE, stripes=False, parts=dog_parts,
+                shadow_rx=10.0,
+                side_legs=lambda p: _legpair(13, 21, 3, 22, p),
+                face_legs=lambda p: _legpair(10, 19, 3, 24, p),
+                eyes_down=[(12, 18), (19, 18)], eye_side=(6, 15),
+                nose=[(15, 23), (16, 23)]),
+    "cat": dict(fur=CAT_FUR, eye=CAT_EYE, stripes=True, parts=cat_parts,
+                shadow_rx=8.5,
+                side_legs=lambda p: _legpair(13, 21, 2, 23, p),
+                face_legs=lambda p: _legpair(11, 19, 2, 24, p),
+                eyes_down=[(13, 19), (18, 19)], eye_side=(7, 16),
+                nose=[(15, 22), (16, 22)]),
+}
+
+
+class Cel:
+    """A 32x32 animal cel. Same contract as Frame: body colours only, with the
+    rim derived from the alpha mask afterwards, so the silhouette is closed
+    however the legs happen to land."""
+
+    def __init__(self):
+        self.img = Image.new("RGBA", (AW, AH), CLEAR)
+
+    def px(self, x, y, c):
+        if 0 <= x < AW and 0 <= y < AH:
+            self.img.putpixel((int(x), int(y)), tuple(c) + (255,))
+
+    def row(self, y, x0, x1, c):
+        for x in range(int(x0), int(x1) + 1):
+            self.px(x, y, c)
+
+
+def paint(c, spans, fur, stripes=False, hi=2, sh=2):
+    """Lay a table of spans down and light it from the north-west.
+
+    The two leftmost pixels of a row go a step lighter and the two rightmost a
+    step darker, with the last column two steps darker. Doing the lighting
+    generically rather than per pixel is the whole reason the tables above are
+    readable; it is the same bargain sculpt() strikes for the player."""
+    for (y, x0, x1, k) in spans:
+        base = fur[max(0, min(len(fur) - 1, k))]
+        c.row(y, x0, x1, base)
+        if stripes and (y % 3) == 0 and x1 - x0 > 3:
+            c.row(y, x0 + 1, x1 - 1, fur[min(len(fur) - 1, k + 2)])
+        c.row(y, x0, min(x1, x0 + hi - 1), fur[max(0, k - 1)])
+        c.row(y, max(x0, x1 - sh + 1), x1, fur[min(len(fur) - 1, k + 1)])
+        c.px(x1, y, fur[min(len(fur) - 1, k + 2)])
+
+
+def paint_legs(c, legs, fur):
+    for (x0, x1, y0, y1) in legs:
+        for y in range(y0, y1 + 1):
+            c.row(y, x0, x1, fur[3])
+            c.px(x1, y, fur[4])
+        c.row(y1, x0, x1, fur[4])
+
+
+def animal_cel(name, facing, pose):
+    """One cel. Every facing is the same animal with its parts rearranged."""
+    a = ANIMALS[name]
+    fur = a["fur"]
+    parts = a["parts"](pose == "fidget")
+    c = Cel()
+
+    if facing in ("left", "right"):
+        paint_legs(c, a["side_legs"](pose), fur)
+        paint(c, parts["side"], fur, a["stripes"])
+        c.px(a["eye_side"][0], a["eye_side"][1], a["eye"])
+    elif facing == "down":
+        paint_legs(c, a["face_legs"](pose), fur)
+        paint(c, parts["down"], fur, a["stripes"])
+        for (x, y) in a["eyes_down"]:
+            c.px(x, y, a["eye"])
+        for (x, y) in a["nose"]:
+            c.px(x, y, fur[4])
+    else:                                       # up -- walking away from you
+        paint_legs(c, a["face_legs"](pose), fur)
+        paint(c, parts["up"], fur, a["stripes"])
+
+    img = c.img
+    if facing == "right":
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    rim(img)
+    _animal_shadow(img, a["shadow_rx"])
+    return img
+
+
+def _animal_shadow(img, rx, ry=2.5):
+    """The one contact shadow, in the tiles' own colour and alpha, centred under
+    the animal. Centred rather than offset for the same reason the player's is:
+    it can stand anywhere, including at the foot of a cliff."""
+    cy = AGROUND - ry + 0.5
+    for y in range(AH):
+        for x in range(AW):
+            if img.getpixel((x, y))[3]:
+                continue
+            u = (x - ACX) / rx
+            v = (y - cy) / ry
+            if u * u + v * v <= 1.0:
+                img.putpixel((x, y), tuple(SHADOW) + (SHADOW_A,))
+    return img
+
+
+def build_animal(name):
+    return {(f, p): animal_cel(name, f, p) for f in FACINGS for p in APOSES}
+
+
+def animal_sheet(cels):
+    sheet = Image.new("RGBA", (AW * len(APOSES), AH * len(FACINGS)), CLEAR)
+    for r, f in enumerate(FACINGS):
+        for col, p in enumerate(APOSES):
+            sheet.paste(cels[(f, p)], (col * AW, r * AH))
+    return sheet
+
+
+def animal_contact(sheet, name, scale=5):
+    """The sheet at 5x with the cell grid ruled over it. The grid is the point:
+    the engine slices on exactly these lines."""
+    pad_l, pad_t = 44, 16
+    big = sheet.resize((sheet.width * scale, sheet.height * scale), Image.NEAREST)
+    out = Image.new("RGBA", (big.width + pad_l + 8, big.height + pad_t + 8),
+                    mix(C["bg"], BLACK, 0.35) + (255,))
+    out.alpha_composite(big, (pad_l, pad_t))
+    d = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    rule = C["line"] + (255,)
+    for col in range(len(APOSES) + 1):
+        x = pad_l + col * AW * scale
+        d.line([(x, pad_t), (x, pad_t + big.height)], fill=rule)
+    for r in range(len(FACINGS) + 1):
+        y = pad_t + r * AH * scale
+        d.line([(pad_l, y), (pad_l + big.width, y)], fill=rule)
+    for col, p in enumerate(APOSES):
+        d.text((pad_l + col * AW * scale + 2, 3), "%d %s" % (col, p),
+               fill=C["muted"] + (255,), font=font)
+    for r, f in enumerate(FACINGS):
+        d.text((3, pad_t + r * AH * scale + 4), f, fill=C["muted"] + (255,),
+               font=font)
+    d.text((3, 3), name, fill=C["accent"] + (255,), font=font)
+    return out
+
+
+def animal_on_ground(cels, grounds, zoom=4):
+    """Every facing on every walkable ground, at the zoom the game runs at."""
+    cw, ch = 32, 32
+    pad_l, pad_t = 48, 14
+    out = Image.new("RGBA",
+                    (pad_l + len(FACINGS) * cw * zoom + 8,
+                     pad_t + len(grounds) * ch * zoom + 8),
+                    mix(C["bg"], BLACK, 0.35) + (255,))
+    d = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    for r, (name, _i, gm, tile) in enumerate(grounds):
+        for col, f in enumerate(FACINGS):
+            cell = ground_patch(tile, cw, ch).convert("RGBA")
+            cell.alpha_composite(cels[(f, "neutral")], (0, 0))
+            out.alpha_composite(cell.resize((cw * zoom, ch * zoom), Image.NEAREST),
+                                (pad_l + col * cw * zoom, pad_t + r * ch * zoom))
+        d.text((3, pad_t + r * ch * zoom + 4), "%s\n%.0f" % (name[:11], gm),
+               fill=C["muted"] + (255,), font=font)
+    for col, f in enumerate(FACINGS):
+        d.text((pad_l + col * cw * zoom + 3, 3), f, fill=C["muted"] + (255,),
+               font=font)
+    return out
+
+
+def animal_ascii(cels, facing="left", pose="neutral"):
+    """The silhouette as text. The only way to check a pose from a terminal, and
+    it catches the failures that matter -- legs fused into a skirt by the rim, a
+    tail off the frame, a head and a body merged into one lozenge."""
+    img = cels[(facing, pose)]
+    out = []
+    for y in range(AH):
+        line = ""
+        for x in range(AW):
+            p = img.getpixel((x, y))
+            line += (" " if p[3] == 0 else
+                     "." if p[3] < 255 else
+                     "#" if luma(p) > 100 else "+")
+        out.append("%2d|%s|" % (y, line))
+    return "\n".join(out)
+
+
+def write_animals(save, grounds):
+    """Both animals, and the contract each one owes HJCritters, proved."""
+    for name in sorted(ANIMALS):
+        cels = build_animal(name)
+        sheet = animal_sheet(cels)
+        save(sheet, "%s.png" % name)
+        save(animal_contact(sheet, name), "_%s_x5.png" % name)
+        if grounds:
+            save(animal_on_ground(cels, grounds), "_%s_ground.png" % name)
+
+        print()
+        print("%s.png  %dx%d  =  %d cols x %d rows of %dx%d"
+              % (name, sheet.width, sheet.height, len(APOSES), len(FACINGS),
+                 AW, AH))
+        print("  rows %s" % FACINGS)
+        print("  cols %s, walk order %s, idle shows col 0 and col 3"
+              % (APOSES, WALK_ORDER))
+        ok = True
+        for f in FACINGS:
+            paws, tops, xs = set(), [], []
+            for p in APOSES:
+                im = cels[(f, p)]
+                body = [y for y in range(AH)
+                        if any(im.getpixel((x, y))[3] == 255 for x in range(AW))]
+                cols = [x for x in range(AW)
+                        if any(im.getpixel((x, y))[3] == 255 for y in range(AH))]
+                paws.add(max(body))
+                tops.append(min(body))
+                xs.append((min(cols), max(cols)))
+            x0 = min(v for v, _ in xs)
+            x1 = max(v for _, v in xs)
+            # The rim sits a pixel outside the body, so the figure has to stop
+            # one short of the frame or the silhouette is cut by the cell edge.
+            inside = x0 >= 1 and x1 <= AW - 2 and min(tops) >= 1
+            stable = len(paws) == 1
+            ok = ok and stable and inside
+            print("    %-6s x %2d..%2d  top %2d  paw row %s%s"
+                  % (f, x0, x1, min(tops),
+                     "%d stable" % sorted(paws)[0] if stable
+                     else "MOVES %s" % sorted(paws),
+                     "" if inside else "   TOUCHES THE FRAME EDGE"))
+        px = [luma(p) for p in cels[("down", "neutral")].getdata() if p[3] == 255]
+        print("    %d opaque px, luma %.0f..%.0f mean %.1f"
+              % (len(px), min(px), max(px), sum(px) / len(px)))
+        if not ok:
+            raise SystemExit("ANIMAL CONTRACT FAILED: %s" % name)
 
 
 if __name__ == "__main__":

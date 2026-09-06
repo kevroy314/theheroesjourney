@@ -148,9 +148,13 @@ func build() -> void:
 
 
 ## Cheap path: the header and the graph are the only things that move.
+##
+## Note the header is *not* synced here. `refresh()` rebuilds the whole screen a
+## frame later, header included, and the reward animations are one-shot pulses:
+## syncing a header that is about to be freed spends the pulse on a widget the
+## player never sees, and the replacement then has nothing to play.
 func sync() -> void:
 	var run: HJRun = Game.run
 	if run == null or _graph == null or not is_instance_valid(_graph):
 		return
-	_header.sync()
 	refresh()

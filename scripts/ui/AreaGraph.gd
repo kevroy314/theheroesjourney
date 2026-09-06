@@ -44,11 +44,13 @@ func _ready() -> void:
 
 ## A task completed on the task screen pays before this graph exists, so the
 ## number is floated here, off the card that paid it, the moment the board comes
-## back. HJGritFx holds the pulse across the screen swap; claiming it clears it,
-## so it plays once and not again on the next rebuild.
+## back. HJGritFx holds the pulse across the screen swap, and holds it for a
+## beat longer than one rebuild takes — the area screen is torn down and rebuilt
+## more than once on the way back from a task, and a pulse spent on the first of
+## those is spent on cards nobody sees.
 func _replay_award() -> void:
 	HJGritFx.pump(run)
-	var amount := HJGritFx.claim_grit()
+	var amount := HJGritFx.recent_grit()
 	if amount == 0:
 		return
 	var card: Control = _cards.get(HJGritFx.pending_node, null)
@@ -280,8 +282,15 @@ func _make_card(id: String, budget: float = CARD_MAX) -> Control:
 			var price := HJUI.hbox(4)
 			price.size_flags_horizontal = Control.SIZE_SHRINK_END
 			price.add_child(HJUI.icon("grit", 16, "accent" if available else "muted"))
-			price.add_child(HJUI.label(reward, HJUI.FS_TINY,
-				"accent" if available else "muted"))
+			var price_label := HJUI.label(reward, HJUI.FS_TINY,
+				"accent" if available else "muted")
+			# Every HJUI label wraps by default, which is right for prose and
+			# ruinous for a three-character number in a shrink-to-fit cell: it
+			# has no minimum width to defend, so the descriptor takes the row and
+			# "+23" comes out as a column of digits.
+			price_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+			price_label.size_flags_horizontal = Control.SIZE_SHRINK_END
+			price.add_child(price_label)
 			line.add_child(price)
 		v.add_child(line)
 	card.add_child(v)

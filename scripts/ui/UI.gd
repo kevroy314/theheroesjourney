@@ -461,6 +461,9 @@ static func nav_bar(omit: String = "") -> Control:
 class BuffStrip extends HBoxContainer:
 	func _init() -> void:
 		add_theme_constant_override("separation", 6)
+		alignment = BoxContainer.ALIGNMENT_BEGIN
+		size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 
 	func _ready() -> void:
 		Buffs.changed.connect(_rebuild)
@@ -479,6 +482,17 @@ class BuffStrip extends HBoxContainer:
 		for b in Buffs.active():
 			add_child(_pill(b))
 		visible = get_child_count() > 0
+
+	## One line, always. HJUI.label defaults to AUTOWRAP_WORD_SMART and
+	## EXPAND_FILL, which is right for prose and catastrophic here: inside a
+	## shrink-to-fit HBox it wrapped "Boon of the White Room" to one letter per
+	## line and drew a column down the entire screen.
+	static func _pill_text(text: String, role: String) -> Label:
+		var l := HJUI.label(text, HJUI.FS_TINY, role)
+		l.autowrap_mode = TextServer.AUTOWRAP_OFF
+		l.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		return l
+
 
 	func _pill(b: Dictionary) -> Control:
 		var left := int(b.get("seconds_left", -1))
@@ -499,9 +513,9 @@ class BuffStrip extends HBoxContainer:
 		var mark := String(b.get("icon", ""))
 		if HJUI.has_icon(mark):
 			row.add_child(HJUI.icon(mark, 24, role))
-		row.add_child(HJUI.label(String(b.get("name", "")), HJUI.FS_TINY, role))
+		row.add_child(_pill_text(String(b.get("name", "")), role))
 		if left >= 0:
-			row.add_child(HJUI.label(HJClock.format_remaining(left), HJUI.FS_TINY, "muted"))
+			row.add_child(_pill_text(HJClock.format_remaining(left), "muted"))
 		pad.add_child(row)
 		pill.add_child(pad)
 		pill.tooltip_text = String(b.get("desc", ""))

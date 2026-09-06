@@ -12,13 +12,20 @@ extends Object
 ##
 ## Hence a static ledger. It holds what the UI is currently *showing*, which
 ## lags the truth by the length of one tween, and a short-lived pulse the graph
-## can claim to float a number off the card that paid. Every consumer calls
-## `pump()` first; it is idempotent, so it does not matter who gets there first.
+## reads to float a number off the card that paid. Every consumer calls `pump()`
+## first; it is idempotent, so it does not matter who gets there first.
 
-## How long a pulse stays claimable. Long enough to survive a screen swap and a
-## rebuild, short enough that a number never floats up out of nowhere because
-## the player left the app open on some other screen for a minute.
-const WINDOW_MSEC := 2500
+## How long a pulse stays live. Pulses are *read* rather than consumed, because
+## the screen is rebuilt wholesale more than once on the way back from a task —
+## a consumed pulse gets spent on a widget that is freed a frame later, and the
+## replacement then has nothing to play. Reading instead means a rebuild repairs
+## an animation it interrupted. The windows are short so that a rebuild long
+## after the fact cannot resurrect one.
+const WINDOW_MSEC := 1500
+## The clock note is text rather than motion, so it can stand for longer — and
+## has to, because it is the one thing on this screen the player has never been
+## told.
+const DEADLINE_MSEC := 4000
 
 ## A deadline that moved by less than this is bookkeeping, not a reprieve.
 const DEADLINE_FLOOR := 1800
@@ -55,7 +62,9 @@ static func pump(run: HJRun) -> void:
 		return
 
 	if run.grit != _seen_grit:
-		pending_grit += run.grit - _seen_grit
+		# Accumulate only within one pulse; a later award starts its own.
+		var carried := pending_grit if _fresh(_pending_at, WINDOW_MSEC) else 0
+		pending_grit = carried + run.grit - _seen_grit
 		pending_node = String(run.completed.back()) if not run.completed.is_empty() else ""
 		_pending_at = Time.get_ticks_msec()
 		_seen_grit = run.grit
@@ -68,25 +77,18 @@ static func pump(run: HJRun) -> void:
 		_seen_deadline = run.deadline_unix
 
 
-static func _fresh(stamp: int) -> bool:
-	return stamp > 0 and Time.get_ticks_msec() - stamp <= WINDOW_MSEC
+static func _fresh(stamp: int, window: int) -> bool:
+	return stamp > 0 and Time.get_ticks_msec() - stamp <= window
 
 
-## Take the grit pulse, if there is one worth showing. Returns 0 otherwise, and
-## clears the pulse either way so it cannot play twice.
-static func claim_grit() -> int:
-	var amount := pending_grit if _fresh(_pending_at) else 0
-	pending_grit = 0
-	_pending_at = 0
-	return amount
+## The grit change worth floating right now, or 0.
+static func recent_grit() -> int:
+	return pending_grit if _fresh(_pending_at, WINDOW_MSEC) else 0
 
 
-## Take the deadline pulse, in seconds. Same contract.
-static func claim_deadline() -> int:
-	var amount := pending_deadline if _fresh(_deadline_at) else 0
-	pending_deadline = 0
-	_deadline_at = 0
-	return amount
+## Seconds the clock has just jumped forward by, or 0.
+static func recent_deadline() -> int:
+	return pending_deadline if _fresh(_deadline_at, DEADLINE_MSEC) else 0
 
 
 static func motion() -> bool:
@@ -109,8 +111,16 @@ static func float_number(anchor: Control, amount: int, suffix: String = "") -> v
 	var tree := anchor.get_tree()
 	if tree == null:
 		return
-	tree.create_timer(SETTLE).timeout.connect(
-		func() -> void: _spawn_number(anchor, amount, suffix))
+	# The id rather than the node: a lambda that captures a Control the screen
+	# then rebuilds out from under is called with a null capture and logs an
+	# engine error, which `test.sh` is right to treat as a fault.
+	var anchor_id := anchor.get_instance_id()
+	tree.create_timer(SETTLE).timeout.connect(func() -> void:
+		if not is_instance_id_valid(anchor_id):
+			return
+		var target := instance_from_id(anchor_id)
+		if target is Control:
+			_spawn_number(target as Control, amount, suffix))
 
 
 static func _spawn_number(anchor: Control, amount: int, suffix: String) -> void:

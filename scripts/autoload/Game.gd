@@ -141,6 +141,15 @@ func start_run(run_seed: int = 0) -> void:
 	# deadline runs until you find something, and what you find is decided by
 	# how far you are willing to walk.
 	run.zone = 0
+	# Where you are standing, from the start. `world_pos` defaulted to (-1,-1)
+	# and was only written by the *renderer* on the first step, so for the whole
+	# of a run in which the player had not yet moved, anything asking the run
+	# where it was got a cell off the edge of the world. The overworld header
+	# duly reported that a player standing in their own bedroom was "Outside".
+	if run.world_pos.x < 0:
+		# nearest_walkable, matching what HJTileWorld does with the same value,
+		# so the run and the renderer never disagree about where the player is.
+		run.world_pos = HJWorld.shared().nearest_walkable(HJWorld.shared().spawn)
 	run.deadline_unix = HJClock.now() + HJClock.hours_to_seconds(
 		maxf(1.0, 24.0 + Rules.value("area.deadline_bonus_hours", run.ctx(), 0.0)))
 	tutorial.on_run_start()

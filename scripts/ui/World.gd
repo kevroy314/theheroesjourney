@@ -208,6 +208,33 @@ func walkable(x: int, y: int) -> bool:
 	return false
 
 
+## What to call where you are standing.
+##
+## The overworld header used to read `run.area.get("name", "Area")`, and outside
+## an anomaly there is no area — so a player walking around their own house was
+## told they were in "Area". The world knows better than the run does: it has
+## named regions and it knows what is indoors.
+func place_name(cell: Vector2i) -> String:
+	if is_indoors(cell):
+		return "Home"
+	var best := ""
+	var best_d := 1 << 30
+	for id in regions:
+		var at: Vector2i = regions[id]
+		var d: int = absi(at.x - cell.x) + absi(at.y - cell.y)
+		if d < best_d:
+			best_d = d
+			best = String(id)
+	if best == "":
+		return "Outside"
+	# Far from everything named is its own answer. Claiming you are in the
+	# Observatory because it is the closest anchor forty tiles away is worse
+	# than admitting the map has nothing to say about here.
+	if best_d > 24:
+		return "Outside"
+	return String(Content.area(best).get("name", best))
+
+
 ## Is this cell inside a building?
 func is_indoors(cell: Vector2i) -> bool:
 	for r in indoors:

@@ -25,12 +25,19 @@ var _whence := "title"
 ## Reset by leaving the screen, so the form is never left open over a stale value.
 var _editing_server := false
 
+## Every screen Back may return to. "task" is here because the tutorial can send
+## a player straight here from the middle of a task to turn the timers off, and
+## the whole promise of that tooltip is that Back puts them back where they were
+## — the run keeps `pending_node` and `pending_started`, so the task resumes
+## exactly as they left it.
+const WHENCE := ["title", "area", "palace", "overworld", "menu", "hearth", "task"]
+
 
 func _enter_tree() -> void:
 	super._enter_tree()
 	# Reachable from nearly everywhere, so Back has to return to whichever it
 	# actually was.
-	if Game.previous_screen in ["title", "area", "palace", "overworld", "menu", "hearth"]:
+	if Game.previous_screen in WHENCE:
 		_whence = Game.previous_screen
 	# The update card is a state machine — checking, downloading, ready — and it
 	# has to redraw as that state moves without the player touching anything.
@@ -41,6 +48,10 @@ func _exit_tree() -> void:
 	super._exit_tree()
 	if Updater.state_changed.is_connected(refresh):
 		Updater.state_changed.disconnect(refresh)
+	# The highlight is spent by leaving, not by drawing: this screen rebuilds
+	# several times while the player is standing on it, and a flag consumed on
+	# the first build would take the highlight with it.
+	HJPrefs.clear_focus()
 
 
 func build() -> void:
@@ -54,6 +65,7 @@ func build() -> void:
 	scroll.add_child(list)
 	v.add_child(scroll)
 
+	_tasks(list, scroll)
 	_notifications(list)
 	_updates(list)
 
@@ -96,6 +108,69 @@ func build() -> void:
 			Game.goto("title")
 			Game.say("Wiped. Back to the first morning.", "warn"))
 	list.add_child(wipe)
+
+
+## Tasks: the two rules a player is allowed to switch off.
+##
+## Both are here because both can punish honesty. The wait assumes you are doing
+## the thing now, and someone logging their real day at eleven at night is
+## telling the truth; the tap assumes hands that can drum, in an app whose
+## players may be injured. Neither switch touches the confirm itself — a task
+## still has to be deliberately said yes to, or a pocket would finish a workout.
+func _tasks(list: VBoxContainer, scroll: ScrollContainer) -> void:
+	list.add_child(HJUI.label("TASKS", HJUI.FS_SMALL, "muted"))
+
+	var lit := HJPrefs.focus() == "timers"
+	var card := HJUI.panel("panel", "accent" if lit else "")
+	var cv := HJUI.vbox(8)
+	cv.add_child(_flag("Confirm timers", "timers_on",
+		"A task waits out roughly how long it would take before Confirm unlocks."
+		if HJPrefs.get_flag("timers_on")
+		else "Confirm is ready straight away. You still have to say yes to it."))
+	cv.add_child(HJUI.rule())
+	cv.add_child(_flag("Always hold to confirm", "hold_confirm",
+		"Every task confirms with a hold, including the brisk ones that would ask you to tap fast."))
+	card.add_child(cv)
+	list.add_child(card)
+
+	if lit:
+		# Landing on a page of options with no idea which one you were sent for
+		# is the same as not arriving. Scroll to it, then breathe.
+		scroll.ensure_control_visible.call_deferred(card)
+		_flash(card)
+
+
+## One preference, one line of plain English about what it currently does.
+##
+## Deliberately the same shape as the notification toggles below rather than a
+## cleverer control: two switches on this screen change how the game plays and
+## they should not look more important than the ones that change the phone.
+func _flag(title: String, id: String, explain: String) -> VBoxContainer:
+	var box := HJUI.vbox(6)
+	var row := HJUI.hbox(10)
+	row.add_child(HJUI.label(title, HJUI.FS_SMALL, "text"))
+	var value := HJPrefs.get_flag(id)
+	var b := HJUI.button("On" if value else "Off", "primary" if value else "quiet")
+	b.custom_minimum_size = Vector2(120, 58)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_END
+	b.pressed.connect(func() -> void:
+		HJPrefs.set_flag(id, not value)
+		refresh())
+	row.add_child(b)
+	box.add_child(row)
+	box.add_child(HJUI.label(explain, HJUI.FS_TINY, "muted"))
+	return box
+
+
+## Two slow pulses of the border, then still. Long enough to catch an eye that
+## is still travelling down the page, short enough not to become the screen.
+func _flash(card: PanelContainer) -> void:
+	if Debug.knob("motion") <= 0.0:
+		return
+	var tween := card.create_tween()
+	tween.set_loops(3)
+	tween.tween_property(card, "modulate:a", 0.45, 0.34)
+	tween.tween_property(card, "modulate:a", 1.0, 0.34)
 
 
 ## Notifications. The defaults are off and every kind can be silenced on its

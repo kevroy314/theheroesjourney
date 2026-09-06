@@ -536,6 +536,74 @@ def modifier_pass(report, docs, schema, readable_keys, config_keys):
     return used
 
 
+# --- critters ------------------------------------------------------------------
+# The state machines that make things move. The generic schema pass checks the
+# shape of a record; this checks the graph, which is where the failures are. A
+# `to` that names no state is an animal that walks into a state with no goal and
+# stands there forever, and it is indistinguishable in play from art direction.
+
+def critter_pass(report, docs, schema):
+    vocab = schema["vocabulary"]
+    sprites = os.path.join(ROOT, "assets", "sprites")
+    for rel, doc in docs_in(docs, "content"):
+        for critter in doc.get("critters", []):
+            if not isinstance(critter, dict):
+                continue
+            where = "%s [critter %s]" % (rel, critter.get("id"))
+            states = critter.get("states") or {}
+            if not isinstance(states, dict) or not states:
+                report.error(where, "states must be a non-empty object")
+                continue
+
+            start = critter.get("start")
+            if start not in states:
+                report.error(where, "start '%s' is not one of its states: %s"
+                             % (start, ", ".join(sorted(states))))
+
+            # The art has to exist. A sprite id that names no sheet is an
+            # invisible animal that still blocks a cell and still answers a
+            # verb, which reads as a haunting rather than as a missing file.
+            sprite = critter.get("sprite")
+            if sprite and not os.path.exists(os.path.join(sprites, "%s.png" % sprite)):
+                report.error(where, "sprite '%s' has no assets/sprites/%s.png -- "
+                             "run tools/make_sprites.py" % (sprite, sprite))
+
+            reached = {start} if start in states else set()
+            for i, rule in enumerate(critter.get("transitions") or []):
+                if not isinstance(rule, dict):
+                    report.error(where, "transition %d must be an object" % i)
+                    continue
+                spot = "%s transition %d" % (where, i)
+                froms = rule.get("from")
+                froms = froms if isinstance(froms, list) else [froms]
+                for name in froms:
+                    if name != "*" and name not in states:
+                        report.error(spot, "from '%s' is not one of its states: %s"
+                                     % (name, ", ".join(sorted(states))))
+                target = rule.get("to")
+                if target not in states:
+                    report.error(spot, "to '%s' is not one of its states: %s"
+                                 % (target, ", ".join(sorted(states))))
+                else:
+                    reached.add(target)
+                for condition in (rule.get("when") or {}):
+                    if condition not in vocab["critter_conditions"]:
+                        report.error(spot, "when condition '%s' is not implemented "
+                                     "(HJCritters._conditions_met knows: %s)"
+                                     % (condition, ", ".join(vocab["critter_conditions"])))
+                effect = rule.get("effect")
+                if isinstance(effect, dict) and effect.get("type") not in vocab["hook_effects"]:
+                    report.error(spot, "effect type '%s' is not implemented by "
+                                 "Game.apply_effects" % effect.get("type"))
+
+            # A state nothing can transition into is dead data. It warns rather
+            # than errors because an author part-way through writing the third
+            # state of a machine is a normal thing to be.
+            for name in sorted(set(states) - reached):
+                report.warn(where, "state '%s' is not the start state and no "
+                            "transition leads to it, so it can never run" % name)
+
+
 # --- world and tileset ---------------------------------------------------------
 
 def theme_pass(report, docs, schema):
@@ -791,9 +859,21 @@ def main():
         hook_names.update(re.findall(r'Rules\.hook\(\s*"([^"]+)"', read(path)))
     reconcile(report, schema, hook_names, "hooks", "the Rules.hook() call sites")
 
+    # The animals. Three vocabularies, all read out of the one file that
+    # implements them, so data can never name a goal or a condition the state
+    # machine does not have.
+    critters_gd = os.path.join(SCRIPTS, "game", "Critters.gd")
+    reconcile(report, schema, arms(critters_gd, "_step_for"), "critter_goals",
+              "HJCritters._step_for")
+    reconcile(report, schema, arms(critters_gd, "_conditions_met"), "critter_conditions",
+              "HJCritters._conditions_met")
+    reconcile(report, schema, const_array(critters_gd, "EVENTS"), "critter_events",
+              "HJCritters.EVENTS")
+
     id_sets = build_id_sets(docs, schema)
     schema_pass(report, docs, schema, id_sets)
     graph_pass(report, docs)
+    critter_pass(report, docs, schema)
 
     dynamic_fields = vocab["dynamic_key_fields"]
     dynamic_keys = set()

@@ -2,7 +2,7 @@
   "_comment": "Declarative schema for everything under data/. Read by two checkers with different reach: scripts/autoload/Content.gd validates the merged runtime view (and can run on a player's device), tools/validate_data.py validates the files on disk and additionally scans the GDScript source for the vocabularies below. It lives here rather than as a const in Content.gd because both readers need it and a hand-synced second copy would drift; data/*.json is also the only path the export presets ship, so this is the only place the device pass can read it from. Content.load_all() globs the subdirectories, never data/ itself, so this file is not mistaken for content.",
   "_paths": "Locator grammar, shared by 'files' and 'runtime'. A path is dot-separated segments: 'name' takes a field, 'name[]' takes a field and expands the list, 'name{}' takes a field and expands the dictionary's values, '[]' and '{}' on their own expand what the previous segment produced (so 'loot{}.[]' is every entry of every loot table), and a bare '.' means the record itself. A 'runtime' path's first segment names a property on Content. A path that selects nothing is reported: a locator typo otherwise validates an empty set and looks like a pass.",
   "vocabulary": {
-    "_comment": "Words the engine implements. validate_data.py re-derives each of these from the GDScript source and fails if this list and the source disagree, so the schema cannot quietly go stale \u2014 that is the whole point of having a build-time tool as well as a runtime one.",
+    "_comment": "Words the engine implements. validate_data.py re-derives each of these from the GDScript source and fails if this list and the source disagree, so the schema cannot quietly go stale — that is the whole point of having a build-time tool as well as a runtime one.",
     "ops": [
       "set",
       "add",
@@ -134,6 +134,11 @@
     "choice_inputs": [
       "text"
     ],
+    "_comment_confirm_kinds": "How a task is confirmed once the plausibility wait is over: the deliberate act that says yes, I did that. One script each under scripts/game/gestures/, registered in HJGestures.KINDS. A movement may name one and so may an axis, which is where the default comes from — so adding a gesture is a new file, a line in KINDS, and a word here.",
+    "confirm_kinds": [
+      "hold",
+      "tap_rapid"
+    ],
     "_comment_truths": "An anomaly is a memory of a life adjacent to yours, and this is the claim it makes about itself. AreaScreen reads it into the line above the intro, so it is the frame the player is given before they act; nothing yet checks the claim, which is the point.",
     "truths": [
       "true",
@@ -162,6 +167,28 @@
     "_comment_goals": "Completion conditions Objectives.progress() implements. Objectives.problems() checks the loaded data against this list at runtime.",
     "objective_goals": [
       "anomalies_in_ring"
+    ],
+    "_comment_critters": "The animal vocabularies. Each is reconciled against a `match` or a `const` in scripts/game/Critters.gd, the same way ops, when_keys and hook_effects are reconciled against Rules and Game -- so a goal the schema allows but the engine does not implement is an error here rather than an animal that stands perfectly still and looks like art direction.",
+    "critter_goals": [
+      "hold",
+      "approach",
+      "retreat",
+      "wander"
+    ],
+    "critter_conditions": [
+      "dist_gte",
+      "dist_lte",
+      "held_gte",
+      "stray_gte",
+      "has_tag",
+      "lacks_tag"
+    ],
+    "critter_events": [
+      "petted"
+    ],
+    "critter_targets": [
+      "player",
+      "home"
     ]
   },
   "types": {
@@ -241,7 +268,7 @@
       }
     },
     "anomalies": {
-      "_comment": "Anomalies are areas in every structural respect \u2014 same nodes, same slots \u2014 so the graph pass treats them together with areas and their ids share the area id space.",
+      "_comment": "Anomalies are areas in every structural respect — same nodes, same slots — so the graph pass treats them together with areas and their ids share the area id space.",
       "files": {
         "dir": "content",
         "paths": [
@@ -470,10 +497,14 @@
       "optional": [
         "cue",
         "scaling",
-        "pack"
+        "pack",
+        "confirm"
       ],
       "refs": {
         "axis": "axes"
+      },
+      "enum": {
+        "confirm": "confirm_kinds"
       }
     },
     "packs": {
@@ -648,7 +679,12 @@
         "angle",
         "desc"
       ],
-      "optional": []
+      "optional": [
+        "confirm"
+      ],
+      "enum": {
+        "confirm": "confirm_kinds"
+      }
     },
     "wheel_rings": {
       "files": {
@@ -757,7 +793,7 @@
       }
     },
     "buffs": {
-      "_comment": "A buff is a set of modifiers with an expiry and an icon, resolved through Rules like every other source. `hours` is a wall-clock timer; `break_on` lists events another system calls Buffs.trigger() with, and a buff with neither runs until something breaks it. `then` applies a second buff the moment this one ends, which is how coffee pays for itself. Not in `runtime`: Content.gd does not merge this key yet, so only the file-side tool checks these records \u2014 four lines in Content.load_all would fix that.",
+      "_comment": "A buff is a set of modifiers with an expiry and an icon, resolved through Rules like every other source. `hours` is a wall-clock timer; `break_on` lists events another system calls Buffs.trigger() with, and a buff with neither runs until something breaks it. `then` applies a second buff the moment this one ends, which is how coffee pays for itself. Not in `runtime`: Content.gd does not merge this key yet, so only the file-side tool checks these records — four lines in Content.load_all would fix that.",
       "files": {
         "dir": "content",
         "paths": [
@@ -786,7 +822,7 @@
       }
     },
     "interactables": {
-      "_comment": "Something in the world you can stand next to and act on. This is the catalogue \u2014 the verb, the price and what happens. The instances live in data/world/overworld.json as an `interactables` list of { x, y, type, label? } records, which is a shape the Tiled round trip already turns into a draggable object layer. `cost_key` names a config key rather than a number so a trinket can bend the price, and `effect` is one entry of the same vocabulary hooks use, applied by Game.apply_effects.",
+      "_comment": "Something in the world you can stand next to and act on. This is the catalogue — the verb, the price and what happens. The instances live in data/world/overworld.json as an `interactables` list of { x, y, type, label? } records, which is a shape the Tiled round trip already turns into a draggable object layer. `cost_key` names a config key rather than a number so a trinket can bend the price, and `effect` is one entry of the same vocabulary hooks use, applied by Game.apply_effects. A `critter` names a species in data/content/critters.json: the placement spawns that animal there, reach follows it as it walks, and `critter_event` (default \"petted\") is what acting on it fires at the state machine. That one key is why petting the dog and petting the cat do opposite things with no branch anywhere in the code.",
       "files": {
         "dir": "content",
         "paths": [
@@ -805,6 +841,8 @@
       "optional": [
         "blocks_until_tag",
         "cost_key",
+        "critter",
+        "critter_event",
         "desc",
         "icon",
         "once",
@@ -812,10 +850,12 @@
         "spent_text"
       ],
       "enum": {
-        "reach": "interactable_reach"
+        "reach": "interactable_reach",
+        "critter_event": "critter_events"
       },
       "refs": {
-        "cost_key": "config_keys"
+        "cost_key": "config_keys",
+        "critter": "critters"
       },
       "effect_vocab": "hook_effects"
     },
@@ -1000,6 +1040,71 @@
         "objective": "objectives"
       },
       "unique_ids": false
+    },
+    "critters": {
+      "_comment": "An animal that moves: a named state machine over the tile grid. `start` names the state it wakes in, `states` is a map of state id to what it does there, and `transitions` is an ordered list -- first match wins, so order is priority. Placement is world data, not here: an interactables record whose catalogue entry carries a `critter` spawns one where it stands, which is what lets a designer drag the cat into another room or retype the dog as a second cat with no code. Not in `runtime`: Content.gd does not merge a `critters` key yet, so only the file-side tool checks these records -- four lines in Content.load_all would fix that, exactly as the buffs comment says of buffs.",
+      "files": {
+        "dir": "content",
+        "paths": [
+          "critters[]"
+        ]
+      },
+      "required": [
+        "id",
+        "name",
+        "sprite",
+        "start",
+        "states"
+      ],
+      "optional": [
+        "transitions"
+      ]
+    },
+    "critter_states": {
+      "_comment": "One state. `goal` is what it does while it is here; `keep` is the distance it is trying to hold, read as a floor by `retreat` and a ceiling by `approach`; `trail` aims it at where the target was N moves ago rather than where it is, which is the lag that makes a follower read as a companion rather than as a mirror; `pace` is seconds per cell as a multiple of critter.tick_seconds, so 1.0 is exactly the player's walking speed; `recover` is how many move attempts may make no progress before the animal abandons the path and reappears at the edge of its band, which is what stops a follower wedged behind furniture from being lost for the run. No `id`: the state's name is its key in the map.",
+      "files": {
+        "dir": "content",
+        "paths": [
+          "critters[].states{}"
+        ]
+      },
+      "required": [
+        "goal"
+      ],
+      "optional": [
+        "keep",
+        "trail",
+        "pace",
+        "recover",
+        "restless",
+        "say",
+        "target"
+      ],
+      "enum": {
+        "goal": "critter_goals",
+        "target": "critter_targets"
+      }
+    },
+    "critter_transitions": {
+      "_comment": "One rule for leaving a state. `from` is a state id or a list of them, or \"*\" for any. `on` names an event fired at the animal by something acting on it; a rule with no `on` is tested every tick. `when` is a set of conditions, all of which must hold. `effect` is one entry of the same vocabulary hooks and interactables use, applied by Game.apply_effects -- which is how an escort that fails can set a run tag without this system knowing what a quest is. No `id`: a transition is identified by its position in the list, and its position is its priority. `effect` is checked by critter_pass() in tools/validate_data.py rather than by the generic effect_vocab hook, because that hook is written for a required field and reports a missing one as the type None -- and most transitions correctly have no effect at all.",
+      "files": {
+        "dir": "content",
+        "paths": [
+          "critters[].transitions[]"
+        ]
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "optional": [
+        "on",
+        "when",
+        "effect"
+      ],
+      "enum": {
+        "on": "critter_events"
+      }
     }
   },
   "world": {
@@ -1029,17 +1134,17 @@
       "bridge"
     ],
     "_prop_light": "Where light comes from. A prop entry in assets/tiles/tiles.json may carry a `light`, and that is the whole contract between the art side and the lighting pass: the art declares WHERE a source is and what colour it is, and never renders one. Nothing in the tileset reads the key back. A source declared wrong is invisible rather than wrong-looking, which is exactly the failure this file exists to catch, so all three fields are required once the key is present.",
-  "prop_light": {
-   "required": [
-    "radius",
-    "color",
-    "flicker"
-   ],
-   "radius": "float greater than 0, in tiles",
-   "color": "#RRGGBB, the colour at the source; the falloff belongs to the renderer",
-   "flicker": "float 0.0 to 1.0, 0 is a steady lamp"
-  },
-  "_indoors": "Optional. { x, y, w, h } in cells, the footprint of the building the player wakes in, walls included. The Boon of the White Room is free walking inside it and breaks on the first cell outside, and that same crossing unlocks the Hearth and triggers the Spite encounter (Beat 5). Classified by shape as a marker with w and h as editable properties, so it is a rectangle the designer can drag rather than a rule derived from the floor material.",
-  "_interactables": "Optional. A list of { x, y, type, label? } records naming an entry of the interactables catalogue in data/content/. Classified by shape as an object layer, so Tiled can place, drag and retype them with no tooling change. tools/validate_data.py does not yet check that `type` resolves \u2014 the world pass would need one loop, mirroring the anomaly `area` check."
+    "prop_light": {
+      "required": [
+        "radius",
+        "color",
+        "flicker"
+      ],
+      "radius": "float greater than 0, in tiles",
+      "color": "#RRGGBB, the colour at the source; the falloff belongs to the renderer",
+      "flicker": "float 0.0 to 1.0, 0 is a steady lamp"
+    },
+    "_indoors": "Optional. { x, y, w, h } in cells, the footprint of the building the player wakes in, walls included. The Boon of the White Room is free walking inside it and breaks on the first cell outside, and that same crossing unlocks the Hearth and triggers the Spite encounter (Beat 5). Classified by shape as a marker with w and h as editable properties, so it is a rectangle the designer can drag rather than a rule derived from the floor material.",
+    "_interactables": "Optional. A list of { x, y, type, label? } records naming an entry of the interactables catalogue in data/content/. Classified by shape as an object layer, so Tiled can place, drag and retype them with no tooling change. tools/validate_data.py does not yet check that `type` resolves — the world pass would need one loop, mirroring the anomaly `area` check."
   }
 }

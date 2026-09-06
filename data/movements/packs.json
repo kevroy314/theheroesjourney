@@ -68,6 +68,8 @@
           "unit": "second",
           "set": 20,
           "seconds_per_unit": 1,
+          "_confirm": "The move axis taps to confirm, and this one does not: you have just held a position, so the confirm holds too. Per-movement overrides exist for exactly this \u2014 a plank and a burpee are the same axis and not the same feeling.",
+          "confirm": "hold",
           "scaling": [
             "Knee plank",
             "Incline plank",
@@ -399,6 +401,7 @@
           "unit": "second",
           "set": 40,
           "seconds_per_unit": 1,
+          "confirm": "hold",
           "scaling": [
             "20 seconds",
             "Lighter load"

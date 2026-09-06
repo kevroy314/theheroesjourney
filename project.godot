@@ -30,7 +30,13 @@ Game="*res://scripts/autoload/Game.gd"
 Steps="*res://scripts/autoload/Steps.gd"
 History="*res://scripts/autoload/History.gd"
 Objectives="*res://scripts/autoload/Objectives.gd"
+Discovery="*res://scripts/game/Discovery.gd"
 Dialogue="*res://scripts/autoload/Dialogue.gd"
+; Critters lives under scripts/game/ with the other per-run systems but has to
+; be an autoload: it is stepped by nothing that owns it, and both the renderer
+; and HJInteractables read it. Registered after Game so Game.run exists the
+; first time it looks.
+Critters="*res://scripts/game/Critters.gd"
 Updater="*res://scripts/autoload/Updater.gd"
 
 [display]

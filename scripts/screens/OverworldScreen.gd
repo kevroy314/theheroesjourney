@@ -39,7 +39,15 @@ func build() -> void:
 	var head := HJUI.hbox(10)
 	var titles := HJUI.vbox(2)
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	titles.add_child(HJUI.label(String(run.area.get("name", "Area")), HJUI.FS_HEAD, "text"))
+	# Outside an anomaly there is no area, and the fallback read "Area" — so a
+	# player walking round their own house was told they were in "Area".
+	var where := String(run.area.get("name", ""))
+	if where == "":
+		var at := run.world_pos
+		if at.x < 0:
+			at = HJWorld.shared().nearest_walkable(HJWorld.shared().spawn)
+		where = HJWorld.shared().place_name(at)
+	titles.add_child(HJUI.label(where, HJUI.FS_HEAD, "text"))
 	_where = HJUI.label(Steps.describe(), HJUI.FS_TINY, "muted")
 	titles.add_child(_where)
 	# On Android the counter is useless until ACTIVITY_RECOGNITION is granted,

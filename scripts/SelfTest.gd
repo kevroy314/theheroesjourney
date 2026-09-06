@@ -157,11 +157,11 @@ static func run_all(host: Node) -> int:
 	_check(failures, "finished runs are archived", History.count() > 0,
 		"%d rows" % History.count())
 	_archive_checks(failures)
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(History.path))
+	_discard_scratch(History.path, History.PATH)
 	History.use_path(History.PATH)
 
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(Objectives.path))
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(Dialogue.path))
+	_discard_scratch(Objectives.path, Objectives.PATH)
+	_discard_scratch(Dialogue.path, Dialogue.PATH)
 	Objectives.use_path(Objectives.PATH)
 	Dialogue.use_path(Dialogue.PATH)
 
@@ -169,7 +169,7 @@ static func run_all(host: Node) -> int:
 	# redirect so the scratch file goes with it, then pointing back at the real
 	# one, which reloads and settles it exactly as a cold start would.
 	Buffs.clear_all()
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(Buffs.path))
+	_discard_scratch(Buffs.path, Buffs.SAVE_PATH)
 	Buffs.use_path(Buffs.SAVE_PATH)
 
 	_restore(saved_meta)
@@ -922,7 +922,7 @@ static func _archive_checks(failures: Array) -> void:
 	_check(failures, "appending after migration keeps the old rows",
 		History.count() == 4, "%d rows" % History.count())
 
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(scratch))
+	_discard_scratch(scratch, History.PATH)
 	History.use_path(live)
 
 
@@ -1419,6 +1419,12 @@ static func _interactable_checks(failures: Array) -> void:
 	Game.run = null
 	Game.clear_saved_run()
 	Game.start_run(530001)
+	# Stand where the test says the player is standing. `interactables_near`
+	# takes a cell, but `Game.interact` reads `run.world_pos` — which now holds
+	# the real spawn rather than the (-1,-1) it used to, so a harness that
+	# positioned itself only in the argument was reaching across the map. It
+	# passed until `act()` learned to check reach, which is the check working.
+	Game.run.world_pos = here
 	Buffs.clear_all()
 	Game.rebuild_rules()
 
@@ -1673,6 +1679,21 @@ static func _restore(s: Dictionary) -> void:
 	Meta.save_game()
 	Game.run = null
 	Game.clear_saved_run()
+
+
+## Delete a scratch store, and refuse to delete anything that is not one.
+##
+## Every teardown here is two lines — remove the file, then point the store back
+## at the player's own — and the two lines are only safe in that order. Reversed
+## they delete the player's archive instead of the harness's, which is not a
+## failing test but a support ticket, and the reversal is exactly the kind of
+## thing a merge does quietly. So the deletion is told what the live path is and
+## will not touch it.
+static func _discard_scratch(scratch_path: String, live_path: String) -> void:
+	if scratch_path == "" or scratch_path == live_path:
+		push_error("selftest: refusing to delete '%s' — that is the live store" % scratch_path)
+		return
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(scratch_path))
 
 
 static func _check(failures: Array, what: String, ok: bool, detail: String) -> void:

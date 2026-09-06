@@ -185,6 +185,20 @@ def spite():
     return img
 
 
+def choice():
+    """A fork in the road. Alone among the node marks this one asks a question
+    rather than for exertion, and that is the distinction the board most needs
+    to make: two ways on from one stem, with the split shown rather than
+    implied."""
+    img, d = canvas()
+    d.line([(8, 14), (8, 9)], fill=W)          # the stem you arrive along
+    d.line([(8, 9), (3, 4)], fill=W)           # left branch
+    d.line([(8, 9), (13, 4)], fill=W)          # right branch
+    d.line([(2, 4), (4, 2)], fill=W)           # arrowheads, so it reads as going
+    d.line([(12, 2), (14, 4)], fill=W)
+    return img
+
+
 def warden():
     """An hourglass — the only icon about time running rather than remaining."""
     img, d = canvas()
@@ -237,6 +251,7 @@ ICONS = {
     "task": task, "done": done, "threshold": threshold,
     "echo": echo, "cache": cache, "mirror": mirror,
     "charm": charm, "spite": spite, "warden": warden,
+    "choice": choice,
     "deadline": deadline, "loop": loop, "light": light,
 }
 
