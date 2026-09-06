@@ -22,8 +22,33 @@ const MAX_ACTIONS := 3000
 ## reasons nothing in the working tree explains, which is an expensive hour.
 const BACKUP := "user://selftest_backup.json"
 
+## Disposable copies of the two story stores. Both are written to by ordinary
+## play, so the harness must never be pointed at the real ones.
+const OBJECTIVES_SCRATCH := "user://objectives_selftest.json"
+const DIALOGUE_SCRATCH := "user://dialogue_selftest.json"
+const BUFFS_SCRATCH := "user://buffs_selftest.json"
+
+## Held for the length of a run, so two harnesses cannot overlap.
+##
+## They already have, and it cost a real save. BACKUP is one fixed path with no
+## lock: process A snapshots the player's state and starts mutating it, process
+## B snapshots *A's mutated state*, and whichever finishes last restores its own
+## snapshot over the top. The developer came out of that with a Warden already
+## met, a claimed Wheel node and a full Codex, on a save that had done none of
+## those things — and the failures it caused looked like bugs in the working
+## tree for an hour.
+const LOCK := "user://selftest.lock"
+## Old enough to be a corpse rather than a peer. A suite run is minutes.
+const LOCK_STALE_SECONDS := 1800
+
 
 static func run_all(host: Node) -> int:
+	if not _take_lock():
+		push_error("selftest: another run holds %s — refusing to start" % LOCK)
+		print("selftest: another run is already in progress. Refusing, because "
+			+ "two harnesses sharing one backup file destroys the save.")
+		return 1
+
 	# A backup still on disk means the last run died before it could restore.
 	# Put the player's save back before doing anything else.
 	if FileAccess.file_exists(BACKUP):
@@ -42,6 +67,27 @@ static func run_all(host: Node) -> int:
 	History.use_path("user://history_selftest.ndjson")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(History.path))
 
+	# Two more stores that ordinary play writes to, and both of them cost
+	# something real. Every anomaly the harness closes would be recorded against
+	# the player's own town objective, and the one conversation Spite is allowed
+	# to have would be spent on a test. This has already happened once: a run
+	# wrote closed-anomaly cells into a developer's store and the save had to
+	# come back from a backup.
+	#
+	# The scratch files are removed *before* the redirect rather than after it.
+	# `use_path` loads immediately, so deleting the file afterwards would leave
+	# the last run's leftovers sitting in memory with nothing on disk to explain
+	# them — which is the same failure wearing a different hat.
+	# Buffs is the third and the worst of them: the checks below do not merely
+	# write to it, they time-travel it, rewinding every timestamp in the file
+	# hours into the past to prove that a buff expires while the app is shut.
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(OBJECTIVES_SCRATCH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(DIALOGUE_SCRATCH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(BUFFS_SCRATCH))
+	Objectives.use_path(OBJECTIVES_SCRATCH)
+	Dialogue.use_path(DIALOGUE_SCRATCH)
+	Buffs.use_path(BUFFS_SCRATCH)
+
 	var saved_meta := _snapshot()
 	var backup := FileAccess.open(BACKUP, FileAccess.WRITE)
 	if backup != null:
@@ -54,7 +100,20 @@ static func run_all(host: Node) -> int:
 
 	var cleared := 0
 	var tasks := 0
-	var echoes_before := Meta.codex.size()
+	# Measured against an empty codex, not against whatever the person running
+	# the harness happens to have found. Read from the ambient save this number
+	# silently stops meaning anything the moment somebody has collected all
+	# sixteen echoes — it prints zero forever and reads as a regression. The
+	# snapshot above already holds the real codex and `_restore` puts it back.
+	Meta.codex = []
+	# The same treatment for the two pieces of save state the fuzz loop makes
+	# assertions about. "The Warden turns you back the first time" is only a
+	# statement about the game if the player has not already met them and has not
+	# already claimed the balance that lets them walk out — read from the ambient
+	# save it flips from a test into a report on whoever is running it, and a
+	# developer who has finished the game once can never make it green again.
+	Meta.seen_warden = false
+	Meta.claimed = []
 
 	for i in range(RUNS):
 		var result: Dictionary = await _play_one(host, 4000 + i * 7919, failures)
@@ -62,9 +121,11 @@ static func run_all(host: Node) -> int:
 		if result.get("cleared", false):
 			cleared += 1
 
+	var echoes_found := Meta.codex.size()
+
 	print("\n--- The Heroes' Journey self-test ---")
 	print("runs: %d   full journeys: %d   tasks completed: %d   echoes found: %d" % [
-		RUNS, cleared, tasks, Meta.codex.size() - echoes_before])
+		RUNS, cleared, tasks, echoes_found])
 	print("resolve: %d   loops: %d   deepest ring: %d" % [Meta.resolve, Meta.loops, Meta.deepest_ring])
 
 	_check(failures, "tasks actually happen", tasks > RUNS * 3, "%d tasks" % tasks)
@@ -72,15 +133,25 @@ static func run_all(host: Node) -> int:
 		Meta.deepest_ring >= 3, "deepest ring %d" % Meta.deepest_ring)
 	_check(failures, "the Warden turns you back the first time", Meta.seen_warden and cleared == 0,
 		"seen=%s cleared=%d" % [str(Meta.seen_warden), cleared])
+	# Six runs that hand out no story at all is a real defect, and it used to
+	# read as a quiet zero because the baseline came from the ambient save.
+	_check(failures, "playing turns up story", echoes_found > 0,
+		"%d echoes from %d runs" % [echoes_found, RUNS])
 
 	await _advance_checks(host, failures)
+	await _choice_checks(host, failures)
 	await _warden_checks(host, failures)
 	await _deadline_checks(host, failures)
 	_persistence_checks(failures)
 	_streak_checks(failures)
 	_wheel_checks(failures)
 	_palace_checks(failures)
+	_reveal_checks(failures)
 	await _anomaly_checks(host, failures)
+	await _story_checks(host, failures)
+	_buff_checks(failures)
+	_interactable_checks(failures)
+	_tutorial_checks(failures)
 	await _screen_checks(host, failures)
 
 	_check(failures, "finished runs are archived", History.count() > 0,
@@ -89,10 +160,23 @@ static func run_all(host: Node) -> int:
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(History.path))
 	History.use_path(History.PATH)
 
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Objectives.path))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Dialogue.path))
+	Objectives.use_path(Objectives.PATH)
+	Dialogue.use_path(Dialogue.PATH)
+
+	# Whatever the harness left running is not the player's. Clearing before the
+	# redirect so the scratch file goes with it, then pointing back at the real
+	# one, which reloads and settles it exactly as a cold start would.
+	Buffs.clear_all()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Buffs.path))
+	Buffs.use_path(Buffs.SAVE_PATH)
+
 	_restore(saved_meta)
 	# The run finished, so the on-disk copy has done its job. Leaving it would
 	# make the next run think this one crashed.
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(BACKUP))
+	_release_lock()
 
 	if failures.is_empty():
 		print("PASS — all checks green\n")
@@ -211,6 +295,9 @@ static func _play_one(host: Node, seed_value: int, failures: Array) -> Dictionar
 				Game.tap_node(_pick_node(run, available))
 			"task":
 				var node := run.node(run.pending_node)
+				if String(node.get("type", "")) == "choice":
+					_answer(node, seed_value)
+					continue
 				var options := Game.movement_options(node)
 				if options.is_empty():
 					_check(failures, "a task always has a movement", false,
@@ -234,6 +321,33 @@ static func _play_one(host: Node, seed_value: int, failures: Array) -> Dictionar
 	return { "cleared": Game.summary.get("cleared", false), "tasks": tasks }
 
 
+## Claim the lock, or report that someone else holds it.
+##
+## A lock left by a killed process would block every future run, so one older
+## than LOCK_STALE_SECONDS is treated as abandoned and taken. That is a
+## deliberate trade: a stale lock silently blocking CI is a worse failure than
+## the vanishingly rare case of a suite that genuinely ran for half an hour.
+static func _take_lock() -> bool:
+	if FileAccess.file_exists(LOCK):
+		var age := HJClock.now() - int(FileAccess.get_modified_time(LOCK))
+		if age < LOCK_STALE_SECONDS:
+			return false
+		print("selftest: taking a lock %d seconds old; assuming it was abandoned" % age)
+	var f := FileAccess.open(LOCK, FileAccess.WRITE)
+	if f == null:
+		# Cannot write the lock: better to run than to refuse forever on a
+		# read-only user dir.
+		return true
+	f.store_string(str(HJClock.now()))
+	f.close()
+	return true
+
+
+static func _release_lock() -> void:
+	if FileAccess.file_exists(LOCK):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(LOCK))
+
+
 static func _dump_nodes(run: HJRun) -> String:
 	var parts: Array = []
 	for id in run.area.get("order", []):
@@ -247,6 +361,20 @@ static func _dump_nodes(run: HJRun) -> String:
 			state = "waiting"
 		parts.append("%s:%s" % [node_id, state])
 	return ", ".join(parts)
+
+
+## Answer the choice node sitting in the task slot.
+##
+## The harness used to assume the run's pending thing was always a movement. A
+## `choice` node borrows `run.pending_node` and the task screen without being a
+## task: it has no movement, so `movement_options` comes back empty, and the
+## `skip_task()` fallback then put the node straight back in the available set —
+## tapped and re-offered for ever, which reads as a stall a long way from the
+## line at fault. `salt` varies the answer so a suite of seeds walks the
+## survey's conditional branches rather than only its unconditional default.
+static func _answer(node: Dictionary, salt: int) -> void:
+	var options: Array = node.get("options", [])
+	HJSurvey.answer(String(Game.run.pending_node), salt % maxi(1, options.size()), "Ada")
 
 
 ## Prefer the spine so runs make progress, but take side nodes when they appear.
@@ -296,7 +424,11 @@ static func _advance_checks(host: Node, failures: Array) -> void:
 					break
 				Game.tap_node(_pick_node(Game.run, available))
 			"task":
-				var options := Game.movement_options(Game.run.node(Game.run.pending_node))
+				var pending := Game.run.node(Game.run.pending_node)
+				if String(pending.get("type", "")) == "choice":
+					_answer(pending, actions)
+					continue
+				var options := Game.movement_options(pending)
 				if options.is_empty():
 					break
 				Game.complete_task(String(options[0].get("id", "")), false)
@@ -324,6 +456,64 @@ static func _advance_checks(host: Node, failures: Array) -> void:
 		_check(failures, "never parked on a dead screen",
 			Game.screen in ["area", "event", "boon", "task", "overworld"],
 			Game.screen)
+	Game.abandon_run()
+
+
+# --- being asked something ------------------------------------------------------
+
+## A choice node is not a task, and the one place that matters is `skip_task`.
+##
+## It borrows `run.pending_node` and the task screen, so every caller that
+## reaches for the task vocabulary reaches it too — and skipping is the only bit
+## of that vocabulary that is wrong here. Backing out of ten push-ups is a real
+## answer; backing out of a question is not, and clearing `pending_node` without
+## finishing the node put the same question straight back in the available set.
+## The harness span on that for two hundred actions before anybody saw it, so
+## the guard is worth a test of its own.
+static func _choice_checks(host: Node, failures: Array) -> void:
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(550001)
+	Steps.grant(2000)
+	# The waking room is a named cell, so stepping onto it always builds the
+	# survey rather than drawing from the tier's pool.
+	var cell := HJWorld.shared().anchor("waking_room")
+	Game.enter_anomaly(cell)
+	await host.get_tree().process_frame
+	_check(failures, "the waking room is the survey",
+		String(Game.run.area.get("id", "")) == "waking_room",
+		String(Game.run.area.get("id", "?")))
+
+	var available := HJAreaGen.available_ids(Game.run)
+	_check(failures, "the survey opens on a question", not available.is_empty(),
+		_dump_nodes(Game.run))
+	if available.is_empty():
+		Game.abandon_run()
+		return
+	var first := String(available[0])
+	Game.tap_node(first)
+	var node := Game.run.node(first)
+	_check(failures, "a question is a choice node, not a task",
+		String(node.get("type", "")) == "choice" and Game.run.pending_node == first,
+		"%s, pending '%s'" % [String(node.get("type", "?")), Game.run.pending_node])
+	_check(failures, "a question asks for no movement",
+		Game.movement_options(node).is_empty(),
+		"%d movements" % Game.movement_options(node).size())
+
+	# The regression guard: skipping must not quietly un-ask the question.
+	Game.skip_task()
+	_check(failures, "backing out of a question does not count as answering it",
+		Game.run.pending_node == first and not Game.run.is_done(first),
+		"pending '%s', done=%s" % [Game.run.pending_node, str(Game.run.is_done(first))])
+
+	# And answering it does.
+	_answer(node, 1)
+	_check(failures, "answering a question finishes it",
+		Game.run.pending_node == "" and Game.run.is_done(first),
+		"pending '%s', done=%s" % [Game.run.pending_node, str(Game.run.is_done(first))])
+	_check(failures, "an answer is a tag the rest of the area can read",
+		not Game.run.tags.is_empty(), str(Game.run.tags))
+
 	Game.abandon_run()
 
 
@@ -364,7 +554,11 @@ static func _warden_checks(host: Node, failures: Array) -> void:
 					break
 				Game.tap_node(_pick_node(Game.run, available))
 			"task":
-				var options := Game.movement_options(Game.run.node(Game.run.pending_node))
+				var pending := Game.run.node(Game.run.pending_node)
+				if String(pending.get("type", "")) == "choice":
+					_answer(pending, actions)
+					continue
+				var options := Game.movement_options(pending)
 				if options.is_empty():
 					break
 				Game.complete_task(String(options[0].get("id", "")), false)
@@ -564,7 +758,7 @@ static func _palace_checks(failures: Array) -> void:
 static func _screen_checks(host: Node, failures: Array) -> void:
 	var names: Array = ["title", "menu", "palace", "gym", "workshop", "stores", "hearth",
 		"observatory", "codex", "wheel", "inventory", "area", "overworld", "worldmap",
-		"task", "boon", "event", "summary"]
+		"task", "boon", "event", "summary", "dialogue"]
 
 	Game.run = null
 	Game.clear_saved_run()
@@ -644,7 +838,11 @@ static func _anomaly_checks(host: Node, failures: Array) -> void:
 					break
 				Game.tap_node(String(available[0]))
 			"task":
-				var options := Game.movement_options(Game.run.node(Game.run.pending_node))
+				var pending := Game.run.node(Game.run.pending_node)
+				if String(pending.get("type", "")) == "choice":
+					_answer(pending, guard)
+					continue
+				var options := Game.movement_options(pending)
 				if options.is_empty():
 					Game.skip_task()
 				else:
@@ -728,6 +926,697 @@ static func _archive_checks(failures: Array) -> void:
 	History.use_path(live)
 
 
+# --- the reveal ladder ---------------------------------------------------------
+
+## Which rooms a save can see, and when. `reveal_after` in rooms.json is the
+## ladder, and it is content rather than code — which is exactly why it needs a
+## test: reordering it is a one-line edit in a JSON file that nothing else
+## would notice was wrong.
+static func _reveal_checks(failures: Array) -> void:
+	# God mode shows everything, so a developer who left it on would make every
+	# assertion below vacuously true.
+	var was_god := Debug.god
+	Debug.god = false
+	Meta.revealed = []
+	Meta.rooms_owned = []
+	Meta.room_grid = {}
+	Meta.palace_size = 0
+	Meta.ensure_palace()
+
+	_check(failures, "a fresh save can already see the Hearth",
+		Meta.room_revealed("hearth"), str(Meta.rooms_owned))
+	_check(failures, "a fresh save cannot yet see the Observatory",
+		not Meta.room_revealed("observatory"), str(Meta.rooms_owned))
+	_check(failures, "the Observatory sits one rung above the Workshop",
+		String(Content.room("observatory").get("reveal_after", "")) == "workshop",
+		String(Content.room("observatory").get("reveal_after", "?")))
+
+	Meta.resolve = 1000
+	var bought := Meta.buy_room("workshop")
+	_check(failures, "the rung below the Observatory can be bought", bought, str(Meta.rooms_owned))
+	_check(failures, "buying the Workshop reveals the Observatory",
+		Meta.room_revealed("observatory"), str(Meta.rooms_owned))
+
+	Debug.god = was_god
+	Meta.revealed = []
+	Meta.rooms_owned = []
+	Meta.room_grid = {}
+	Meta.palace_size = 0
+	Meta.ensure_palace()
+	Game.rebuild_rules()
+
+
+# --- the story layer -----------------------------------------------------------
+
+## Dialogue, objectives and the Finder — the three halves of Beat 6.
+##
+## The conversation is walked the way a player walks it rather than driven node
+## by node, because the interesting failures are all in the seams: a reply that
+## is visible when it should not be, a `next` that ends the conversation instead
+## of following it, an effect that fires twice. None of those show up if the
+## test reaches into the graph and asserts about the data.
+static func _story_checks(host: Node, failures: Array) -> void:
+	# Both stores are scratch copies, but earlier sections have already played
+	# thirty-odd anomalies over them. Start from nothing so "the objective is
+	# active" is a statement about `start()` rather than about the fuzz loop.
+	Objectives.wipe()
+	Dialogue.wipe()
+
+	var dialogue_problems := Dialogue.problems()
+	for problem in dialogue_problems:
+		failures.append("dialogue: %s" % problem)
+	_check(failures, "every conversation's gotos and conditions resolve",
+		dialogue_problems.is_empty(), "%d problem(s)" % dialogue_problems.size())
+
+	var objective_problems := Objectives.problems()
+	for problem in objective_problems:
+		failures.append("objectives: %s" % problem)
+	_check(failures, "every objective's goal is one the code implements",
+		objective_problems.is_empty(), "%d problem(s)" % objective_problems.size())
+
+	_finder_checks(failures)
+
+	# --- walking the doorstep conversation end to end --------------------------
+	var doc: Dictionary = Content.dialogues.get("spite_doorstep", {})
+	_check(failures, "Spite is waiting on the doorstep in the data",
+		not doc.is_empty() and bool(doc.get("once", false)),
+		"%d node(s)" % (doc.get("nodes", []) as Array).size())
+	if doc.is_empty():
+		return
+	_check(failures, "the gift node still carries the reply gated on how far you have walked",
+		_gated_reply_index("spite_doorstep", "gift") >= 0, "no zone_gte reply")
+
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(510001)
+	Game.run.zone = 0
+
+	_check(failures, "an unseen once-only conversation is on offer",
+		Dialogue.available("spite_doorstep"), "already seen")
+	_check(failures, "the doorstep conversation starts", Dialogue.start("spite_doorstep"),
+		"start() refused")
+	var view := Dialogue.current()
+	_check(failures, "a conversation opens on the first line of its first node",
+		String(view.get("node", "")) == "arrival" and int(view.get("line", 0)) == 1,
+		"%s line %d" % [String(view.get("node", "?")), int(view.get("line", 0))])
+	_check(failures, "replies stay hidden until the speaker has finished talking",
+		(view.get("replies", []) as Array).is_empty() and bool(view.get("can_continue", false)),
+		"%d replies on line 1" % (view.get("replies", []) as Array).size())
+
+	_advance_to_last_line("arrival")
+	view = Dialogue.current()
+	_check(failures, "the last line of a node is where the replies appear",
+		(view.get("replies", []) as Array).size() == 3 and not bool(view.get("can_continue", true)),
+		"%d replies" % (view.get("replies", []) as Array).size())
+
+	# A tap on an unanswered question must do nothing at all — not advance, not
+	# fall through to the next node, not end.
+	Dialogue.advance()
+	var after := Dialogue.current()
+	_check(failures, "tapping past an unanswered question does nothing",
+		String(after.get("node", "")) == "arrival" and int(after.get("line", 0)) == int(view.get("line", 0)),
+		"%s line %d" % [String(after.get("node", "?")), int(after.get("line", 0))])
+
+	Dialogue.choose(0)
+	_check(failures, "choosing a reply moves the conversation on",
+		String(Dialogue.current().get("node", "")) == "want",
+		String(Dialogue.current().get("node", "?")))
+
+	# --- the objective the conversation hands over -----------------------------
+	_check(failures, "arriving at Spite's demand leaves the town objective running",
+		Objectives.is_active("close_town_anomalies"),
+		Objectives.state("close_town_anomalies"))
+
+	_advance_to_last_line("want")
+	Dialogue.choose(2)
+	_check(failures, "a reply with no gate reaches the gift",
+		String(Dialogue.current().get("node", "")) == "gift",
+		String(Dialogue.current().get("node", "?")))
+	_check(failures, "the gift node hands over the Finder", Meta.item_count("finder") > 0,
+		"%d carried" % Meta.item_count("finder"))
+
+	# --- the gate is the ordinary condition engine, not a second one -----------
+	_advance_to_last_line("gift")
+	Game.run.zone = 0
+	var near_home: Array = Dialogue.current().get("replies", [])
+	Game.run.zone = 3
+	var far_out: Array = Dialogue.current().get("replies", [])
+	_check(failures, "a reply gated on how far you have walked is hidden close to home",
+		near_home.size() == 1, "%d replies at ring 0" % near_home.size())
+	_check(failures, "the same reply appears once you have been out past the foothills",
+		far_out.size() == 2, "%d replies at ring 3" % far_out.size())
+
+	# --- once means once -------------------------------------------------------
+	var take_it := -1
+	for reply in far_out:
+		if int((reply as Dictionary)["index"]) != _gated_reply_index("spite_doorstep", "gift"):
+			take_it = int((reply as Dictionary)["index"])
+	Dialogue.choose(take_it)
+	var guard := 0
+	while Dialogue.active() and guard < 40:
+		guard += 1
+		Dialogue.advance()
+	_check(failures, "the conversation reaches its end", not Dialogue.active(),
+		"still on %s after %d taps" % [String(Dialogue.current().get("node", "?")), guard])
+	_check(failures, "a finished conversation is remembered", Dialogue.seen.has("spite_doorstep"), "")
+	_check(failures, "a once-only conversation refuses to run twice",
+		not Dialogue.start("spite_doorstep"), "started again")
+
+	# --- the objective outlives the loop and the disk --------------------------
+	var ring_zero := _ring_zero_cells()
+	_check(failures, "the town has anomalies for the objective to count",
+		ring_zero.size() >= 2, "%d in ring 0" % ring_zero.size())
+	if ring_zero.size() < 2:
+		Game.abandon_run()
+		return
+
+	Game.run.anomalies_cleared.append(Game._cell_key(ring_zero[0]))
+	Game.changed()
+	var closed_one := Objectives.progress("close_town_anomalies")
+	_check(failures, "closing an anomaly moves the objective on",
+		int(closed_one["done"]) == 1 and int(closed_one["total"]) == ring_zero.size(),
+		"%d/%d" % [int(closed_one["done"]), int(closed_one["total"])])
+
+	Game.end_run("loop")
+	Game.start_run(510002)
+	var after_loop := Objectives.progress("close_town_anomalies")
+	_check(failures, "the loop takes the world back and leaves the errand standing",
+		Objectives.is_active("close_town_anomalies")
+			and int(after_loop["done"]) == int(closed_one["done"]),
+		"%s %d/%d" % [Objectives.state("close_town_anomalies"),
+			int(after_loop["done"]), int(after_loop["total"])])
+
+	Objectives.load_store()
+	var after_disk := Objectives.progress("close_town_anomalies")
+	_check(failures, "the errand survives being read back off disk",
+		Objectives.is_active("close_town_anomalies")
+			and int(after_disk["done"]) == int(closed_one["done"])
+			and int(after_disk["total"]) == int(closed_one["total"]),
+		"%s %d/%d" % [Objectives.state("close_town_anomalies"),
+			int(after_disk["done"]), int(after_disk["total"])])
+
+	# --- and it pays exactly once ---------------------------------------------
+	var reward := _resolve_reward("close_town_anomalies")
+	_check(failures, "finishing the town is worth something", reward > 0, "%d resolve" % reward)
+	var before_reward := Meta.resolve
+	for i in range(1, ring_zero.size()):
+		Game.run.anomalies_cleared.append(Game._cell_key(ring_zero[i]))
+	Game.changed()
+	_check(failures, "closing the last hole in town finishes the objective",
+		Objectives.is_complete("close_town_anomalies"),
+		Objectives.state("close_town_anomalies"))
+	var paid := Meta.resolve - before_reward
+	_check(failures, "finishing an objective pays its reward", paid == reward,
+		"%+d, expected %+d" % [paid, reward])
+	Game.changed()
+	_check(failures, "an objective already finished does not pay again",
+		Meta.resolve - before_reward == reward,
+		"%+d after a second harvest" % (Meta.resolve - before_reward))
+
+	Game.abandon_run()
+	await host.get_tree().process_frame
+
+
+## The Finder is a deliberately poor instrument, which makes it easy to get
+## wrong in a way nobody notices: too honest and it is a map, too noisy and it
+## is a random number. Both failures are invisible on screen.
+static func _finder_checks(failures: Array) -> void:
+	var ring_zero := _ring_zero_cells()
+	if ring_zero.is_empty():
+		_check(failures, "there is an anomaly to point the Finder at", false, "none in ring 0")
+		return
+	var here: Vector2i = ring_zero[0]
+	var far := here + Vector2i(200, 200)
+	_check(failures, "the Finder's target is open before it is read",
+		not Objectives.is_cell_closed(here), "already closed")
+
+	var now := float(HJClock.now())
+	_check(failures, "the Finder reads high standing on a hole",
+		Objectives.finder_reading_at(here, now) > 0.85,
+		"%.3f" % Objectives.finder_reading_at(here, now))
+
+	# One sample at range is not a measurement: the noise is a pair of sines and
+	# a single unlucky moment can put it anywhere inside the noise band. What the
+	# design promises is that the *reading* is low out there, so average it.
+	var near_low := 1.0
+	var far_total := 0.0
+	var far_low := 1.0
+	var far_high := 0.0
+	var out_of_range := 0
+	var samples := 64
+	for i in range(samples):
+		var t := now + float(i) * 0.7
+		var near_reading := Objectives.finder_reading_at(here, t)
+		var far_reading := Objectives.finder_reading_at(far, t)
+		if near_reading < 0.0 or near_reading > 1.0 or far_reading < 0.0 or far_reading > 1.0:
+			out_of_range += 1
+		near_low = minf(near_low, near_reading)
+		far_low = minf(far_low, far_reading)
+		far_high = maxf(far_high, far_reading)
+		far_total += far_reading
+	var far_mean := far_total / float(samples)
+
+	_check(failures, "no Finder reading escapes the bar it is drawn in",
+		out_of_range == 0, "%d of %d samples outside 0..1" % [out_of_range, samples])
+	_check(failures, "the Finder reads low a long walk away from anything",
+		far_mean < 0.2, "mean %.3f over %d samples" % [far_mean, samples])
+	_check(failures, "the Finder wobbles at range rather than sitting still",
+		far_high - far_low > 0.05, "spread %.3f" % (far_high - far_low))
+	_check(failures, "the Finder does not wobble away from a hole it is standing on",
+		near_low > 0.6, "dipped to %.3f" % near_low)
+
+
+## The index of the one reply on `node_id` that carries a `when`, or -1.
+static func _gated_reply_index(dialogue_id: String, node_id: String) -> int:
+	var replies: Array = Dialogue.node_of(dialogue_id, node_id).get("replies", [])
+	for i in range(replies.size()):
+		if not (replies[i] as Dictionary).get("when", {}).is_empty():
+			return i
+	return -1
+
+
+## Tap through to the last line of the node the conversation is on.
+static func _advance_to_last_line(node_id: String) -> void:
+	var guard := 0
+	while guard < 20:
+		guard += 1
+		var view := Dialogue.current()
+		if String(view.get("node", "")) != node_id:
+			return
+		if int(view.get("line", 0)) >= int(view.get("lines", 0)):
+			return
+		Dialogue.advance()
+
+
+static func _ring_zero_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for entry in HJWorld.shared().anomalies:
+		var spawn: Dictionary = entry
+		if int(spawn.get("tier", -1)) == 0:
+			out.append(Vector2i(int(spawn.get("x", 0)), int(spawn.get("y", 0))))
+	return out
+
+
+static func _resolve_reward(objective_id: String) -> int:
+	var total := 0
+	for e in (Objectives.definition(objective_id).get("reward", []) as Array):
+		var effect: Dictionary = e
+		if String(effect.get("type", "")) == "resolve":
+			total += int(round(float(effect.get("amount", 0))))
+	return total
+
+
+# --- buffs ---------------------------------------------------------------------
+
+## A buff is only a bundle of modifiers, so most of what can go wrong is in the
+## clock: a timer measured in frames, a chain that starts from now instead of
+## from the expiry it is owed to, an expired buff that is still tuning numbers
+## because nothing has swept it up yet. All three survive a screenshot.
+static func _buff_checks(failures: Array) -> void:
+	Game.run = null
+	Game.clear_saved_run()
+	Buffs.clear_all()
+	Game.rebuild_rules()
+
+	# --- a buff is an ordinary Rules source -----------------------------------
+	var plain := Rules.value("run.grit_mult")
+	_check(failures, "breakfast is in the catalogue",
+		not Buffs.definition("breakfast").is_empty(), "no such buff")
+	_check(failures, "breakfast applies", Buffs.apply("breakfast", true), "apply() refused")
+	var fed := Rules.value("run.grit_mult")
+	_check(failures, "breakfast is worth half again as much Grit, read through the rules",
+		is_equal_approx(fed, plain * 1.5), Rules.explain("run.grit_mult"))
+
+	var left := Buffs.seconds_left("breakfast")
+	_check(failures, "breakfast runs for four hours", absi(left - 4 * 3600) <= 2, "%ds left" % left)
+	var showing := Buffs.active()
+	_check(failures, "a running buff is something the Steps counter can draw",
+		showing.size() == 1 and String((showing[0] as Dictionary).get("icon", "")) == "fuel",
+		"%d active, icon '%s'" % [showing.size(),
+			String((showing[0] as Dictionary).get("icon", "")) if not showing.is_empty() else ""])
+
+	Buffs.break_buff("breakfast", true)
+	_check(failures, "the numbers go back where they were when a buff ends",
+		is_equal_approx(Rules.value("run.grit_mult"), plain), Rules.explain("run.grit_mult"))
+
+	# --- the wall clock runs while the app does not ---------------------------
+	Buffs.apply("breakfast", true)
+	Buffs.save_state()
+	_check(failures, "the buff file is on disk to be rewound",
+		_rewind_buffs(5 * 3600), "nothing written")
+	Buffs.load_state()
+	_check(failures, "four hours of breakfast does not survive five hours of being closed",
+		not Buffs.has("breakfast"), "%ds left" % Buffs.seconds_left("breakfast"))
+	_check(failures, "and the number it was bending comes back with it",
+		is_equal_approx(Rules.value("run.grit_mult"), plain), Rules.explain("run.grit_mult"))
+
+	# --- the chain settles from the expiry, not from now ----------------------
+	Buffs.clear_all()
+	Buffs.apply("coffee", true)
+	_check(failures, "coffee is what the crash is chained to",
+		String(Buffs.definition("coffee").get("then", "")) == "coffee_crash",
+		String(Buffs.definition("coffee").get("then", "?")))
+	_rewind_buffs(4 * 3600)
+	Buffs.load_state()
+	_check(failures, "three hours of coffee is spent after four hours away",
+		not Buffs.has("coffee"), "still running")
+	_check(failures, "and the crash it was borrowing against has started",
+		Buffs.has("coffee_crash"), "no crash")
+	var crash_left := Buffs.seconds_left("coffee_crash")
+	# Two hours of crash that began when the coffee ended, an hour ago. Settling
+	# from now instead would leave the whole two hours of it in front of you.
+	_check(failures, "the crash is settled from when the coffee ended, not from now",
+		absi(crash_left - 3600) <= 60, "%ds left, expected about 3600" % crash_left)
+	_check(failures, "the crash makes every tile slower to walk",
+		Steps.step_time() > 0.17, "%.3fs a tile" % Steps.step_time())
+
+	_rewind_buffs(3 * 3600)
+	Buffs.load_state()
+	_check(failures, "a chain that has run out leaves nothing behind",
+		Buffs.active().is_empty() and not Buffs.has("coffee_crash"),
+		"%d still running" % Buffs.active().size())
+
+	# --- a buff with no timer at all ------------------------------------------
+	Steps.reset_run()
+	Steps.grant(500)
+	Buffs.clear_all()
+	Buffs.apply("white_room", true)
+	_check(failures, "the Boon of the White Room has no timer on it",
+		Buffs.seconds_left("white_room") == -1, "%ds" % Buffs.seconds_left("white_room"))
+	_check(failures, "walking is free inside the white room",
+		is_zero_approx(Steps.step_cost()), "%.3f a tile" % Steps.step_cost())
+	var spent_before := Steps.spent
+	for i in range(20):
+		Steps.spend(1)
+	_check(failures, "twenty free tiles cost nothing", Steps.spent == spent_before,
+		"%d -> %d" % [spent_before, Steps.spent])
+
+	Buffs.save_state()
+	Buffs.load_state()
+	_check(failures, "a buff with no timer survives the app being closed",
+		Buffs.has("white_room") and is_zero_approx(Steps.step_cost()),
+		"%.3f a tile" % Steps.step_cost())
+
+	_check(failures, "stepping outdoors breaks the boon", Buffs.trigger("outdoors") == 1,
+		"nothing was listening")
+	_check(failures, "and it is gone rather than merely quiet", not Buffs.has("white_room"), "")
+	Steps.set_burn(1.0)
+	spent_before = Steps.spent
+	for i in range(3):
+		Steps.spend(1)
+	_check(failures, "the next three tiles cost three", Steps.spent == spent_before + 3,
+		"%d -> %d" % [spent_before, Steps.spent])
+
+	# --- expired but not yet swept up -----------------------------------------
+	# `active()` and `sources()` both filter rather than settle, because a screen
+	# that asked what to draw and got a state change back would rebuild itself
+	# from inside its own build. That filter is the only thing standing between
+	# the player and a buff that keeps working for the second before _process
+	# notices, so it is worth an assertion of its own.
+	Buffs.clear_all()
+	Buffs.apply("breakfast", true)
+	Buffs.shift(-5 * 3600)
+	_check(failures, "an expired buff nobody has settled yet is still on the books",
+		Buffs.has("breakfast"), "it settled early")
+	_check(failures, "but it is not drawn", Buffs.active().is_empty(),
+		"%d shown" % Buffs.active().size())
+	_check(failures, "and it is not still bending numbers",
+		_buff_source_names().is_empty() and is_equal_approx(Rules.value("run.grit_mult"), plain),
+		Rules.explain("run.grit_mult"))
+
+	# --- pausing, and the end of a run ----------------------------------------
+	Buffs.clear_all()
+	Buffs.apply("breakfast", true)
+	var before_pause := Buffs.seconds_left("breakfast")
+	Buffs.shift(600)
+	var after_pause := Buffs.seconds_left("breakfast")
+	_check(failures, "a paused night does not eat the breakfast you paid for",
+		absi(after_pause - (before_pause + 600)) <= 2,
+		"%ds -> %ds" % [before_pause, after_pause])
+
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(520001)
+	Buffs.apply("breakfast", true)
+	Game.end_run("loop")
+	_check(failures, "new run, new legs: the loop closing clears every buff",
+		Buffs.active().is_empty() and not Buffs.has("breakfast"),
+		"%d survived" % Buffs.active().size())
+	Buffs.clear_all()
+	Steps.reset_run()
+	Game.rebuild_rules()
+
+
+## Move every timestamp in the buff file back by `seconds`, which is the only
+## honest way to test a wall clock: there is no injectable now(), and a test
+## that waited four hours is not a test.
+static func _rewind_buffs(seconds: int) -> bool:
+	if not FileAccess.file_exists(Buffs.path):
+		return false
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(Buffs.path))
+	if not (parsed is Dictionary):
+		return false
+	var doc: Dictionary = parsed
+	var rows: Array = doc.get("buffs", [])
+	if rows.is_empty():
+		return false
+	for entry in rows:
+		var e: Dictionary = entry
+		e["started"] = int(e.get("started", 0)) - seconds
+		if int(e.get("expires", 0)) > 0:
+			e["expires"] = int(e.get("expires", 0)) - seconds
+	var file := FileAccess.open(Buffs.path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(doc))
+	file.close()
+	return true
+
+
+static func _buff_source_names() -> Array:
+	var out: Array = []
+	for source in Buffs.sources():
+		out.append(String((source as Dictionary).get("name", "")))
+	return out
+
+
+# --- things in the world you can act on -----------------------------------------
+
+## Interactables, on placements this file owns rather than on wherever the house
+## agent has left the furniture. Where the stove stands is a design decision and
+## it will move; that reach, price and tombstone all work is not, and a test
+## that read the world file would break every time somebody dragged a door.
+static func _interactable_checks(failures: Array) -> void:
+	var real := HJWorld.shared().interactables
+	var here := Vector2i(10, 10)
+	Game.interactables.use_placements([
+		{"x": 11, "y": 10, "type": "front_door", "label": "Front door"},
+		{"x": 9, "y": 9, "type": "stove"},
+		{"x": 10, "y": 11, "type": "dog"},
+		{"x": 20, "y": 20, "type": "counter"},
+	])
+
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(530001)
+	Buffs.clear_all()
+	Game.rebuild_rules()
+
+	# --- reach ----------------------------------------------------------------
+	var within := Game.interactables_near(here)
+	var ids: Array = []
+	for row in within:
+		ids.append(String((row as Dictionary).get("id", "")))
+	ids.sort()
+	_check(failures, "everything beside you is within reach",
+		ids.has("front_door") and ids.has("stove") and ids.has("dog"), str(ids))
+	_check(failures, "and the thing across the room is not", not ids.has("counter"), str(ids))
+
+	var door := _placed_row(within, "front_door")
+	_check(failures, "the door is one of the things you can reach", not door.is_empty(), str(ids))
+	if door.is_empty():
+		Game.interactables.use_placements(real)
+		Game.abandon_run()
+		return
+
+	# --- priced in data, worded in data ---------------------------------------
+	var door_cost := int(round(Content.base("interact.door_cost")))
+	_check(failures, "the door costs what the config says it costs",
+		int(door["cost"]) == door_cost and door_cost == 25,
+		"%d, config says %d" % [int(door["cost"]), door_cost])
+	_check(failures, "the door's verb comes from the catalogue rather than the code",
+		String(door["verb"]) == String(Content.interactable("front_door").get("verb", "")),
+		String(door["verb"]))
+
+	# --- the door is a purchase, and it is the exit ---------------------------
+	var key := String(door["key"])
+	Game.run.grit = 0
+	_check(failures, "with no Grit the door will not open", not Game.interact(key), "it opened")
+	_check(failures, "and a refused door leaves no mark on the run",
+		not Game.has_tag("front_door_open"), str(Game.run.tags))
+
+	Game.run.grit = 100
+	_check(failures, "with Grit in hand the door opens", Game.interact(key), "it refused")
+	_check(failures, "an open door is something the run remembers",
+		Game.has_tag("front_door_open"), str(Game.run.tags))
+	_check(failures, "opening the door costs exactly what it said it would",
+		Game.run.grit == 100 - door_cost, "%d Grit left" % Game.run.grit)
+	_check(failures, "a door already open cannot be bought again",
+		not Game.interact(key), "it charged twice")
+	_check(failures, "and refusing it costs nothing", Game.run.grit == 100 - door_cost,
+		"%d Grit left" % Game.run.grit)
+
+	# --- the stove pays for a buff, the dog is free ---------------------------
+	var coffee_cost := int(round(Content.base("interact.coffee_cost")))
+	Game.run.grit = 100
+	Buffs.clear_all()
+	_check(failures, "the stove makes coffee", Game.interact("stove@9,9"), "it refused")
+	_check(failures, "coffee costs what the config says",
+		Game.run.grit == 100 - coffee_cost, "%d Grit left" % Game.run.grit)
+	_check(failures, "and leaves you with coffee running", Buffs.has("coffee"),
+		str(Buffs.active().size()))
+
+	Game.run.grit = 0
+	_check(failures, "the dog does not charge you", Game.interact("dog@10,11"), "it refused")
+	_check(failures, "and petting him leaves your Grit alone", Game.run.grit == 0,
+		"%d Grit" % Game.run.grit)
+
+	Buffs.clear_all()
+	Game.interactables.use_placements(real)
+
+	# --- the gate is a wall, not a label --------------------------------------
+	# This one has to use the real placements: the world's own collision reads
+	# the interactables out of overworld.json, which is the only way the door
+	# can actually stop a path query.
+	var world := HJWorld.shared()
+	var door_cell := Vector2i(-1, -1)
+	for entry in real:
+		if entry is Dictionary and String((entry as Dictionary).get("type", "")) == "front_door":
+			door_cell = Vector2i(int((entry as Dictionary).get("x", 0)),
+				int((entry as Dictionary).get("y", 0)))
+	_check(failures, "the world has a front door standing in it", door_cell.x >= 0,
+		"%d placements" % real.size())
+	if door_cell.x >= 0:
+		Game.run = null
+		Game.clear_saved_run()
+		Game.start_run(530002)
+		_check(failures, "a run that has not bought the door does not have the tag",
+			not Game.has_tag("front_door_open"), str(Game.run.tags))
+		_check(failures, "a shut front door is a cell you cannot walk onto",
+			not world.walkable(door_cell.x, door_cell.y), str(door_cell))
+		Game.run.tags.append("front_door_open")
+		_check(failures, "and an open one is a cell you can",
+			world.walkable(door_cell.x, door_cell.y), str(door_cell))
+
+	Game.abandon_run()
+	Buffs.clear_all()
+
+
+static func _placed_row(rows: Array, id: String) -> Dictionary:
+	for row in rows:
+		if String((row as Dictionary).get("id", "")) == id:
+			return row
+	return {}
+
+
+# --- the first thirty minutes ---------------------------------------------------
+
+## The tutorial is a sequence of one-shots, and a one-shot is the hardest thing
+## in the codebase to test by playing: by the time you notice it fired twice,
+## the save that would have proved it is gone. Each beat here is un-fired first
+## — `Meta.revealed` is in the snapshot, so that is safe — and then fired.
+static func _tutorial_checks(failures: Array) -> void:
+	var world := HJWorld.shared()
+	_check(failures, "the house has an inside for the tutorial to be inside of",
+		not world.indoors.is_empty(), "%d rooms" % world.indoors.size())
+
+	# --- beat 1: the boon, and only on the first run --------------------------
+	Meta.revealed.erase("beat:left_house")
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(540001)
+	_check(failures, "a player who has never left the house wakes with the boon",
+		Buffs.has("white_room"), str(Buffs.active().size()))
+	Game.abandon_run()
+
+	if not Meta.revealed.has("beat:left_house"):
+		Meta.revealed.append("beat:left_house")
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(540002)
+	_check(failures, "a player who has already been outside does not get it again",
+		not Buffs.has("white_room"), str(Buffs.active().size()))
+	Game.abandon_run()
+
+	# --- beat 5: crossing the threshold ---------------------------------------
+	Meta.revealed.erase("beat:left_house")
+	Dialogue.stop()
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(540003)
+	_check(failures, "the threshold beat starts with the boon to break",
+		Buffs.has("white_room"), str(Buffs.active().size()))
+
+	var inside := world.spawn
+	_check(failures, "you wake up indoors", world.is_indoors(inside), str(inside))
+	Game.tutorial.note_moved(inside)
+	_check(failures, "walking about inside the house changes nothing",
+		Buffs.has("white_room") and not Meta.revealed.has("beat:left_house"), str(inside))
+
+	var outside := _outdoor_cell(world)
+	_check(failures, "there is somewhere outside to walk to", outside.x >= 0, str(outside))
+	if outside.x >= 0:
+		Game.tutorial.note_moved(outside)
+		_check(failures, "stepping outside breaks the Boon of the White Room",
+			not Buffs.has("white_room"), str(Buffs.active().size()))
+		_check(failures, "and the beat is marked as having happened",
+			Meta.revealed.has("beat:left_house"), str(Meta.revealed.size()))
+
+		# Once. A beat that fires on every step outside would re-break a boon the
+		# player had been given again, and re-introduce Spite for ever.
+		Dialogue.stop()
+		Buffs.apply("white_room", true)
+		Game.tutorial.note_moved(outside)
+		_check(failures, "crossing out a second time does not fire the beat again",
+			Buffs.has("white_room"), "the boon broke twice")
+	Buffs.clear_all()
+	Dialogue.stop()
+	Game.abandon_run()
+
+	# --- beat 2: the first hole does not let go -------------------------------
+	var closed_before := Meta.anomalies_closed
+	Meta.anomalies_closed = 0
+	Game.run = null
+	Game.clear_saved_run()
+	Game.start_run(540004)
+	Steps.grant(2000)
+	_check(failures, "standing in the world, nothing is holding you",
+		not Game.tutorial.holds_you_in(), "held with no anomaly")
+	var cell := _next_anomaly(Game.run)
+	_check(failures, "there is an anomaly to be held by", cell.x >= 0, "world exhausted")
+	if cell.x >= 0:
+		Game.enter_anomaly(cell)
+		_check(failures, "the first anomaly of a save will not let you walk back out",
+			Game.tutorial.holds_you_in(), "screen=%s" % Game.screen)
+		Meta.anomalies_closed = 1
+		_check(failures, "every anomaly after the first one will",
+			not Game.tutorial.holds_you_in(), "still held")
+	Meta.anomalies_closed = closed_before
+	Game.abandon_run()
+	Buffs.clear_all()
+	Steps.reset_run()
+
+
+## A walkable cell outside every indoor rectangle, or (-1,-1).
+static func _outdoor_cell(world: HJWorld) -> Vector2i:
+	for entry in world.anomalies:
+		var spawn: Dictionary = entry
+		var cell := Vector2i(int(spawn.get("x", 0)), int(spawn.get("y", 0)))
+		if not world.is_indoors(cell):
+			return cell
+	return Vector2i(-1, -1)
+
+
 # --- helpers -------------------------------------------------------------------
 
 static func _snapshot() -> Dictionary:
@@ -739,6 +1628,13 @@ static func _snapshot() -> Dictionary:
 		"palace_size": Meta.palace_size,
 		"last_active_day": Meta.last_active_day, "rest_used_day": Meta.rest_used_day,
 		"codex": Meta.codex.duplicate(), "axis_tasks": Meta.axis_tasks.duplicate(true),
+		# The tutorial beats are one-shots recorded here, and the checks below
+		# have to un-fire them to test them at all.
+		"revealed": Meta.revealed.duplicate(),
+		# What the survey wrote down about the player. The harness answers five
+		# questions a run and every answer is kept, so without this the person
+		# running the test ends up remembered as whoever the fuzzer said it was.
+		"self_description": Meta.self_description.duplicate(true),
 		"deepest_ring": Meta.deepest_ring, "anomalies_closed": Meta.anomalies_closed,
 		"loops": Meta.loops,
 		"runs_today": Meta.runs_today.duplicate(true), "stats": Meta.stats.duplicate(true),
@@ -762,6 +1658,8 @@ static func _restore(s: Dictionary) -> void:
 	Meta.rest_used_day = s["rest_used_day"]
 	Meta.codex = s["codex"]
 	Meta.axis_tasks = s["axis_tasks"]
+	Meta.revealed = s.get("revealed", Meta.revealed)
+	Meta.self_description = s.get("self_description", Meta.self_description)
 	Meta.deepest_ring = s["deepest_ring"]
 	Meta.anomalies_closed = s["anomalies_closed"]
 	Meta.loops = s["loops"]

@@ -412,10 +412,21 @@ func wipe() -> void:
 func problems() -> Array[String]:
 	var out: Array[String] = []
 	var goals: Array = Content.schema().get("vocabulary", {}).get("objective_goals", [])
+	var when_keys: Array = Content.schema().get("vocabulary", {}).get("when_keys", [])
 	for id in Content.objectives.keys():
-		var goal: Dictionary = (Content.objectives[id] as Dictionary).get("goal", {})
+		var doc: Dictionary = Content.objectives[id]
+		var goal: Dictionary = doc.get("goal", {})
 		var kind := String(goal.get("type", ""))
 		if not goals.has(kind):
 			out.append("objective '%s': goal type '%s' is not one Objectives.progress implements"
 				% [String(id), kind])
+		# The docstring above promised this check and the body did not make it.
+		# Harmless while no objective carries a `when`, and silently wrong the
+		# day one does — an unknown condition makes Rules.passes warn once and
+		# then pass, so the gate is simply always open. Dialogue.problems has
+		# checked this since it was written; this is the matching half.
+		for key in (doc.get("when", {}) as Dictionary).keys():
+			if not when_keys.has(String(key)):
+				out.append("objective '%s': condition '%s' is not implemented by Rules.passes"
+					% [String(id), String(key)])
 	return out

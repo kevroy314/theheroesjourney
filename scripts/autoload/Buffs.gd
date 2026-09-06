@@ -28,6 +28,20 @@ extends Node
 signal changed   ## the active set moved: apply, expiry, break, or a wipe
 
 const SAVE_PATH := "user://heroes_buffs.json"
+
+## Overridable, so the self-test does not write buffs into the player's own
+## file. It already cost one: the harness applies, expires and time-travels
+## buffs by rewriting their timestamps hours into the past, and without this
+## every one of those writes landed on the real save. Objectives, Dialogue and
+## History all carry the same override for the same reason.
+var path := SAVE_PATH
+
+
+func use_path(new_path: String) -> void:
+	path = new_path
+	# Load immediately, the way History does. Pointing at a new file and keeping
+	# the old file's buffs in memory is worse than either state on its own.
+	load_state()
 const VERSION := 1
 
 ## A `then` chain that loops would settle forever. It cannot happen with the
@@ -250,7 +264,7 @@ func sources() -> Array:
 # surviving the app being killed is not an optimisation, it is the feature.
 
 func save_state() -> void:
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return
 	file.store_string(JSON.stringify({"version": VERSION, "buffs": _active}))
@@ -259,8 +273,8 @@ func save_state() -> void:
 
 func load_state() -> void:
 	_active.clear()
-	if FileAccess.file_exists(SAVE_PATH):
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
+	if FileAccess.file_exists(path):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 		if parsed is Dictionary and int((parsed as Dictionary).get("version", 0)) == VERSION:
 			for entry in (parsed as Dictionary).get("buffs", []):
 				if not (entry is Dictionary):
@@ -282,8 +296,8 @@ func load_state() -> void:
 
 
 func _erase() -> void:
-	if FileAccess.file_exists(SAVE_PATH):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 # --- internals -----------------------------------------------------------------

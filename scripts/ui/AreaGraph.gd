@@ -11,6 +11,7 @@ signal node_tapped(id: String)
 const NODE_ICONS := {
 	"task": "task", "threshold": "threshold", "echo": "echo", "cache": "cache",
 	"mirror": "mirror", "trinket": "charm", "spite": "spite", "warden": "warden",
+	"choice": "choice",
 }
 
 ## Cards are sized to what they say and centred, never stretched to the frame.
@@ -38,6 +39,24 @@ func _init(run_ref: HJRun) -> void:
 func _ready() -> void:
 	_build()
 	sort_children.connect(queue_redraw)
+	_replay_award()
+
+
+## A task completed on the task screen pays before this graph exists, so the
+## number is floated here, off the card that paid it, the moment the board comes
+## back. HJGritFx holds the pulse across the screen swap; claiming it clears it,
+## so it plays once and not again on the next rebuild.
+func _replay_award() -> void:
+	HJGritFx.pump(run)
+	var amount := HJGritFx.claim_grit()
+	if amount == 0:
+		return
+	var card: Control = _cards.get(HJGritFx.pending_node, null)
+	if card == null:
+		# Paid by something with no card on this board — an echo, a threshold, a
+		# ring cleared. The header still counts; nothing floats.
+		return
+	HJGritFx.float_number(card, amount)
 
 
 ## A stable pseudo-random in [0,1) for a node. Stable is the point: the jitter
@@ -139,23 +158,32 @@ func _make_card(id: String, budget: float = CARD_MAX) -> Control:
 	var glyph := Palette.glyph(type_id)
 	var title := String(node.get("label", "?"))
 	var sub := _descriptor(node)
+	# What the node pays, worked through the same multipliers that will actually
+	# pay it. Only shown where the payout is knowable — a Cache is arithmetic, a
+	# Mirror is a coin toss, and quoting a number for the coin toss would be a
+	# lie the player routes around.
+	var reward := HJNodeInfo.reward_text(run, node)
 
 	if not visible_now:
 		glyph = Palette.glyph("locked")
 		title = "Something Here"
 		sub = "not yet"
+		reward = ""
 		fill = Palette.ca("panel", 0.5)
 	elif done:
 		glyph = Palette.glyph("done")
 		title_role = "good"
 		border = Palette.ca("good", 0.5)
 		sub = "done"
+		reward = ""
 	elif locked:
 		fill = Palette.ca("panel", 0.5)
 		sub = "the other way"
+		reward = ""
 	elif closed:
 		fill = Palette.ca("panel", 0.5)
 		sub = "not what you said"
+		reward = ""
 	elif available:
 		fill = Palette.c("panel_alt")
 		border = Palette.c("accent")
@@ -186,8 +214,13 @@ func _make_card(id: String, budget: float = CARD_MAX) -> Control:
 	# Sized to what it says — the long "choose · 16 options" nodes get to be wide
 	# and the bare ones stay small. Title and subtitle are set at different sizes,
 	# so they are measured at different rates rather than by raw character count.
+	# The reward rides on the same line as the descriptor, so it buys width there
+	# rather than wrapping the descriptor onto two lines.
+	var sub_width := float(sub.length()) * 9.5
+	if reward != "":
+		sub_width += float(reward.length()) * 11.0 + 34.0
 	var wanted := 104.0 \
-		+ maxf(float(title.length()) * 12.5, float(sub.length()) * 9.5) \
+		+ maxf(float(title.length()) * 12.5, sub_width) \
 		+ _wobble(id, 1) * 40.0
 	var ceiling := maxf(CARD_MIN, minf(CARD_MAX, budget))
 	# Height wanders a little too. Boxes that are all exactly one height read as
@@ -216,7 +249,11 @@ func _make_card(id: String, budget: float = CARD_MAX) -> Control:
 	var v := HJUI.vbox(2)
 	var top := HJUI.hbox(8)
 	var mark_role := "accent" if available else "muted"
-	var mark_id := "done" if done else String(NODE_ICONS.get(type_id, ""))
+	# For a task the mark is the *axis*, not the word "task": the complaint was
+	# that "The errand" gave no warning it was about to ask for press-ups, and
+	# the six axis icons already exist. Where the axis genuinely is not fixed the
+	# generic mark comes back, because a wrong promise is worse than a vague one.
+	var mark_id := "done" if done else HJNodeInfo.mark_of(node, String(NODE_ICONS.get(type_id, "")))
 	if not visible_now:
 		mark_id = ""
 	if HJUI.has_icon(mark_id):
@@ -227,10 +264,26 @@ func _make_card(id: String, budget: float = CARD_MAX) -> Control:
 		var glyph_label := HJUI.label(glyph, HJUI.FS_BODY, mark_role)
 		glyph_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		top.add_child(glyph_label)
-	top.add_child(HJUI.label(title, HJUI.FS_SMALL, title_role))
+	var title_label := HJUI.label(title, HJUI.FS_SMALL, title_role)
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title_label)
 	v.add_child(top)
-	if sub != "":
-		v.add_child(HJUI.label(sub, HJUI.FS_TINY, "muted"))
+	if sub != "" or reward != "":
+		var line := HJUI.hbox(6)
+		var sub_label := HJUI.label(sub, HJUI.FS_TINY, "muted")
+		sub_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(sub_label)
+		if reward != "":
+			# The one saturated thing on the card, and it is a number. The
+			# aesthetic note is explicit that accent belongs on data and not on
+			# chrome; this is the data.
+			var price := HJUI.hbox(4)
+			price.size_flags_horizontal = Control.SIZE_SHRINK_END
+			price.add_child(HJUI.icon("grit", 16, "accent" if available else "muted"))
+			price.add_child(HJUI.label(reward, HJUI.FS_TINY,
+				"accent" if available else "muted"))
+			line.add_child(price)
+		v.add_child(line)
 	card.add_child(v)
 
 	if available:
