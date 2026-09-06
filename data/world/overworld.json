@@ -124,12 +124,6 @@
    "sector": "desert"
   },
   {
-   "x": 91,
-   "y": 133,
-   "tier": 1,
-   "sector": "jungle"
-  },
-  {
    "x": 121,
    "y": 154,
    "tier": 1,
@@ -146,6 +140,12 @@
    "y": 104,
    "tier": 1,
    "sector": "mountain"
+  },
+  {
+   "x": 167,
+   "y": 118,
+   "tier": 1,
+   "sector": "desert"
   },
   {
    "x": 177,
@@ -176,6 +176,12 @@
    "y": 130,
    "tier": 2,
    "sector": "jungle"
+  },
+  {
+   "x": 143,
+   "y": 180,
+   "tier": 2,
+   "sector": "ocean"
   },
   {
    "x": 50,

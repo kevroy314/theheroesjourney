@@ -1438,6 +1438,22 @@ def main():
                    for y in range(plan["y0"], plan["y0"] + plan["h"])
                    for x in range(plan["x0"], plan["x0"] + plan["w"])}
 
+    # Nothing procedural within sight of the house.
+    #
+    # `forbid=house_cells` kept anomalies out of the rooms and let one land a
+    # single tile past the north wall -- tier 1, four tiles from the bed, and
+    # plainly visible through the bedroom window. That breaks the tutorial twice
+    # over: Beat 2 is the player *finding* the first hole, and the one they
+    # would find is both harder than the tier-0 the house contains and reachable
+    # before it. The viewport is about seven tiles wide, so ten is far enough
+    # that the first portal a player ever sees is the one meant for them.
+    HOUSE_CLEARANCE = 10
+    house_keep_out = {(x, y)
+                      for y in range(plan["y0"] - HOUSE_CLEARANCE,
+                                     plan["y0"] + plan["h"] + HOUSE_CLEARANCE)
+                      for x in range(plan["x0"] - HOUSE_CLEARANCE,
+                                     plan["x0"] + plan["w"] + HOUSE_CLEARANCE)}
+
     # Spite stands on the doorstep, and he has to actually be standable on: his
     # reach is `adjacent`, which is the eight cells around him plus his own, so
     # a Spite three cells into the long grass is a Spite you cannot talk to. The
@@ -1478,7 +1494,7 @@ def main():
     # unreachable, so the house footprint is off limits to everything but its
     # own named anomaly.
     anomalies = name_anomalies(
-        cells, place_anomalies(world, rng, reach, forbid=house_cells))
+        cells, place_anomalies(world, rng, reach, forbid=house_keep_out))
 
     # THE HOUSE MUST BE SEALED. HJWorld.walkable() returns false on the front
     # door cell until the player has paid the Grit to open it, so that one cell
