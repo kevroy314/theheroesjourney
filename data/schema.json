@@ -2,7 +2,7 @@
   "_comment": "Declarative schema for everything under data/. Read by two checkers with different reach: scripts/autoload/Content.gd validates the merged runtime view (and can run on a player's device), tools/validate_data.py validates the files on disk and additionally scans the GDScript source for the vocabularies below. It lives here rather than as a const in Content.gd because both readers need it and a hand-synced second copy would drift; data/*.json is also the only path the export presets ship, so this is the only place the device pass can read it from. Content.load_all() globs the subdirectories, never data/ itself, so this file is not mistaken for content.",
   "_paths": "Locator grammar, shared by 'files' and 'runtime'. A path is dot-separated segments: 'name' takes a field, 'name[]' takes a field and expands the list, 'name{}' takes a field and expands the dictionary's values, '[]' and '{}' on their own expand what the previous segment produced (so 'loot{}.[]' is every entry of every loot table), and a bare '.' means the record itself. A 'runtime' path's first segment names a property on Content. A path that selects nothing is reported: a locator typo otherwise validates an empty set and looks like a pass.",
   "vocabulary": {
-    "_comment": "Words the engine implements. validate_data.py re-derives each of these from the GDScript source and fails if this list and the source disagree, so the schema cannot quietly go stale — that is the whole point of having a build-time tool as well as a runtime one.",
+    "_comment": "Words the engine implements. validate_data.py re-derives each of these from the GDScript source and fails if this list and the source disagree, so the schema cannot quietly go stale \u2014 that is the whole point of having a build-time tool as well as a runtime one.",
     "ops": [
       "set",
       "add",
@@ -134,7 +134,7 @@
     "choice_inputs": [
       "text"
     ],
-    "_comment_confirm_kinds": "How a task is confirmed once the plausibility wait is over: the deliberate act that says yes, I did that. One script each under scripts/game/gestures/, registered in HJGestures.KINDS. A movement may name one and so may an axis, which is where the default comes from — so adding a gesture is a new file, a line in KINDS, and a word here.",
+    "_comment_confirm_kinds": "How a task is confirmed once the plausibility wait is over: the deliberate act that says yes, I did that. One script each under scripts/game/gestures/, registered in HJGestures.KINDS. A movement may name one and so may an axis, which is where the default comes from \u2014 so adding a gesture is a new file, a line in KINDS, and a word here.",
     "confirm_kinds": [
       "hold",
       "tap_rapid"
@@ -268,7 +268,7 @@
       }
     },
     "anomalies": {
-      "_comment": "Anomalies are areas in every structural respect — same nodes, same slots — so the graph pass treats them together with areas and their ids share the area id space.",
+      "_comment": "Anomalies are areas in every structural respect \u2014 same nodes, same slots \u2014 so the graph pass treats them together with areas and their ids share the area id space.",
       "files": {
         "dir": "content",
         "paths": [
@@ -793,7 +793,7 @@
       }
     },
     "buffs": {
-      "_comment": "A buff is a set of modifiers with an expiry and an icon, resolved through Rules like every other source. `hours` is a wall-clock timer; `break_on` lists events another system calls Buffs.trigger() with, and a buff with neither runs until something breaks it. `then` applies a second buff the moment this one ends, which is how coffee pays for itself. Not in `runtime`: Content.gd does not merge this key yet, so only the file-side tool checks these records — four lines in Content.load_all would fix that.",
+      "_comment": "A buff is a set of modifiers with an expiry and an icon, resolved through Rules like every other source. `hours` is a wall-clock timer; `break_on` lists events another system calls Buffs.trigger() with, and a buff with neither runs until something breaks it. `then` applies a second buff the moment this one ends, which is how coffee pays for itself. Not in `runtime`: Content.gd does not merge this key yet, so only the file-side tool checks these records \u2014 four lines in Content.load_all would fix that.",
       "files": {
         "dir": "content",
         "paths": [
@@ -822,7 +822,7 @@
       }
     },
     "interactables": {
-      "_comment": "Something in the world you can stand next to and act on. This is the catalogue — the verb, the price and what happens. The instances live in data/world/overworld.json as an `interactables` list of { x, y, type, label? } records, which is a shape the Tiled round trip already turns into a draggable object layer. `cost_key` names a config key rather than a number so a trinket can bend the price, and `effect` is one entry of the same vocabulary hooks use, applied by Game.apply_effects. A `critter` names a species in data/content/critters.json: the placement spawns that animal there, reach follows it as it walks, and `critter_event` (default \"petted\") is what acting on it fires at the state machine. That one key is why petting the dog and petting the cat do opposite things with no branch anywhere in the code. It is checked by critter_pass() in tools/validate_data.py rather than by `refs`: Content.gd builds its id sets from `runtime` paths and does not merge a `critters` key, so a `refs` entry here would resolve against an empty set and reject every placement on a player's device.",
+      "_comment": "Something in the world you can stand next to and act on. This is the catalogue \u2014 the verb, the price and what happens. The instances live in data/world/overworld.json as an `interactables` list of { x, y, type, label? } records, which is a shape the Tiled round trip already turns into a draggable object layer. `cost_key` names a config key rather than a number so a trinket can bend the price, and `effect` is one entry of the same vocabulary hooks use, applied by Game.apply_effects. A `critter` names a species in data/content/critters.json: the placement spawns that animal there, reach follows it as it walks, and `critter_event` (default \"petted\") is what acting on it fires at the state machine. That one key is why petting the dog and petting the cat do opposite things with no branch anywhere in the code. It is checked by critter_pass() in tools/validate_data.py rather than by `refs`: Content.gd builds its id sets from `runtime` paths and does not merge a `critters` key, so a `refs` entry here would resolve against an empty set and reject every placement on a player's device.",
       "files": {
         "dir": "content",
         "paths": [
@@ -1144,6 +1144,19 @@
       "flicker": "float 0.0 to 1.0, 0 is a steady lamp"
     },
     "_indoors": "Optional. { x, y, w, h } in cells, the footprint of the building the player wakes in, walls included. The Boon of the White Room is free walking inside it and breaks on the first cell outside, and that same crossing unlocks the Hearth and triggers the Spite encounter (Beat 5). Classified by shape as a marker with w and h as editable properties, so it is a rectangle the designer can drag rather than a rule derived from the floor material.",
-    "_interactables": "Optional. A list of { x, y, type, label? } records naming an entry of the interactables catalogue in data/content/. Classified by shape as an object layer, so Tiled can place, drag and retype them with no tooling change. tools/validate_data.py does not yet check that `type` resolves — the world pass would need one loop, mirroring the anomaly `area` check."
+    "_interactables": "Optional. A list of { x, y, type, label? } records naming an entry of the interactables catalogue in data/content/. Classified by shape as an object layer, so Tiled can place, drag and retype them with no tooling change. tools/validate_data.py does not yet check that `type` resolves \u2014 the world pass would need one loop, mirroring the anomaly `area` check.",
+    "_prop_sway": "What moves. A prop entry in assets/tiles/tiles.json may carry a `sway`; the art declares WHAT MOVES and how far and never animates anything, exactly as it does for `light`. scripts/ui/Motion.gd is the only reader, by key, so a misspelt field is a prop that has quietly stopped moving. `amount` means the same on a 10px tuft and a 55px tree because the renderer measures each sprite's real bounding box and normalises against it. Declared in tools/make_tiles.py, not only in the generated manifest -- that file rebuilds tiles.json from scratch and once ate all 74 declarations.",
+    "prop_sway": {
+      "required": [
+        "amount",
+        "speed"
+      ],
+      "optional": [
+        "mode"
+      ],
+      "amount": "float greater than 0, world pixels the tip travels either side of rest",
+      "speed": "float greater than 0, cycles per second",
+      "mode": "'sway' (a horizontal bend about the base) or 'breathe' (a vertical stretch about it)"
+    }
   }
 }

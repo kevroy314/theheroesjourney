@@ -2890,8 +2890,26 @@ BUILDERS = {
 # means nothing is there. Appending is safe, reordering rewrites every world.
 
 def _p(pid, build, biome, density, solid=False, foot=(1, 1), shadow=True,
-       outline=True, light=None, **params):
-    """`light` is the one field here that no code in this file reads.
+       outline=True, light=None, sway=None, **params):
+    """`light` and `sway` are the two fields here that no code in this file reads.
+
+    THE MOTION CONTRACT. A prop entry in assets/tiles/tiles.json may carry
+
+        "sway": { "amount": 1.6, "speed": 1.05 }
+        "sway": { "amount": 0.9, "speed": 2.80, "mode": "breathe" }
+
+    `amount` is world pixels the tip travels either side of rest, `speed` is
+    cycles per second, `mode` is "sway" (a horizontal bend about the base) or
+    "breathe" (a vertical stretch about it). The art declares WHAT MOVES and how
+    far and never animates anything; scripts/ui/Motion.gd is the only reader.
+    `amount` means the same on a 10px tuft and a 55px tree because the renderer
+    measures each sprite's real bounding box and normalises against it.
+
+    Declared here rather than only in the generated manifest, because this file
+    rebuilds tiles.json from scratch -- a declaration that lives only in the
+    output disappears on the next `npm run tiles`, which is exactly what happened
+    to all 74 of these once already.
+
 
     THE LIGHT CONTRACT. A prop entry in assets/tiles/tiles.json may carry
 
@@ -2917,23 +2935,25 @@ def _p(pid, build, biome, density, solid=False, foot=(1, 1), shadow=True,
                  foot=list(foot), shadow=shadow, outline=outline, params=params)
     if light is not None:
         entry["light"] = dict(light)
+    if sway is not None:
+        entry["sway"] = dict(sway)
     return entry
 
 
 PROPS = [
     # --- grassland ------------------------------------------------------------
-    _p("grass_tuft", "tuft", "grass_short", 0.055, shadow=False, outline=False, pal="leaf", n=11, spread=11, h=7),
-    _p("grass_clump", "tuft", "grass_tall", 0.070, shadow=False, outline=False, pal="leaf", n=15, spread=12, h=11),
-    _p("flowers_gold", "flowers", "grass_short", 0.022, shadow=False, outline=False, pal="flower", n=8, spread=10),
-    _p("flowers_red", "flowers", "grass_short", 0.016, shadow=False, outline=False, pal="bloom", n=7, spread=9),
-    _p("thistle", "tuft", "grass_tall", 0.020, shadow=False, outline=False, pal="pale", n=7, spread=7, h=13),
+    _p("grass_tuft", "tuft", "grass_short", 0.055, shadow=False, outline=False, pal="leaf", n=11, spread=11, h=7, sway=dict(amount=1.6, speed=1.05)),
+    _p("grass_clump", "tuft", "grass_tall", 0.070, shadow=False, outline=False, pal="leaf", n=15, spread=12, h=11, sway=dict(amount=1.8, speed=0.95)),
+    _p("flowers_gold", "flowers", "grass_short", 0.022, shadow=False, outline=False, pal="flower", n=8, spread=10, sway=dict(amount=1.2, speed=1.2)),
+    _p("flowers_red", "flowers", "grass_short", 0.016, shadow=False, outline=False, pal="bloom", n=7, spread=9, sway=dict(amount=1.2, speed=1.25)),
+    _p("thistle", "tuft", "grass_tall", 0.020, shadow=False, outline=False, pal="pale", n=7, spread=7, h=13, sway=dict(amount=1.4, speed=1.0)),
     _p("stone_small", "boulder", "grass_short", 0.024, pal="stone", w=8, h=8, cracks=3),
     _p("boulder", "boulder", "grass_short", 0.012, solid=True, pal="stone", w=13, h=16, cracks=5),
-    _p("bush", "bush", "grass_short", 0.026, pal="leaf", r=9, tips=12),
-    _p("bramble", "bush", "grass_tall", 0.020, solid=True, pal="leaf", r=11, tips=16, berries=8),
+    _p("bush", "bush", "grass_short", 0.026, pal="leaf", r=9, tips=12, sway=dict(amount=1.0, speed=0.7)),
+    _p("bramble", "bush", "grass_tall", 0.020, solid=True, pal="leaf", r=11, tips=16, berries=8, sway=dict(amount=0.9, speed=0.65)),
     _p("stump", "stump", "grass_short", 0.012, solid=True, r=7, h=9),
     _p("log_fallen", "log", "grass_short", 0.010, solid=True, foot=(2, 1), pal="bark", w=15, r=5, moss=8),
-    _p("tree_lone", "tree", "grass_short", 0.014, solid=True, pal="leaf", trunk=13, crown=12, tw=2),
+    _p("tree_lone", "tree", "grass_short", 0.014, solid=True, pal="leaf", trunk=13, crown=12, tw=2, sway=dict(amount=2.0, speed=0.42)),
     _p("fencepost", "post", "grass_tall", 0.012, h=19, rail=True),
     _p("gate", "post", "grass_tall", 0.004, solid=True, h=24, rail=True, board=(9, 8)),
 
@@ -2943,47 +2963,47 @@ PROPS = [
     # walkable cell. A tree does not stand *on* a forest tile — the forest tile
     # IS canopy — it stands on the ground beside the wood, which is also what
     # makes a treeline read as one.
-    _p("tree_pine", "pine", "grass_short", 0.030, solid=True, pal="pine", trunk=8, tiers=4, w=12, th=8),
-    _p("tree_broad", "tree", "grass_short", 0.028, solid=True, pal="leaf", trunk=15, crown=14, tw=3),
+    _p("tree_pine", "pine", "grass_short", 0.030, solid=True, pal="pine", trunk=8, tiers=4, w=12, th=8, sway=dict(amount=1.5, speed=0.45)),
+    _p("tree_broad", "tree", "grass_short", 0.028, solid=True, pal="leaf", trunk=15, crown=14, tw=3, sway=dict(amount=2.2, speed=0.38)),
     _p("tree_dead", "deadtree", "scree", 0.014, solid=True, h=30,
-       branches=[(11, -1, 8), (17, 1, 9), (23, -1, 6)]),
+       branches=[(11, -1, 8), (17, 1, 9), (23, -1, 6)], sway=dict(amount=1.0, speed=0.5)),
     _p("log_mossy", "log", "grass_tall", 0.014, solid=True, foot=(2, 1), pal="bark", w=17, r=6, moss=14),
     _p("mushroom_ring", "mushroom", "grass_tall", 0.018, shadow=False, n=7, spread=12, cap="fungus"),
-    _p("fern", "tuft", "grass_tall", 0.030, shadow=False, outline=False, pal="pine", n=12, spread=12, h=9),
+    _p("fern", "tuft", "grass_tall", 0.030, shadow=False, outline=False, pal="pine", n=12, spread=12, h=9, sway=dict(amount=1.5, speed=0.9)),
 
     # --- shore and sea --------------------------------------------------------
     _p("driftwood", "log", "sand", 0.022, pal="pale", w=13, r=4),
     _p("shell", "flat", "sand", 0.026, shadow=False, pal="pale", w=7, h=8, ribs=True),
-    _p("beach_weed", "tuft", "sand", 0.038, shadow=False, outline=False, pal="reed", n=9, spread=11, h=8),
+    _p("beach_weed", "tuft", "sand", 0.038, shadow=False, outline=False, pal="reed", n=9, spread=11, h=8, sway=dict(amount=1.6, speed=1.15)),
     _p("tide_pool", "flat", "sand", 0.014, shadow=False, outline=False, pal="ice", w=13, h=10),
-    _p("palm_shore", "palm", "sand", 0.016, solid=True, pal="palm", trunk=26, lean=6, fronds=6, flen=14),
+    _p("palm_shore", "palm", "sand", 0.016, solid=True, pal="palm", trunk=26, lean=6, fronds=6, flen=14, sway=dict(amount=2.8, speed=0.55)),
     _p("sea_rock", "boulder", "sand", 0.022, solid=True, pal="stone", w=11, h=10, cracks=4),
-    _p("reed_bed", "reeds", "mud", 0.055, shadow=False, outline=False, n=15, spread=13, h=15, head=True),
+    _p("reed_bed", "reeds", "mud", 0.055, shadow=False, outline=False, n=15, spread=13, h=15, head=True, sway=dict(amount=2.0, speed=0.9)),
 
     # --- desert ---------------------------------------------------------------
     _p("cactus_tall", "cactus", "dune", 0.018, solid=True, h=26, w=3, arms=[(-1, 9, 11), (1, 15, 8)], bloom=True),
     _p("cactus_round", "cactus", "dune", 0.022, h=11, w=6, bloom=True),
-    _p("dry_shrub", "bush", "dune", 0.028, pal="leaf_dry", r=9, tips=16),
-    _p("dune_grass", "tuft", "dune", 0.045, shadow=False, outline=False, pal="leaf_dry", n=13, spread=13, h=10),
+    _p("dry_shrub", "bush", "dune", 0.028, pal="leaf_dry", r=9, tips=16, sway=dict(amount=1.1, speed=0.8)),
+    _p("dune_grass", "tuft", "dune", 0.045, shadow=False, outline=False, pal="leaf_dry", n=13, spread=13, h=10, sway=dict(amount=1.8, speed=1.1)),
     _p("sand_mound", "mound", "dune", 0.030, shadow=False, outline=False, pal="dustpile", w=16, h=8),
     _p("skull", "flat", "hardpan", 0.014, pal="pale", w=7, h=9, eyes=True),
     _p("bones", "flat", "hardpan", 0.018, pal="pale", w=11, h=7, ribs=True),
     _p("mesa_rock", "boulder", "hardpan", 0.028, solid=True, pal="stone", w=15, h=19, cracks=7),
-    _p("palm_oasis", "palm", "hardpan", 0.008, solid=True, pal="palm", trunk=30, lean=-5, fronds=7, flen=15),
+    _p("palm_oasis", "palm", "hardpan", 0.008, solid=True, pal="palm", trunk=30, lean=-5, fronds=7, flen=15, sway=dict(amount=2.8, speed=0.55)),
 
     # --- jungle ---------------------------------------------------------------
-    _p("jungle_fern", "tuft", "undergrowth", 0.075, shadow=False, outline=False, pal="palm", n=16, spread=14, h=13),
-    _p("banana_palm", "palm", "undergrowth", 0.020, solid=True, pal="palm", trunk=22, lean=4, fronds=5, flen=16),
-    _p("vine_pillar", "post", "undergrowth", 0.016, solid=True, pal="bark", h=32, w=4, board=(6, 6)),
+    _p("jungle_fern", "tuft", "undergrowth", 0.075, shadow=False, outline=False, pal="palm", n=16, spread=14, h=13, sway=dict(amount=1.7, speed=0.85)),
+    _p("banana_palm", "palm", "undergrowth", 0.020, solid=True, pal="palm", trunk=22, lean=4, fronds=5, flen=16, sway=dict(amount=3.0, speed=0.6)),
+    _p("vine_pillar", "post", "undergrowth", 0.016, solid=True, pal="bark", h=32, w=4, board=(6, 6), sway=dict(amount=1.4, speed=0.65)),
     _p("giant_mushroom", "mushroom", "undergrowth", 0.014, n=4, spread=9, cap="bloom"),
     _p("idol", "monument", "undergrowth", 0.004, solid=True, kind="menhir", pal="stone", h=28, w=7, runes=7),
-    _p("marsh_reeds", "reeds", "undergrowth", 0.030, shadow=False, outline=False, n=13, spread=13, h=14),
+    _p("marsh_reeds", "reeds", "undergrowth", 0.030, shadow=False, outline=False, n=13, spread=13, h=14, sway=dict(amount=2.0, speed=0.85)),
 
     # --- highland -------------------------------------------------------------
     _p("scree_stone", "boulder", "scree", 0.045, pal="stone", w=9, h=8, cracks=3),
     _p("crag", "boulder", "scree", 0.020, solid=True, pal="stone", w=16, h=21, cracks=8),
     _p("cairn", "monument", "scree", 0.010, kind="cairn", stack=[8, 7, 5, 4], jog=2),
-    _p("scrub", "bush", "scree", 0.026, pal="pine", r=8, tips=11),
+    _p("scrub", "bush", "scree", 0.026, pal="pine", r=8, tips=11, sway=dict(amount=1.0, speed=0.75)),
     _p("snow_drift", "mound", "snow", 0.040, shadow=False, outline=False, pal="snowpile", w=17, h=9),
     _p("ice_shard", "shard", "snow", 0.018, pal="ice", n=4, spread=8, h=13),
     _p("marker_pole", "post", "snow", 0.010, h=26, flag=True),
@@ -3002,7 +3022,7 @@ PROPS = [
     _p("cart", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="cart"),
     _p("market_stall", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="stall"),
     _p("lamppost", "structure", "placed", 0.0, solid=True, kind="lamppost",
-       light=dict(radius=6.0, color="#FFC880", flicker=0.12)),
+       light=dict(radius=6.0, color="#FFC880", flicker=0.12), sway=dict(amount=0.5, speed=1.55, mode='breathe')),
     _p("bench", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="bench"),
     _p("standing_stone", "monument", "placed", 0.0, solid=True, kind="menhir", pal="stone", h=34, w=8, runes=8),
 
@@ -3013,8 +3033,8 @@ PROPS = [
     _p("bookshelf", "furniture", "placed", 0.0, solid=True, kind="shelf"),
     _p("chest", "box", "placed", 0.0, solid=True, w=8, h=9, d=4, lid=True),
     _p("floor_lamp", "furniture", "placed", 0.0, kind="lamp",
-       light=dict(radius=4.5, color="#FFC880", flicker=0.08)),
-    _p("plant_pot", "furniture", "placed", 0.0, solid=True, kind="pot"),
+       light=dict(radius=4.5, color="#FFC880", flicker=0.08), sway=dict(amount=0.5, speed=1.8, mode='breathe')),
+    _p("plant_pot", "furniture", "placed", 0.0, solid=True, kind="pot", sway=dict(amount=0.6, speed=0.55)),
     _p("rug", "furniture", "placed", 0.0, shadow=False, outline=False, kind="rug"),
 
     # --- placed: the house that is actually a house ---------------------------
@@ -3028,13 +3048,13 @@ PROPS = [
     _p("window_lit", "structure", "placed", 0.0, shadow=False, kind="window",
        light=dict(radius=5.0, color="#FFD9A0", flicker=0.0)),
     _p("candle", "clutter", "placed", 0.0, shadow=False, kind="candle",
-       light=dict(radius=2.5, color="#FFC880", flicker=0.45)),
+       light=dict(radius=2.5, color="#FFC880", flicker=0.45), sway=dict(amount=0.9, speed=2.8, mode='breathe')),
     _p("cup", "clutter", "placed", 0.0, shadow=False, kind="cup"),
     _p("boots", "clutter", "placed", 0.0, shadow=False, kind="boots"),
     _p("book_open", "clutter", "placed", 0.0, shadow=False, kind="book"),
     _p("bottle", "clutter", "placed", 0.0, shadow=False, kind="bottle"),
     _p("street_lamp", "structure", "placed", 0.0, solid=True, kind="street_lamp",
-       light=dict(radius=7.5, color="#FFD08A", flicker=0.10)),
+       light=dict(radius=7.5, color="#FFD08A", flicker=0.10), sway=dict(amount=0.6, speed=1.35, mode='breathe')),
     # Not solid. An animal that walks is not a wall: marking these solid baked a
     # 1 into the world's `blocked` plane exactly where the dog was lying, so he
     # could walk off his own cell and never back onto it. The live critter is
@@ -3175,10 +3195,13 @@ for _base_id in VARIED:
         for _key in VARIANT_DIMS:
             if isinstance(_params.get(_key), int) and not isinstance(_params[_key], bool):
                 _params[_key] = max(1, int(round(_params[_key] * _f)))
+        # A variant is the same species: it moves the way its base moves, and a
+        # bush whose _v2 stands still is a gap nobody notices for weeks.
         PROPS.append(_p("%s_v%d" % (_base_id, _k + 2), _base["build"],
                         _base["biome"], _base["density"], solid=_base["solid"],
                         foot=tuple(_base["foot"]), shadow=_base["shadow"],
-                        outline=_base["outline"], **_params))
+                        outline=_base["outline"], light=_base.get("light"),
+                        sway=_base.get("sway"), **_params))
         PROP_ORDER.append(PROPS[-1]["id"])
 
 PROP_BY_ID = {p["id"]: p for p in PROPS}
@@ -3748,7 +3771,9 @@ def manifest(overlay_rows, cliff_rows, prop_rows):
                       "solid": PROP_BY_ID[pid]["solid"],
                       "foot": PROP_BY_ID[pid]["foot"]},
                      **({"light": PROP_BY_ID[pid]["light"]}
-                        if "light" in PROP_BY_ID[pid] else {}))
+                        if "light" in PROP_BY_ID[pid] else {}),
+                     **({"sway": PROP_BY_ID[pid]["sway"]}
+                        if "sway" in PROP_BY_ID[pid] else {}))
                 for i, pid in enumerate(PROP_ORDER)],
         },
         "shadow": {"rgb": list(SHADOW), "alpha": SHADOW_A},

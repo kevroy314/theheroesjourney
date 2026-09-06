@@ -327,21 +327,17 @@ func spawn_all() -> void:
 ## used to be lying, for the rest of the run — and one he can walk off but never
 ## walk back onto.
 ##
-## This clears those cells in the loaded world, and it is deliberately a stopgap
-## rather than the fix. The fix is in the generator: an animal that has a
-## behaviour should not also be a solid prop, so `_p("dog", ..., solid=True)`
-## and its static art both want removing from tools/make_tiles.py, which this
-## system does not own. Until then this is two cells of floor inside one house,
-## and the alternative is a feature that is visibly broken.
+
+## Nothing to release any more, and kept as a stub only because two call sites
+## read better with the intent named than with the lines silently gone.
+##
+## The animals used to be `solid=True` props, which baked a 1 into the world's
+## blocked plane exactly where each one was lying — an invisible wall it could
+## walk off and never back onto. That was patched here, in the loaded world,
+## which was the wrong place: the fix belongs in the generator, and now is
+## there. Both home cells decode to 0.
 func release_home_cells() -> void:
-	var w := world()
-	if w == null or w.blocked.is_empty():
-		return
-	for entry in _live:
-		var home: Vector2i = (entry as Dictionary)["home"]
-		var i := home.y * w.w + home.x
-		if i >= 0 and i < w.blocked.size():
-			w.blocked[i] = 0
+	pass
 
 
 func _make(key: String, id: String, def: Dictionary, home: Vector2i,

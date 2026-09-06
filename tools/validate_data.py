@@ -732,6 +732,38 @@ def world_pass(report, docs, schema):
                 report.warn("assets/tiles/tiles.json",
                             "%s carries '%s', which nothing reads" % (where, key))
 
+    # And the same for motion, for the same reason. scripts/ui/Motion.gd reads
+    # `sway` by key, so a misspelt field is a prop that has quietly stopped
+    # moving -- which is even harder to notice than a lamp going out, because
+    # stillness is what everything else is doing.
+    spec_sway = spec.get("prop_sway", {})
+    movers = set()
+    for prop in tiles["props"]["list"]:
+        sway = prop.get("sway")
+        if sway is None:
+            continue
+        movers.add(prop["plane"])
+        where = "prop '%s' sway" % prop["id"]
+        for key in spec_sway.get("required", []):
+            if key not in sway:
+                report.error("assets/tiles/tiles.json",
+                             "%s is missing '%s'" % (where, key))
+        for key in ("amount", "speed"):
+            value = sway.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+                report.error("assets/tiles/tiles.json",
+                             "%s %s is %r; it must be a number greater than 0"
+                             % (where, key, value))
+        mode = sway.get("mode", "sway")
+        if mode not in ("sway", "breathe"):
+            report.error("assets/tiles/tiles.json",
+                         "%s mode is %r; it must be 'sway' or 'breathe'" % (where, mode))
+        allowed = spec_sway.get("required", []) + spec_sway.get("optional", [])
+        for key in sway:
+            if key not in allowed:
+                report.warn("assets/tiles/tiles.json",
+                            "%s carries '%s', which nothing reads" % (where, key))
+
     order = tiles["order"]
     walkable = tiles["walkable"]
     width, height = int(world["w"]), int(world["h"])

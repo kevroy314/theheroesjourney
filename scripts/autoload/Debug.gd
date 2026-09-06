@@ -33,7 +33,7 @@ const KNOBS := [
 	{ "id": "motes", "name": "Dust", "min": 0.0, "max": 2.0, "step": 0.05, "default": 1.0,
 	  "rebuild": true, "hint": "Motes drifting up through the light. 0 removes them." },
 	{ "id": "motion", "name": "UI motion", "min": 0.0, "max": 1.0, "step": 1.0, "default": 1.0,
-	  "rebuild": true, "hint": "Screen fades, card stagger, press feedback. 0 makes everything snap." },
+	  "rebuild": true, "hint": "Screen fades, card stagger, press feedback, and everything the world does on its own: grass and canopy sway, water glints, flames breathe. 0 is a still world. 0 makes everything snap." },
 	{ "id": "ui_opacity", "name": "All UI", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
 	  "rebuild": true, "hint": "Master. Multiplies every layer below — drag this first." },
 	{ "id": "panel_opacity", "name": "Panel fills", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
