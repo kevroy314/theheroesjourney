@@ -1,6 +1,6 @@
 {
   "name": "theheroesjourney",
-  "version": "0.2.17",
+  "version": "0.2.18",
   "private": true,
   "description": "A life-balance habit app wearing a roguelike as a costume. Godot 4.7, mobile-first, installable as a PWA.",
   "homepage": "https://github.com/kevroy314/theheroesjourney",
@@ -38,6 +38,7 @@
     "world:export": "python3 tools/world_to_tiled.py",
     "world:import": "python3 tools/tiled_to_world.py",
     "world:check": "python3 tools/tiled_to_world.py --check",
+    "world:shot": "./tools/worldshot.sh",
     "android": "./build_android.sh",
     "version": "python3 tools/version.py",
     "bump": "python3 tools/version.py --bump",

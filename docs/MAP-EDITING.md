@@ -19,6 +19,7 @@ npm run world:export    # data/world/overworld.json  ->  world/overworld.tmj
 npm run world:import    # world/overworld.tmj        ->  data/world/overworld.json
 npm run world:check     # what an import would change, writing nothing
 npm run check           # validate data/, including the world file
+npm run world:shot      # a PNG of any rectangle of it — see "Looking at it"
 ```
 
 Import is the one the game cares about — nothing you draw reaches the game until
@@ -34,6 +35,55 @@ Tiled itself is not installed by the project. `npm run world:edit` finds it on
 `PATH`, in `~/Applications/Tiled-*.AppImage`, or in Flatpak, and prints the three
 ways to install it if there is none. Currently installed here:
 `~/Applications/Tiled-1.12.2_Linux_x86_64.AppImage`.
+
+## Looking at it
+
+The playfield on a phone is about seven and a half tiles across, so an emulator
+screenshot of the town is a screenshot of one doorway. `tools/worldshot.sh`
+draws any rectangle of the overworld into one PNG:
+
+```sh
+./tools/worldshot.sh X Y W H OUT.png [HOUR] [--no-light]
+
+./tools/worldshot.sh 95 95 76 81 .scratch/town-day.png 0.45     # the whole town
+./tools/worldshot.sh 95 95 76 81 .scratch/town-night.png 0.9    # the same at night
+./tools/worldshot.sh 132 126 20 14 .scratch/square.png 0.5 --no-light
+```
+
+`npm run world:shot -- 95 95 76 81 .scratch/town.png 0.45` is the same thing.
+
+It is **the game's own renderer**, not a second one. `scripts/WorldShot.gd` boots
+the engine, instantiates the real `HJTileWorld` into an off-screen SubViewport
+and photographs it, so autotiling precedence, the overlay bleed, cliff faces,
+Y-sorted props, the townsfolk and the lighting overlay are all exactly what the
+phone would draw. If the shot is wrong, the game is wrong — which is the only
+useful property a preview can have. Nothing about the tileset is reimplemented in
+Python, and nothing has to be kept in step.
+
+* `HOUR` is 0..1: 0 midnight, 0.25 dawn, 0.5 noon, 0.75 dusk. Default 0.5, the
+  one hour at which the ambient ramp writes nothing at all.
+* `--no-light` skips the overlay entirely — the raw art with no shader over it.
+* One pixel per tile-pixel, so 32 px per cell: 76x81 cells is a 2432x2592 PNG.
+* The player is parked on open ground in the middle of the rectangle, as a
+  figure of known height to judge scale against. He is never indoors, because
+  the renderer drops an interior floor over the *whole* frame when he is.
+
+Two things to know before believing a shot:
+
+* **A wide night shot under-lights its edges.** The shader carries
+  `HJLighting.MAX_LIGHTS` (12) emitters a frame and the renderer keeps the ones
+  nearest the middle of the view, which is generous for a seven-tile window and
+  is not generous for a town with seventeen lamps in it. The tool prints both
+  numbers every run. Shoot a quarter of the town at a time to see all of them.
+* **It needs a GL context, so it is not `--headless`.** `--headless` gives Godot
+  the dummy renderer: everything runs, nothing is drawn, and the viewport hands
+  back null. The wrapper starts a throwaway `Xvfb`, uses it and kills it.
+
+It never touches the save. Six of the nine stores are pointed at
+`user://*_worldshot.*` scratch copies through the same `use_path()` override the
+self-test uses, and the other three are covered by `Main._ready` skipping
+`Game.boot()` altogether for a shot — the run is never loaded and nothing calls
+`save_game()`.
 
 ## What is in the map
 

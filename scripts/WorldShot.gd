@@ -148,7 +148,7 @@ static func run_shot(host: Node) -> int:
 	viewport.add_child(renderer)
 	host.add_child(viewport)
 
-	for i in range(WARMUP_FRAMES):
+	for _frame in range(WARMUP_FRAMES):
 		await host.get_tree().process_frame
 
 	var texture := viewport.get_texture()
@@ -164,6 +164,14 @@ static func run_shot(host: Node) -> int:
 	if err != OK:
 		push_error("worldshot: could not write %s (error %d)" % [out, err])
 		return 1
+
+	# Torn down before the tool returns, and this is not tidiness. A SubViewport
+	# left in the tree on UPDATE_ALWAYS keeps its render target alive, and the
+	# engine then does not come back from `quit()` — the shot is written, the
+	# process sits there, and the wrapper's timeout is what ends the run.
+	viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	host.remove_child(viewport)
+	viewport.queue_free()
 
 	print("worldshot: %s — cells (%d,%d) %dx%d, %dx%d px, hour %.2f, light %s"
 		% [out, rect.position.x, rect.position.y, rect.size.x, rect.size.y,
