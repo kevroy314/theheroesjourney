@@ -210,6 +210,43 @@ MATERIALS = {
     # rectangle." The *cap* is the material; the face lives in the overlay set
     # and is drawn on the cell below. See _wall_overlay().
     "wall_timber":   dict(hue=_hue((C["panel_alt"], 1.0), (C["accent"], 0.55), (C["muted"], 0.4)), mean=74, spread=16, walk=False, family="captop"),
+    # --- appended for the town. Ids 29..32, nothing renumbered.
+    #
+    # ONE ROOF FOR A WHOLE TOWN IS THE TELL. Fifteen buildings drawn in the one
+    # `roof` shingle read as a housing estate: a tavern, a watermill, a
+    # commonhouse and a farmhouse cannot be the same surface and still be four
+    # different buildings. What makes it ONE town is shared *construction* --
+    # every building here is a roof laid over a front wall course, the wall is
+    # the same cap-and-face extrusion everywhere, the windows are one prop and
+    # the doors are one tile. What makes them DIFFERENT is material, and the
+    # material follows from what the building is and how old it is:
+    #
+    #   roof_thatch    reed and straw. What you roof with when you have a field
+    #                  and no money: the farmhouse, the cottages, the empty
+    #                  house. The oldest surface in the parish.
+    #   roof_slate     split stone. Heavy, and it goes on the buildings that
+    #                  take weather and vibration -- the mill, and the store
+    #                  whose stock must stay dry.
+    #   roof_pantile   fired clay, laid in S-curves. The expensive answer, so it
+    #                  is on the commonhouse, the mayor's and the half of the
+    #                  tavern that was rebuilt after it made money.
+    #   wall_brick     the only wall material later than the timber frame, and
+    #                  it is on the two buildings that were built rather than
+    #                  grown: the commonhouse and the mayor's house.
+    #
+    # Every one is a family of its own, not a hue swap, for the reason the four
+    # interior floors are: at 32 px a hue shift is invisible and a change of
+    # DIRECTION is not. Thatch is fine vertical combing, slate is overlapping
+    # scales, pantile is bold vertical corrugation, shingle is horizontal
+    # courses. Four roofs in a street are legible from a silhouette.
+    #
+    # Means obey the solid rule (>= 12 luma below every walkable material they
+    # border, checked by verify_contrast against ADJACENCY): grass is 42 and
+    # path is 46, so nothing here goes above 30 however pale real straw is.
+    "roof_thatch":   dict(hue=_hue((C["warn"], 1.0), (C["accent"], 0.65), (C["muted"], 0.30)), mean=27, spread=22, walk=False, family="thatch"),
+    "roof_slate":    dict(hue=_hue((C["line"], 1.0), (C["accent_2"], 0.40)), mean=20, spread=18, walk=False, family="slate"),
+    "roof_pantile":  dict(hue=_hue((C["danger"], 1.0), (C["accent"], 0.70)), mean=28, spread=22, walk=False, family="pantile"),
+    "wall_brick":    dict(hue=_hue((C["danger"], 1.0), (C["line"], 1.10), (C["muted"], 0.25)), mean=24, spread=18, walk=False, family="brickwork"),
 }
 
 # Sheet index IS the id stored in the world grid, so this order is load-bearing:
@@ -222,6 +259,7 @@ ORDER = [
     "sand", "scree", "snow", "bridge", "forest", "roof",
     "ocean", "dune", "hardpan", "jungle", "undergrowth", "mud", "cliff", "ice",
     "floor_plank", "floor_tile", "floor_rug", "wall_timber",
+    "roof_thatch", "roof_slate", "roof_pantile", "wall_brick",
 ]
 
 # Which tiles the player may stand on. Derived from MATERIALS so the art and the
@@ -250,6 +288,15 @@ PRECEDENCE = [
     # Top of the stack: a wall overlays everything, because a wall is in front
     # of everything.
     "wall_timber",
+    # The other three walls, appended so no existing rank moves. They were
+    # outside the stack, which meant they neither gave an edge nor took one --
+    # so the observatory drum and every stone or plastered building in the town
+    # was a flat grey rectangle with no face under it, while the house next door
+    # stood up off the ground. The face is the whole difference between an
+    # extrusion and a floor plan and there is no reason three of the four wall
+    # materials should go without it. Same `style: "wall"` generator, so this
+    # costs three rank blocks and no new code.
+    "wall_stone", "wall_plaster", "wall_brick",
 ]
 RANK = {name: i for i, name in enumerate(PRECEDENCE)}
 OVERLAY_MATS = PRECEDENCE[1:]           # everything that owns an edge set
@@ -269,6 +316,17 @@ ADJACENCY = [
     ("floor_tile", "wall_timber"), ("floor_rug", "wall_timber"),
     ("grass_short", "wall_timber"), ("path_dirt", "wall_timber"),
     ("floor_plank", "floor_rug"), ("floor_boards", "floor_tile"),
+    # The town: four roofs and four walls, every one of which stands in a
+    # street, a yard or a field.
+    ("grass_short", "roof_thatch"), ("path_dirt", "roof_thatch"),
+    ("grass_short", "roof_slate"), ("path_dirt", "roof_slate"),
+    ("floor_stone", "roof_slate"),
+    ("grass_short", "roof_pantile"), ("path_dirt", "roof_pantile"),
+    ("floor_stone", "roof_pantile"),
+    ("grass_short", "wall_brick"), ("path_dirt", "wall_brick"),
+    ("floor_stone", "wall_brick"), ("floor_stone", "wall_plaster"),
+    ("grass_short", "wall_stone"), ("path_dirt", "wall_stone"),
+    ("grass_short", "wall_plaster"), ("path_dirt", "wall_plaster"),
 ]
 
 
@@ -817,6 +875,119 @@ def f_shingle(name, v, r, rng):
     return img
 
 
+def f_thatch(name, v, r, rng):
+    """Reed thatch. SOLID.
+
+    The oldest roof in the parish and the one that has to read as *soft*. Straw
+    combs along the pitch, so this is fine vertical strokes -- never a course
+    line as hard as the shingle's -- with the courses showing only as a slight
+    swell every seven pixels where the next bundle laps over the last. Real
+    thatch is pale; the solid rule says it may not be, so the strawness is
+    carried by hue and by the sparse `tip` combings rather than by luma."""
+    img = canvas(r["base"])
+    dither(img, r["base"], r["dark"], lambda x, y: 0.30)
+    for x in range(N):
+        # One straw per column, wandering a little, so the surface has grain
+        # without any two columns agreeing.
+        shade = (r["mid"], r["base"], r["dark"])[(x + v) % 3]
+        y = 0
+        while y < N:
+            run = rng.randint(3, 7)
+            for k in range(run):
+                if y + k < N:
+                    px(img, x, y + k, shade)
+            y += run + rng.randint(0, 2)
+    for y in range(2 + v, N + v, 7):                 # where one bundle laps the next
+        hline(img, y % N, 0, N - 1, r["deep"])
+        hline(img, (y - 1) % N, 0, N - 1, r["dark"])
+    speckle(img, rng, 40, r["lit"])
+    speckle(img, rng, 12, r["tip"])
+    return img
+
+
+def f_slate(name, v, r, rng):
+    """Split stone roofing. SOLID.
+
+    Scales, half-offset course to course, each with a lit top edge and a dark
+    butt -- which is what separates it from the shingle at a glance: shingle is
+    long horizontal boards with notches, slate is small overlapping tiles. Cold
+    where the thatch and the pantile are warm, because it is the one roof made
+    of the same rock as the mill under it."""
+    img = canvas(r["dark"])
+    speckle(img, rng, 50, r["deep"])
+    for ci, y in enumerate(range(1 + v, N + 6, 6)):
+        offset = 0 if ci % 2 == 0 else 4
+        for x in range(-offset, N, 8):
+            for j in range(5):
+                yy = y + j
+                if not (0 <= yy < N):
+                    continue
+                for i in range(7):
+                    xx = x + i
+                    if not (0 <= xx < N):
+                        continue
+                    if j == 0:
+                        px(img, xx, yy, r["mid"])
+                    elif j == 4:
+                        px(img, xx, yy, r["deep"])
+                    elif i in (0, 6):
+                        px(img, xx, yy, r["dark"])
+                    else:
+                        px(img, xx, yy, r["base"])
+    speckle(img, rng, 26, r["lit"])
+    return img
+
+
+def f_pantile(name, v, r, rng):
+    """Fired clay pantiles. SOLID.
+
+    An S-curve tile runs DOWN the pitch, so the corrugation is vertical and
+    bold: a lit crest, a base flank and a deep valley every five pixels. That
+    single direction is what makes it unmistakable beside the thatch's fine
+    comb and the slate's scales, and it is why this is a family and not a
+    recolour of the shingle."""
+    img = canvas(r["base"])
+    for x in range(N):
+        phase = (x + v) % 5
+        col = (r["lit"], r["mid"], r["base"], r["dark"], r["deep"])[phase]
+        vline(img, x, 0, N - 1, col)
+    for y in range(4 + v, N + v, 9):                 # the course laps
+        yy = y % N
+        hline(img, yy, 0, N - 1, r["deep"])
+        hline(img, (yy + 1) % N, 0, N - 1, r["dark"])
+    speckle(img, rng, 34, r["dark"])
+    speckle(img, rng, 14, r["tip"])
+    return img
+
+
+def f_brickwork(name, v, r, rng):
+    """Laid brick. SOLID.
+
+    Deliberately a smaller module than f_blocks: the stone wall is two big
+    courses a cell and this is five, which at 32 px is the difference between
+    "quarried" and "bought". Stretcher bond, half-offset, with the mortar
+    reading as the lightest thing in the cell and the brick faces varying so a
+    long elevation does not stripe."""
+    img = canvas(r["base"])
+    dither(img, r["base"], r["dark"], lambda x, y: 0.34)
+    for ci, top in enumerate(range(v % 6, N, 6)):
+        hline(img, top, 0, N - 1, r["mid"])          # the bed joint
+        offset = 0 if ci % 2 == 0 else 5
+        for x in range(-offset, N, 10):
+            vline(img, x % N, top, min(N - 1, top + 5), r["mid"])
+            for j in range(1, 6):
+                yy = top + j
+                if not (0 <= yy < N):
+                    continue
+                for i in range(1, 10):
+                    xx = (x + i) % N
+                    if rng.random() < 0.10:
+                        px(img, xx, yy, r["dark"])
+    speckle(img, rng, 30, r["deep"])
+    speckle(img, rng, 10, r["lit"])
+    return img
+
+
 def f_planks(name, v, r, rng):
     """Bridge. Walkable -- the one way across, so it has to read as deliberate
     construction rather than as debris."""
@@ -984,6 +1155,8 @@ FAMILIES = {
     "planks": f_planks, "void": f_void, "doorway": f_doorway,
     "plankwide": f_plankwide, "chequer": f_chequer, "weave": f_weave,
     "captop": f_captop,
+    "thatch": f_thatch, "slate": f_slate, "pantile": f_pantile,
+    "brickwork": f_brickwork,
 }
 
 def _mean_luma_rgba(img):
@@ -1137,6 +1310,11 @@ OVERLAY_STYLE = {
     "floor_plank":  dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=False, style="seam"),
     "floor_rug":    dict(d0=2, amp=0.0, dmax=3, scatter=0.0, bite=0.0, lip="fringe", tall=False, style="seam"),
     "wall_timber":  dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=True,  style="wall"),
+    # The town's other three walls, on the same generator: a wall does not lap
+    # over anything, it stands in front of it.
+    "wall_stone":   dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=True,  style="wall"),
+    "wall_plaster": dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=True,  style="wall"),
+    "wall_brick":   dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=True,  style="wall"),
 }
 
 ## How tall the wall stands, in pixels, per variant. This is the single number
@@ -2935,6 +3113,174 @@ def b_structure(img, rng, p):
         for dx in range(-5, 5):                    # the foot
             pp_(img, dx, 0, metal["mid"] if dx < 0 else metal["dark"])
         return 5
+    if kind == "trash_can":
+        # A lidded bin at the kerb. Drawn 25 px across the cell it blocks, with
+        # the lid overhanging the drum -- the overhang is what says "lid" at 32
+        # px, where a line across the top just reads as a band.
+        for dy in range(2, 26):                    # the drum
+            span = 11 - (1 if dy > 22 else 0)
+            for dx in range(-span, span + 1):
+                c = metal["base"]
+                if dx < -span + 3:
+                    c = metal["lit"]
+                elif dx > span - 3:
+                    c = metal["deep"]
+                if dy % 5 == 0:                    # the ribs
+                    c = metal["dark"]
+                pp_(img, dx, dy, c)
+        for dy in range(26, 31):                   # the lid, seen from above
+            span = int(13 * math.sqrt(max(0.0, 1 - ((dy - 28.0) / 3.2) ** 2)))
+            for dx in range(-span, span + 1):
+                pp_(img, dx, dy, metal["tip"] if dy > 28 else metal["mid"])
+        for dy in range(31, 34):                   # the handle
+            for dx in (-2, -1, 0, 1):
+                pp_(img, dx, dy, metal["dark"])
+        for dx in range(-12, 13):                  # and what did not go in
+            pp_(img, dx, 0, metal["deep"])
+        for _ in range(14):
+            dx, dy = rng.randint(-13, 13), rng.randint(0, 2)
+            pp_(img, dx, dy, PP["pale"]["base"] if dx % 2 else PP["cloth"]["dark"])
+        return 12
+    if kind == "haystack":
+        # A round rick in the field. Straw, so it is the one solid prop allowed
+        # to be brighter than its ground: a hayrick catches every bit of light
+        # there is and that is exactly how you find the farm from a distance.
+        straw = PP["dustpile"]
+        for dy in range(30):
+            t = dy / 30.0
+            span = int(15 * math.sqrt(max(0.0, 1.0 - t * t * 0.92)))
+            for dx in range(-span, span + 1):
+                c = straw["base"]
+                if dx < -span + 4:
+                    c = straw["lit"]
+                elif dx > span - 3:
+                    c = straw["dark"]
+                if (dx * 2 + dy * 3) % 11 == 0:
+                    c = straw["deep"]
+                pp_(img, dx, dy, c)
+        for _ in range(80):                        # loose ends, all over
+            dy = rng.randint(1, 28)
+            span = int(15 * math.sqrt(max(0.0, 1.0 - (dy / 30.0) ** 2 * 0.92)))
+            dx = rng.randint(-span, span)
+            pp_(img, dx, dy, straw["tip"])
+        for dy in range(30, 34):                   # the cap of thatch on top
+            span = 5 - (dy - 30)
+            for dx in range(-span, span + 1):
+                pp_(img, dx, dy, straw["mid"])
+        return 15
+    if kind == "leaf_wall":
+        # THE CHILDREN'S DEFENCE. Leaves, pine needles and boxes, and the whole
+        # job of the art is that it must not read as a palisade: a wall a child
+        # built leans, is different heights along its run, and has somebody's
+        # crate holding the bottom of it up. So the profile is deliberately
+        # ragged and the box is drawn square against it.
+        needles, leaves, box = PP["pine"], PP["leaf_dry"], PP["wood"]
+        for dx in range(-15, 16):
+            h = 20 + int(6 * math.sin((dx + 15) * 0.7)) + rng.randint(-3, 3)
+            for dy in range(h):
+                pal = needles if (dx + dy) % 3 else leaves
+                c = pal["base"]
+                if dx < -10:
+                    c = pal["lit"]
+                elif dx > 10:
+                    c = pal["deep"]
+                if dy > h - 4:
+                    c = pal["tip"]
+                pp_(img, dx, dy, c)
+        for _ in range(120):                       # the pine needles, on end
+            dx = rng.randint(-15, 15)
+            dy = rng.randint(2, 24)
+            pp_(img, dx, dy, needles["tip"] if rng.random() < 0.4 else leaves["dark"])
+        for dy in range(0, 12):                    # the box holding it up
+            for dx in range(-14, -3):
+                c = box["base"] if dx < -9 else box["dark"]
+                if dy in (0, 11) or dx in (-14, -4):
+                    c = box["deep"]
+                pp_(img, dx, dy, c)
+        for dx in range(-14, -3):                  # a slat across it
+            pp_(img, dx, 6, box["mid"])
+        for dy in range(0, 9):                     # and a plank leaning the other way
+            for dx in range(8, 13):
+                pp_(img, dx + dy // 3, dy, box["mid"] if dx < 10 else box["deep"])
+        return 15
+    if kind == "campfire":
+        # The fort's fire. Solid, because a fire is not somewhere to stand, and
+        # it carries the `light` the catalogue declares -- the only warm source
+        # anywhere outdoors, which is what makes the fort read as *occupied*
+        # from three streets away at dusk.
+        for a in range(48):                        # the ring of stones
+            th = a / 48.0 * math.tau
+            dx, dy = math.cos(th) * 12, 5 + math.sin(th) * 5
+            pdisc(img, dx, dy, 2.2, stone["base"] if dx < 0 else stone["dark"])
+            pp_(img, dx, dy + 2, stone["lit"])
+        for (x0, y0, x1) in ((-8, 4, 7), (-6, 7, 8)):   # two logs across it
+            for dx in range(x0, x1 + 1):
+                for k in range(3):
+                    pp_(img, dx, y0 + k, PP["bark"]["base"] if k else PP["bark"]["deep"])
+        for dy in range(4, 22):                    # the flame
+            t = (dy - 4) / 18.0
+            span = max(1, int(6 * (1.0 - t) + rng.randint(-1, 1)))
+            for dx in range(-span, span + 1):
+                c = PP["gold"]["tip"] if abs(dx) < span - 1 else PP["gold"]["base"]
+                if t > 0.6:
+                    c = PP["bloom"]["lit"] if abs(dx) < 2 else PP["bloom"]["base"]
+                pp_(img, dx, dy, c)
+        return 13
+    if kind == "washing_line":
+        # Evidence of use at town scale. NOT solid: the line is overhead, and a
+        # prop you cannot walk under in a back yard is a prop that boxes the
+        # yard in. The poles are thin enough to read as poles and no thinner.
+        for side in (-1, 1):
+            for dy in range(34):
+                pp_(img, side * 14, dy, wood["base"])
+                pp_(img, side * 14 + 1, dy, wood["deep"])
+            for dx in range(side * 14 - 3, side * 14 + 4):   # the cross-piece
+                pp_(img, dx, 32, wood["mid"])
+        for dx in range(-14, 15):                  # the line, with a sag in it
+            pp_(img, dx, 33 - abs(dx) // 9, PP["pale"]["dark"])
+        for (at, w, h, pal) in ((-11, 4, 13, "linen"), (-3, 5, 16, "cloth"),
+                                (6, 4, 11, "pale"), (12, 3, 9, "linen")):
+            top = 32 - abs(at) // 9
+            for dy in range(h):
+                for dx in range(at - w, at + w + 1):
+                    c = PP[pal]["base"]
+                    if dx < at - w + 2:
+                        c = PP[pal]["lit"]
+                    elif dx > at + w - 2:
+                        c = PP[pal]["dark"]
+                    if dy == 0:
+                        c = PP[pal]["deep"]
+                    pp_(img, dx, top - dy, c)
+        return 15
+    if kind == "sign_shop":
+        # A shop sign on a bracket. This is how a building says what it sells
+        # without a label: the tavern, the store, the smith and the inn each get
+        # one at the door, and the silhouette -- post, arm, hanging board -- is
+        # the same on all four so it reads as signage rather than as clutter.
+        for dy in range(34):                       # the post
+            for dx in (-13, -12):
+                pp_(img, dx, dy, wood["base"] if dx < -12 else wood["deep"])
+        for dx in range(-12, 3):                   # the bracket arm
+            pp_(img, dx, 33, metal["mid"])
+            pp_(img, dx, 32, metal["deep"])
+        for dx in (-8, 1):                         # its two hangers
+            for dy in range(28, 32):
+                pp_(img, dx, dy, metal["dark"])
+        for dy in range(16, 29):                   # the board
+            for dx in range(-11, 4):
+                c = wood["base"]
+                if dy in (16, 28) or dx in (-11, 3):
+                    c = wood["deep"]
+                elif dx < -8:
+                    c = wood["lit"]
+                pp_(img, dx, dy, c)
+        for dy in range(19, 26, 3):                # the writing nobody can read
+            for dx in range(-9, 2):
+                if (dx + dy) % 3:
+                    pp_(img, dx, dy, PP["gold"]["lit"])
+        for dx in range(-15, -10):                 # the foot
+            pp_(img, dx, 0, wood["deep"])
+        return 13
     if kind == "bench":
         # One cell wide, drawn 31 px across it. Two of these side by side read as
         # one long settle, which is how the hall gets a bench you could sit three
@@ -3443,6 +3789,45 @@ for _base_id in VARIED:
                         sway=_base.get("sway"), shaft=_base.get("shaft"),
                         **_params))
         PROP_ORDER.append(PROPS[-1]["id"])
+
+# --- placed: the rest of the town ---------------------------------------------
+#
+# Appended AFTER the generated bits and variants rather than beside the other
+# `placed` props, because slot index in props.png is the plane id minus one and
+# those ids are stored in world data and in hand edits. Inserting into the town
+# block would have moved 150 props and rewritten every plane byte in the map.
+# Appending moves nothing but tools/add_prop.py's authored tail, which is one
+# deliberate renumbering recorded in art/props/authored.json.
+#
+# Every one of these exists because the town needed a thing it did not have:
+# a boundary you cannot walk through that is not a wall, a barricade a child
+# could plausibly have built, and the litter of a place people live in.
+for _pid, _kw in (
+    # The farmland fence: `fencepost` already draws rails that span the whole
+    # cell so a run of them joins up, but it is NOT solid -- it is scenery. A
+    # boundary has to stop you, and the third side of the vale is a fence.
+    ("fence_rail", dict(build="post", solid=True, h=22, rail=True, pal="wood")),
+    ("field_gate", dict(build="post", solid=True, h=24, rail=True, board=(11, 6), pal="wood")),
+    # The children's defence. Leaves, pine needles and boxes, per
+    # PROPOSALS/BUILDINGS.md, and it has to read as *built by children* -- so it
+    # is a heap that leans, not a palisade.
+    ("leaf_wall", dict(build="structure", solid=True, kind="leaf_wall")),
+    ("campfire", dict(build="structure", solid=True, kind="campfire",
+                      light=dict(radius=5.5, color="#FF8C42", flicker=0.40))),
+    # Evidence that people live here.
+    ("trash_can", dict(build="structure", solid=True, kind="trash_can")),
+    ("haystack", dict(build="structure", solid=True, kind="haystack")),
+    ("washing_line", dict(build="structure", solid=False, kind="washing_line",
+                          sway=dict(amount=1.3, speed=0.55))),
+    ("sign_shop", dict(build="structure", solid=True, kind="sign_shop",
+                       sway=dict(amount=0.8, speed=0.9))),
+):
+    _build = _kw.pop("build")
+    PROPS.append(_p(_pid, _build, "placed", 0.0,
+                    solid=_kw.pop("solid"),
+                    light=_kw.pop("light", None), sway=_kw.pop("sway", None),
+                    **_kw))
+    PROP_ORDER.append(_pid)
 
 PROP_BY_ID = {p["id"]: p for p in PROPS}
 PROP_COLS = 8

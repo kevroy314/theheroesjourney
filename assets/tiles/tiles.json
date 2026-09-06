@@ -52,7 +52,11 @@
     "floor_plank",
     "floor_tile",
     "floor_rug",
-    "wall_timber"
+    "wall_timber",
+    "roof_thatch",
+    "roof_slate",
+    "roof_pantile",
+    "wall_brick"
   ],
   "overlays": {
     "cols": 16,
@@ -169,9 +173,24 @@
         "name": "wall_timber",
         "rank": 21,
         "slot": 20
+      },
+      {
+        "name": "wall_stone",
+        "rank": 22,
+        "slot": 21
+      },
+      {
+        "name": "wall_plaster",
+        "rank": 23,
+        "slot": 22
+      },
+      {
+        "name": "wall_brick",
+        "rank": 24,
+        "slot": 23
       }
     ],
-    "rows": 126,
+    "rows": 144,
     "rule": "draw the cell's own fill, then for each DISTINCT higher-precedence material among its 8 neighbours, lowest rank first: the edge tile for the 4-bit side mask, then the corner tile for the diagonals whose two adjacent sides do not hold that material",
     "side_bits": [
       "N",
@@ -203,7 +222,10 @@
     "floor_tile",
     "floor_plank",
     "floor_rug",
-    "wall_timber"
+    "wall_timber",
+    "wall_stone",
+    "wall_plaster",
+    "wall_brick"
   ],
   "props": {
     "anchor": [
@@ -3344,6 +3366,115 @@
         "solid": false
       },
       {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "fence_rail",
+        "index": 232,
+        "plane": 233,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "field_gate",
+        "index": 233,
+        "plane": 234,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "leaf_wall",
+        "index": 234,
+        "plane": 235,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "campfire",
+        "index": 235,
+        "light": {
+          "color": "#FF8C42",
+          "flicker": 0.4,
+          "radius": 5.5
+        },
+        "plane": 236,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "trash_can",
+        "index": 236,
+        "plane": 237,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "haystack",
+        "index": 237,
+        "plane": 238,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "washing_line",
+        "index": 238,
+        "plane": 239,
+        "solid": false,
+        "sway": {
+          "amount": 1.3,
+          "speed": 0.55
+        }
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sign_shop",
+        "index": 239,
+        "plane": 240,
+        "solid": true,
+        "sway": {
+          "amount": 0.8,
+          "speed": 0.9
+        }
+      },
+      {
         "biome": "scree",
         "density": 0.006,
         "foot": [
@@ -3351,12 +3482,12 @@
           1
         ],
         "id": "tree_windswept",
-        "index": 232,
-        "plane": 233,
+        "index": 240,
+        "plane": 241,
         "solid": true
       }
     ],
-    "rows": 30,
+    "rows": 31,
     "slot": [
       64,
       96
@@ -3381,11 +3512,15 @@
     17,
     20,
     23,
-    28
+    28,
+    29,
+    30,
+    31,
+    32
   ],
   "tile": 32,
   "tileset": {
-    "count": 29,
+    "count": 33,
     "file": "tileset.png",
     "layout": "one row; tile i at x = 32*i"
   },
@@ -3416,11 +3551,15 @@
     "path_dirt": true,
     "rock": false,
     "roof": false,
+    "roof_pantile": false,
+    "roof_slate": false,
+    "roof_thatch": false,
     "sand": true,
     "scree": true,
     "snow": true,
     "undergrowth": true,
     "void": false,
+    "wall_brick": false,
     "wall_plaster": false,
     "wall_stone": false,
     "wall_timber": false,

@@ -100,10 +100,28 @@ static func set_hour(fraction: float) -> void:
 	time_of_day = fposmod(fraction, 1.0)
 
 
+## The debug slider, if it is holding one.
+##
+## Read at the point of use, the way every other knob in this project is, rather
+## than pushed in from wherever the overlay lives — so dragging it lights the
+## next frame and letting go hands the day back to whatever mode was running.
+## Below zero means "not holding it", which is the default.
+static func _knob_hour() -> float:
+	return Debug.knob("hour")
+
+
 ## Advance the hour if anything is driving it. Called from the accessors rather
 ## than from a _process somewhere, so this file stays a RefCounted with no node
 ## to own it and a build that never draws the world never asks the OS the time.
 static func _advance() -> void:
+	# The debug slider wins while it is being held. Checked here rather than
+	# pushed in from the overlay, so dragging it lights the next frame and
+	# letting go hands the day straight back to whatever mode was running —
+	# without the slider having to know what that was.
+	var held := _knob_hour()
+	if held >= 0.0:
+		time_of_day = fposmod(held, 1.0)
+		return
 	if clock_mode == CLOCK_FIXED:
 		return
 	var now := Time.get_ticks_msec()
@@ -388,6 +406,7 @@ static func invalidate() -> void:
 	_buckets.clear()
 	_shaft_buckets.clear()
 	traced_at = -1.0
+	_sky_at = -1.0
 
 
 static func index_world(world: HJWorld) -> void:
@@ -687,17 +706,27 @@ static func sun_stamp() -> float:
 static var moonlight: bool = true
 
 ## How bright a full moon is against the golden hour. A twentieth is roughly the
-## honest figure; a twentieth is also invisible. 0.26 is what reads as moonlight
-## on an ambient this dark without turning the room grey.
-const MOON_LEVEL := 0.26
+## honest figure and a twentieth is also invisible — the first pass shipped 0.26
+## and the difference between moonlight on and moonlight off was a sheen you had
+## to be told to look for. This is a beam spread over four times the area of a
+## sun shaft, so it needs the level to survive the widening.
+const MOON_LEVEL := 0.46
 
 ## Cold, and not fully saturated — a moonlit floor is desaturated, not blue.
 const MOON_COLOUR := Color(0.63, 0.74, 1.0)
 
 ## The beam, against the sun's declared optics for the same aperture.
-const MOON_WIDEN := 2.1        ## half-width at the mouth
+const MOON_WIDEN := 1.8        ## half-width at the mouth
 const MOON_SPREAD := 1.8       ## and how fast it opens further
-const MOON_REACH := 0.78       ## it does not carry as far before it is lost
+## The moon's own reach curve, in place of the sun's REACH_LOW/REACH_HIGH.
+##
+## The sun's arc collapses to 0.45 at the zenith, and applying that to the moon
+## made a midnight beam three tiles long — which at this brightness is a smudge
+## on the sill and nothing on the floor. A high moon does foreshorten, but it is
+## also the only light in the room, so the beam has to be long enough to be a
+## beam. Flatter, and never as long as a raking sun.
+const MOON_REACH_LOW := 0.95
+const MOON_REACH_HIGH := 0.72
 ## A dim, diffuse source collimates harder toward the aperture's own normal —
 ## and it is also what stops a moonbeam skimming a wall it can never light.
 const MOON_REVEAL := 0.82
@@ -726,7 +755,7 @@ static func moon_travel() -> Vector2:
 
 
 static func moon_reach() -> float:
-	return lerpf(REACH_LOW, REACH_HIGH, moon_height()) * MOON_REACH
+	return lerpf(MOON_REACH_LOW, MOON_REACH_HIGH, moon_height())
 
 
 ## Offset past every stamp the sun can produce, so the hour the sky changes hands
@@ -744,58 +773,134 @@ static func moon_stamp() -> float:
 ## The renderer asks the sky, not the sun. One of these is live at a time and
 ## both are zero for the few minutes either side of a horizon, which is a real
 ## thing that happens at dawn and is worth not papering over.
+##
+## Cached, for exactly the reason the ambient ramp is. The first version worked
+## these out from `time_of_day` on every call, and the gather asks six of these
+## questions a frame — each of which resolved the body, which resolved both
+## gains, which is four transcendentals and two smoothsteps apiece. That measured
+## 90 microseconds a frame for an answer that changes when the hour does. The
+## optics dictionary is worse than that: it was one allocation per frame in a
+## file whose every other structure is packed flat to avoid exactly that.
 enum { SKY_NONE, SKY_SUN, SKY_MOON }
 
-
-static func sky_body() -> int:
-	if shaft_gain() > 0.002:
-		return SKY_SUN
-	if moon_gain() > 0.002:
-		return SKY_MOON
-	return SKY_NONE
-
-
-static func sky_gain() -> float:
-	var body := sky_body()
-	if body == SKY_SUN:
-		return shaft_gain()
-	return moon_gain() if body == SKY_MOON else 0.0
-
-
-static func sky_travel() -> Vector2:
-	return moon_travel() if sky_body() == SKY_MOON else sun_travel()
-
-
-static func sky_reach() -> float:
-	return moon_reach() if sky_body() == SKY_MOON else sun_reach()
-
-
-static func sky_stamp() -> float:
-	return moon_stamp() if sky_body() == SKY_MOON else sun_stamp()
-
-
-static func sky_reveal() -> float:
-	return MOON_REVEAL if sky_body() == SKY_MOON else SUN_REVEAL
-
-
-## The optics the active body imposes on an aperture's declared ones, as
-## multipliers plus the two things it overrides outright.
+static var _sky_at: float = -1.0
+static var _sky_flags := 0
+static var _sky_body: int = SKY_NONE
+static var _sky_gain: float = 0.0
+static var _sky_travel: Vector2 = Vector2.RIGHT
+static var _sky_reach: float = 1.0
+static var _sky_stamp: float = 0.0
+static var _sky_reveal: float = SUN_REVEAL
+## The optics the active body imposes on an aperture's declared ones. Flat
+## statics and not a dictionary, for the reason _place_shaft() gives about its
+## own entries: these are read once per beam per frame, and five Variant probes
+## per beam measured more than the whole rest of the gather.
 ##
-##   widen   half-width at the mouth
-##   spread  half-width gained per tile
+##   widen   multiplies half-width at the mouth
+##   spread  multiplies half-width gained per tile
 ##   bars    0 keeps the aperture's own mullions, 1 erases them
 ##   soft    0 a cored beam, 1 a wash with no core at all
 ##   tint    Color.TRANSPARENT means "keep the aperture's own"
-static func sky_optics() -> Dictionary:
-	if sky_body() == SKY_MOON:
-		return {
-			"widen": MOON_WIDEN, "spread": MOON_SPREAD, "bars": 1.0,
-			"soft": 1.0, "tint": MOON_COLOUR,
-		}
-	return {
-		"widen": 1.0, "spread": 1.0, "bars": 0.0,
-		"soft": 0.0, "tint": Color.TRANSPARENT,
-	}
+static var _sky_widen: float = 1.0
+static var _sky_spread: float = 1.0
+static var _sky_bars: float = 0.0
+static var _sky_soft: float = 0.0
+static var _sky_tint: Color = Color.TRANSPARENT
+
+
+static func _sky_refresh() -> void:
+	_advance()
+	var flags := (1 if shafts else 0) | (2 if moonlight else 0)
+	if is_equal_approx(_sky_at, time_of_day) and _sky_flags == flags:
+		return
+	_sky_at = time_of_day
+	_sky_flags = flags
+	var sun := shaft_gain()
+	if sun > 0.002:
+		_sky_body = SKY_SUN
+		_sky_gain = sun
+		_sky_travel = sun_travel()
+		_sky_reach = sun_reach()
+		_sky_stamp = sun_stamp()
+		_sky_reveal = SUN_REVEAL
+		_sky_widen = 1.0
+		_sky_spread = 1.0
+		_sky_bars = 0.0
+		_sky_soft = 0.0
+		_sky_tint = Color.TRANSPARENT
+		return
+	var moon := moon_gain()
+	if moon > 0.002:
+		_sky_body = SKY_MOON
+		_sky_gain = moon
+		_sky_travel = moon_travel()
+		_sky_reach = moon_reach()
+		_sky_stamp = moon_stamp()
+		_sky_reveal = MOON_REVEAL
+		_sky_widen = MOON_WIDEN
+		_sky_spread = MOON_SPREAD
+		_sky_bars = 1.0
+		_sky_soft = 1.0
+		_sky_tint = MOON_COLOUR
+		return
+	_sky_body = SKY_NONE
+	_sky_gain = 0.0
+
+
+static func sky_body() -> int:
+	_sky_refresh()
+	return _sky_body
+
+
+static func sky_gain() -> float:
+	_sky_refresh()
+	return _sky_gain
+
+
+static func sky_travel() -> Vector2:
+	_sky_refresh()
+	return _sky_travel
+
+
+static func sky_reach() -> float:
+	_sky_refresh()
+	return _sky_reach
+
+
+static func sky_stamp() -> float:
+	_sky_refresh()
+	return _sky_stamp
+
+
+static func sky_reveal() -> float:
+	_sky_refresh()
+	return _sky_reveal
+
+
+## See _sky_widen and friends. Read once per frame, not once per beam.
+static func sky_widen() -> float:
+	_sky_refresh()
+	return _sky_widen
+
+
+static func sky_spread() -> float:
+	_sky_refresh()
+	return _sky_spread
+
+
+static func sky_bars() -> float:
+	_sky_refresh()
+	return _sky_bars
+
+
+static func sky_soft() -> float:
+	_sky_refresh()
+	return _sky_soft
+
+
+static func sky_tint() -> Color:
+	_sky_refresh()
+	return _sky_tint
 
 
 ## --- apertures -----------------------------------------------------------------

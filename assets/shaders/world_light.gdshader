@@ -72,7 +72,12 @@ uniform vec4 shaft_form[MAX_SHAFTS];
 // wash that is brightest in the middle only in the sense that a fog is. At 1
 // the across-profile loses its plateau entirely and the beam fades over almost
 // its whole length instead of the last third.
-uniform float shaft_soft[MAX_SHAFTS];
+//
+// A scalar and not an array, unlike everything else here, because there is one
+// body in the sky and every beam in the frame came from it. It was an array for
+// one afternoon and the fourth uniform array upload cost more per frame than
+// the whole CPU gather did.
+uniform float shaft_soft = 0.0;
 
 void fragment() {
 	vec2 p = UV * view_size;
@@ -138,7 +143,7 @@ void fragment() {
 		// Along: a short fade off the sill so the beam is not stamped out with a
 		// flat end where it leaves the frame, and a long one into the far half so
 		// it dies before the wall rather than against it.
-		float soft = shaft_soft[i];
+		float soft = shaft_soft;
 		float body = smoothstep(1.0, mix(0.55, 0.0, soft), abs(u))
 			* smoothstep(0.0, mix(0.12, 0.30, soft), dn)
 			* smoothstep(1.0, mix(0.40, 0.05, soft), dn);

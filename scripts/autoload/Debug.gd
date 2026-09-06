@@ -34,6 +34,8 @@ const KNOBS := [
 	  "rebuild": true, "hint": "Motes drifting up through the light. 0 removes them." },
 	{ "id": "motion", "name": "UI motion", "min": 0.0, "max": 1.0, "step": 1.0, "default": 1.0,
 	  "rebuild": true, "hint": "Screen fades, card stagger, press feedback, and everything the world does on its own: grass and canopy sway, water glints, flames breathe. 0 is a still world. 0 makes everything snap." },
+	{ "id": "hour", "name": "Hour", "min": -0.01, "max": 1.0, "step": 0.01, "default": -0.01,
+	  "hint": "The time of day the world is lit for. 0 is midnight, 0.25 dawn, 0.5 noon, 0.75 dusk. Below 0 lets the day run on its own." },
 	{ "id": "ui_opacity", "name": "All UI", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
 	  "rebuild": true, "hint": "Master. Multiplies every layer below — drag this first." },
 	{ "id": "panel_opacity", "name": "Panel fills", "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0,
