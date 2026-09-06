@@ -269,6 +269,16 @@ func _shut(cell: Vector2i) -> bool:
 	if entry.is_empty():
 		return false
 	var kind := Content.interactable(String(entry.get("type", "")))
+	# A run tag for anything the loop takes back — the front door is bought
+	# again every morning — and an objective for anything it does not. The fort
+	# gate is the second kind: the children have to be convinced once, and a
+	# player who has already walked out past them should not have to argue it
+	# again every loop. Gating that on a run tag would also have made the Hearth
+	# report a permanently finished errand while the children stood in the road
+	# refusing to move, which is the interface lying about the world.
+	var done := String(kind.get("blocks_until_objective", ""))
+	if done != "" and not Objectives.is_complete(done):
+		return true
 	var gate := String(kind.get("blocks_until_tag", ""))
 	return gate != "" and not Game.has_tag(gate)
 

@@ -94,10 +94,76 @@
       "desc": "Leaves, pine needles and boxes, and children behind it who are entirely serious.",
       "icon": "threshold",
       "reach": "adjacent",
-      "blocks_until_tag": "town_quiet",
+      "critter": "kid_pell",
+      "blocks_until_objective": "close_town_anomalies",
       "effect": {
         "type": "dialogue",
         "dialogue": "fort_children"
+      }
+    },
+    {
+      "id": "kid_bird",
+      "name": "Bird",
+      "verb": "Talk",
+      "desc": "She is counting something in a jar and will not say what until she is finished.",
+      "icon": "bond",
+      "reach": "adjacent",
+      "critter": "kid_bird",
+      "effect": {
+        "type": "dialogue",
+        "dialogue": "fort_children"
+      }
+    },
+    {
+      "id": "busybody",
+      "name": "Mrs Ollard",
+      "verb": "Talk",
+      "desc": "She was at the window a moment ago and is now, somehow, out here.",
+      "icon": "bond",
+      "reach": "adjacent",
+      "critter": "busybody",
+      "effect": {
+        "type": "dialogue",
+        "dialogue": "ollard_window"
+      }
+    },
+    {
+      "id": "bram",
+      "name": "Bram",
+      "verb": "Talk",
+      "desc": "He is carrying more than he can have needed, and none of it is his.",
+      "icon": "bond",
+      "reach": "adjacent",
+      "critter": "bram",
+      "effect": {
+        "type": "dialogue",
+        "dialogue": "bram_finds"
+      }
+    },
+    {
+      "id": "tobin",
+      "name": "Tobin",
+      "verb": "Talk",
+      "desc": "Behind the bar, wiping something that is already clean.",
+      "icon": "bond",
+      "reach": "adjacent",
+      "critter": "tobin",
+      "effect": {
+        "type": "dialogue",
+        "dialogue": "tobin_bar"
+      }
+    },
+    {
+      "id": "cobb",
+      "name": "Cobb",
+      "verb": "Talk",
+      "desc": "He sleeps in the back and it shows.",
+      "icon": "bond",
+      "reach": "adjacent",
+      "critter": "cobb",
+      "effect": {
+        "type": "dialogue",
+        "dialogue": "cobb_shop"
       }
     }
   ]

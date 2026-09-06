@@ -851,6 +851,7 @@
         "effect"
       ],
       "optional": [
+        "blocks_until_objective",
         "blocks_until_tag",
         "cost_key",
         "critter",

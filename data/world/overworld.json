@@ -251,6 +251,31 @@
    "label": "The barricade"
   },
   {
+   "x": 160,
+   "y": 129,
+   "type": "kid_bird"
+  },
+  {
+   "x": 127,
+   "y": 135,
+   "type": "busybody"
+  },
+  {
+   "x": 140,
+   "y": 145,
+   "type": "tobin"
+  },
+  {
+   "x": 147,
+   "y": 135,
+   "type": "cobb"
+  },
+  {
+   "x": 105,
+   "y": 157,
+   "type": "bram"
+  },
+  {
    "x": 102,
    "y": 135,
    "type": "stove"

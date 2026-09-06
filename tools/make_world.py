@@ -694,6 +694,22 @@ SQUARE = (132, 132, 13, 9)
 BRIDGES = [("town_bridge", (114, 149, 7, 4)),
            ("north_bridge", (130, 100, 5, 6))]
 
+## Who stands outside which door. The offset is from the doorstep, so a person
+## is beside their threshold rather than in it -- standing IN a doorway blocks
+## the building, and `adjacent` reach means beside is close enough to talk.
+## Offsets are the side the street is on, which is not the same for every door
+## -- the busybodies' faces east onto the square, the tavern and the empty house
+## open north. Worked out by asking which neighbour is walkable rather than
+## assumed, because the first guess put Bram inside his own front wall and the
+## build refused it.
+TOWNSFOLK = [
+    ("kid_bird",  (161, 129), (-1,  0)),   # beside the barricade, counting
+    ("busybody",  (126, 135), ( 1,  0)),   # hard on the pavement, facing the square
+    ("tobin",     (140, 146), ( 0, -1)),   # outside the tavern he works behind
+    ("cobb",      (148, 135), (-1,  0)),   # the store he sleeps in the back of
+    ("bram",      (105, 158), ( 0, -1)),   # outside the empty house that is his
+]
+
 BUILDINGS = [
     ("mill", 121, 112, 10, 10, (125, 121), "wall_stone", "roof_slate"),
     ("commonhouse", 135, 111, 13, 13, (141, 123), "wall_brick", "roof_pantile"),
@@ -2231,6 +2247,15 @@ def main():
                      # again next time -- which is right, the holes are back.
                      {"x": FORT_GATE[0], "y": FORT_GATE[1],
                       "type": "leaf_gate", "label": "The barricade"}]
+
+    # The townsfolk, each outside the door of the building they belong to, or in
+    # the case of Bird, beside the barricade her sister is standing in. Placed
+    # here rather than in the plan because who lives where is a fact about the
+    # cast and the plan is a fact about the ground -- and the assertion below
+    # checks every one of them can be stood beside and is not buried.
+    for kind, door, offset in TOWNSFOLK:
+        interactables.append({"x": door[0] + offset[0],
+                              "y": door[1] + offset[1], "type": kind})
     for (kind, i, j, label) in plan["interactables"]:
         x, y = plan["cell"](i, j)
         entry = {"x": x, "y": y, "type": kind}

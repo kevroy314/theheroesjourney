@@ -1869,8 +1869,9 @@ def sp_build_all():
 #   wary   head sunk one row into shoulders raised two, upper lids down over a
 #          row of each eye, brows ASYMMETRIC -- one up, one down, which is what
 #          a sneer actually is and reads at 112px where a curled lip does not --
-#          mouth pulled up at one corner, collar up over the jaw, face a step
-#          colder.
+#          mouth pulled up at one corner, collar up over the jaw. The light does
+#          NOT change: `warm` is 1 in both rows of MOOD, deliberately, because
+#          an early cut dimmed `wary` a step and bought a corpse, not a mood.
 #
 # The head moving down while the shoulders move up is worth two rows of pixels
 # and does most of the work: at a glance, before any feature resolves, `wary` is
@@ -2196,8 +2197,9 @@ def side_by_side(cels, other, grounds, zoom=3):
 def portrait_contact(plates):
     """Both moods at 1:1 on the real panel colour -- which is the check that
     matters, because a face that only works at 5x is not a portrait -- and again
-    at 4x with the two overlaid in difference, which is where you see that they
-    are one person."""
+    at 4x, which is only for finding WHICH pixel is wrong after the small one
+    has told you that something is. (This docstring used to promise a difference
+    overlay. There has never been one; the number is printed instead.)"""
     pad, gap, zoom = 20, 24, 4
     w = pad * 2 + max(112 * 2 + gap, (112 * zoom) * 2 + gap)
     h = pad * 3 + 112 + 112 * zoom + 30

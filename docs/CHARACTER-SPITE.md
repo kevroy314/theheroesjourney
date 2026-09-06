@@ -142,9 +142,25 @@ Look at these rather than at the PNGs:
 
 ## 7. Still open
 
-Nothing places him in the world yet. `spite.png` matches `player.png`'s layout
-exactly (3 x 4 of 32 x 48, `HJTileWorld.FACINGS` row order), but `TileWorld` only
-loads the player, and `HJCritters` — the one thing that can already walk a
-non-player sprite around — is built for the animals' 4-column 32 x 32 sheet. Beat
-6 needs either a general entity plane (#34) or a placement that reads the sheet
-at the player's dimensions. That is a code change, not an art one.
+**He is placed.** (This section used to say nothing placed him. That has been
+true since the critter system learned about `sheet`.) `data/content/critters.json`
+carries the species with its `{cols: 3, rows: 4, w: 32, h: 48}` override,
+`data/content/interactables.json` has the `Talk` verb, and `data/world/overworld.json`
+puts him on the step. The autoload that walks him is `Critters` — there is no
+`HJCritters` symbol; it has no `class_name`.
+
+What is actually still open:
+
+- **He is the exception, not the pattern.** The town is authored on the shared
+  base in `docs/CHARACTER-TOWNSFOLK.md` — one parameter dictionary per person —
+  and Spite's hand-typed tables were deliberately left alone. That is the right
+  call for a major character and the wrong one for the fifteenth townsperson, so
+  do not copy this file's approach without reading that one first.
+- **Nothing validates the mood → portrait link.** `Dialogue.portrait_path()`
+  resolves `<stem>_<mood>.png` and nothing checks the file is there; rename an
+  alter and the art silently stops resolving with no test failing. The schema
+  now knows every speaker's mood ids (`speaker_moods`, added with the town), so
+  this is one loop in `tools/validate_data.py`.
+- **A critter is a state machine over `hold`, `approach`, `retreat` and
+  `wander`.** Spite holds, which is all beat 6 needs. A character who has to do
+  anything else needs the general entity plane (#34), not more art.
