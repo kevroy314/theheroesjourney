@@ -570,9 +570,9 @@ def coast_stop(world, bearing):
 #   a HALL      on boards, running the width of the building, with the front
 #               door at the end of it and the hole in reality somewhere in it
 #
-# Three rooms, three floors, because §5: "each room inside a building has its
+# Four rooms, four floors and a rug, because §5: "each room inside a building has its
 # own floor", and a change of material is what tells you that you have gone
-# somewhere. Two internal walls with three doorways between them, so the space
+# somewhere. Three wall runs with four doorways between them, so the space
 # has to be walked rather than seen.
 #
 # All of the geometry is in one function that returns a description, and every
@@ -622,12 +622,20 @@ def house_plan(cells):
       the rugs float, which is the one rule that separates a furnished room from
       a warehouse floor.
     * A SINGLE-WALL KITCHEN. The work triangle collapses to a line when the
-      kitchen is one run, and the NKBA rule for that case is: cold store, then
-      sink, then range, within 12 ft. Ours is dresser (10,0), sink (12,0), range
-      (14,0) -- 2 tiles and 2 tiles, 12 ft exactly -- with a tile of landing
-      counter on each side of both the sink and the range, and 15 ft of worktop
-      against a 13 ft minimum. No traffic crosses it: both doorways are at the
-      south of the room and the table sits three tiles clear of the run.
+      kitchen is one run, so the order is cold store, then sink, then range.
+      Ours is dresser (10,0), sink (12,0), range (14,0) -- two tiles between
+      each, so two 6 ft legs and 12 ft in total. NKBA Guideline 5 wants each leg
+      between 4 and 9 ft and the total under 26, which this clears with room to
+      spare. A tile of landing counter sits on each side of both the sink and
+      the range -- 36 in against the 24 in / 18 in the guidelines ask for -- and
+      there is 15 ft of worktop against a 13 ft minimum (Guideline 25). No
+      traffic crosses it: both doorways are at the south of the room and the
+      table sits three tiles clear of the run.
+
+      An earlier draft of this comment cited "the NKBA rule for a single wall:
+      within 12 ft". There is no such rule. The layout happened to be compliant
+      anyway, which is exactly why the invention survived a reading -- a made-up
+      citation that agrees with the right answer is the hardest kind to catch.
     * CLEARANCES, all measured below and all met: one clear tile in front of
       every doorway on both sides, two in front of the front door; one clear
       tile each side of the bed and at its foot; one clear tile of chair ring on
@@ -758,7 +766,7 @@ def house_plan(cells):
             ("table", 8, 9), ("chair", 7, 9), ("chair_pulled", 9, 9),
             ("table", 1, 11), ("chair", 2, 10), ("chair", 2, 11),
             ("floor_lamp", 3, 12), ("book_open", 2, 12),
-            ("barrel", 11, 11), ("crate", 10, 12), ("bench", 6, 12),
+            ("barrel", 11, 10), ("crate", 10, 12), ("bench", 6, 12),
             # and the boots by the front door, with the dog beside them
             ("boots", 7, 12), ("dog", 6, 11),
             # -- the pantry ----------------------------------------------------
@@ -1436,12 +1444,24 @@ def main():
     # preference from the plan first, then the rest of the ring round the door
     # in a fixed order so the answer is the same on every run.
     dx0, dy0 = plan["door_outside"]
+    # Diagonals first. carve_road lays path_dirt in a plus around every cell it
+    # walks, so all four orthogonal neighbours of the doorstep are road; the
+    # diagonals are the only cells that are both adjacent to where the player
+    # lands and off the path they land on.
     ring = [plan["spite"]] + [(dx0 + a, dy0 + b)
-                              for (a, b) in ((1, 1), (-1, 1), (1, 0), (-1, 0),
-                                             (0, 1), (1, -1), (-1, -1))]
-    spite = next((c for c in ring
-                  if c in reach and c not in house_cells
-                  and c != plan["door_outside"]), None)
+                              for (a, b) in ((1, 1), (-1, 1), (1, -1), (-1, -1),
+                                             (1, 0), (-1, 0), (0, 1))]
+
+    def standable(c):
+        return (c in reach and c not in house_cells
+                and c != plan["door_outside"])
+
+    spite = (next((c for c in ring if standable(c)
+                   and not props[c[1]][c[0]]
+                   and ORDER[world.at(*c)] != "path_dirt"), None)
+             or next((c for c in ring if standable(c)
+                      and ORDER[world.at(*c)] != "path_dirt"), None)
+             or next((c for c in ring if standable(c)), None))
     if spite is None:
         raise SystemExit(
             "there is nowhere for Spite to stand: every cell round the doorstep "
@@ -1470,6 +1490,15 @@ def main():
     shut = World(world.tiles, elev)
     shut.blocked = blocked | {plan["door"]}
     inside = reachable(shut, spawn)
+    stranded_inside = sorted(
+        c for c in house_cells
+        if c not in inside and c != plan["door"] and world.walkable(c[0], c[1]))
+    if stranded_inside:
+        raise SystemExit(
+            "the furniture has boxed %d cell(s) of the house in: %s. Every "
+            "walkable cell inside has to be reachable from the bed -- a pocket "
+            "behind a barrel is a cell the player can see, walk at, and never "
+            "stand on." % (len(stranded_inside), stranded_inside))
     leaked = sorted(c for c in inside if c not in house_cells)
     if leaked:
         raise SystemExit(

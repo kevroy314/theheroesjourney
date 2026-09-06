@@ -3787,7 +3787,7 @@ def interior_demo(tiles, sprites, zoom=3):
         ("bench", 9, 7), ("chest", 11, 7), ("crate", 11, 8),
         ("table", 8, 9), ("chair", 7, 9), ("chair_pulled", 9, 9),
         ("table", 1, 11), ("chair", 2, 10), ("chair", 2, 11),
-        ("floor_lamp", 3, 12), ("book_open", 2, 12), ("barrel", 11, 11),
+        ("floor_lamp", 3, 12), ("book_open", 2, 12), ("barrel", 11, 10),
         ("crate", 10, 12), ("bench", 6, 12), ("boots", 7, 12),
         ("dog", 6, 11),
         ("shelf_open", 13, 7), ("shelf_open", 14, 7), ("shelf_open", 15, 7),

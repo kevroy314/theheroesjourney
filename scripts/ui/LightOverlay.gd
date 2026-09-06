@@ -37,6 +37,8 @@ var _sform: PackedVector4Array = PackedVector4Array()  ## xy direction, z spread
 var _scount := 0
 var _last_scount := -1
 var _warned := false
+## Cached reach of the longest declared aperture; -1 means none is declared.
+var _margin := 0
 
 
 func _init() -> void:
@@ -135,7 +137,14 @@ func _gather_shafts(view: Vector2, given: Vector2, given_scale: float) -> void:
 	# Night, or noon. Either way the sun is not coming through a window sideways
 	# and nothing below runs.
 	var gain := HJLighting.shaft_gain()
-	if gain <= 0.002 or not HJLighting.any_shafts():
+	if gain <= 0.002:
+		return
+	# Cached rather than asked for: the reach of the longest aperture in the
+	# tileset is a fact about the manifest, and -1 also stands in for "no
+	# aperture is declared at all", which is the whole degrade path.
+	if _margin == 0:
+		_margin = HJLighting.shaft_margin_tiles() if HJLighting.any_shafts() else -1
+	if _margin < 0:
 		return
 	var scale := given_scale if given_scale > 0.0 else _scale()
 	if scale <= 0.0:
@@ -144,7 +153,7 @@ func _gather_shafts(view: Vector2, given: Vector2, given_scale: float) -> void:
 	if cam.x >= INF:
 		return
 
-	var margin := HJLighting.shaft_margin_tiles()
+	var margin := _margin
 	var from := Vector2i(
 		maxi(0, int(floor(cam.x / scale)) - margin),
 		maxi(0, int(floor(cam.y / scale)) - margin))
@@ -152,24 +161,35 @@ func _gather_shafts(view: Vector2, given: Vector2, given_scale: float) -> void:
 		maxi(0, int(ceil((cam.x + view.x) / scale)) + margin),
 		maxi(0, int(ceil((cam.y + view.y) / scale)) + margin))
 
+	# The traces are only re-run when the sun has actually moved, and that is one
+	# comparison for the whole world rather than one per aperture: a player
+	# walking round a house at a fixed hour never enters the branch.
 	var stamp := HJLighting.sun_stamp()
+	var stale := HJLighting.shafts_are_stale(stamp)
 	var travel := HJLighting.sun_travel()
 	var reach := HJLighting.sun_reach()
 	for bucket in HJLighting.shaft_buckets_over(from, to):
 		for source in bucket:
 			var entry: Dictionary = source
-			HJLighting.refresh_shaft(entry, stamp, travel, reach)
+			if stale:
+				HJLighting.refresh_shaft(entry, stamp, travel, reach)
+			# The beam's own tile box against the view, before any float touches
+			# it. A bucket is sixteen tiles square and most of what one hands
+			# back throws its light somewhere the player cannot see.
+			var lo: Vector2i = entry["lo"]
+			var hi: Vector2i = entry["hi"]
+			if hi.x < from.x or hi.y < from.y or lo.x > to.x or lo.y > to.y:
+				continue
 			_emit_shaft(entry, cam, scale, gain, view)
 
 
 ## One aperture: tiles to overlay pixels, a cull, and one slot filled.
 func _emit_shaft(entry: Dictionary, cam: Vector2, scale: float, gain: float,
 		view: Vector2) -> void:
-	var span := float(entry["length"]) - float(entry["mouth"])
+	var span := float(entry["span"])
 	if span <= 0.0:
 		return
-	var spec: Dictionary = entry["spec"]
-	var strength := gain * float(entry["gate"]) * float(spec["intensity"])
+	var strength := gain * float(entry["gate"]) * float(entry["gain"])
 	if strength <= 0.004:
 		return
 
@@ -177,11 +197,11 @@ func _emit_shaft(entry: Dictionary, cam: Vector2, scale: float, gain: float,
 	var dir: Vector2 = entry["dir"]
 	# The beam starts where it leaves the masonry, not at the middle of the wall
 	# cell — otherwise its first tile is drawn inside the wall it came through.
-	var mouth := (Vector2(cell) + Vector2(0.5, 0.5)) * scale - cam \
-		+ dir * (float(entry["mouth"]) * scale)
+	var lead: Vector2 = entry["from"]
+	var mouth := (Vector2(cell) + Vector2(0.5, 0.5) + lead) * scale - cam
 	var length := span * scale
-	var half := float(spec["width"]) * scale
-	var spread := float(spec["spread"])
+	var half := float(entry["half"]) * scale
+	var spread := float(entry["spread"])
 
 	# Off screen by more than its own reach. The bucket hands back everything
 	# within sixteen tiles and a beam is a segment, so this is the segment's box
@@ -212,10 +232,10 @@ func _emit_shaft(entry: Dictionary, cam: Vector2, scale: float, gain: float,
 	else:
 		_scount += 1
 
-	var tint: Color = spec["colour"]
+	var tint: Color = entry["tint"]
 	_spos[slot] = Vector4(mouth.x, mouth.y, length, strength)
 	_scol[slot] = Vector4(tint.r, tint.g, tint.b, half)
-	_sform[slot] = Vector4(dir.x, dir.y, spread, float(spec["bars"]))
+	_sform[slot] = Vector4(dir.x, dir.y, spread, float(entry["bars"]))
 
 
 ## --- the projection -------------------------------------------------------------

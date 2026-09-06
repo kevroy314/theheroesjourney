@@ -142,7 +142,7 @@ void fragment() {
 		// wedge look like a barcode instead of like light.
 		if (F.w > 0.0) {
 			float pane = abs(sin(F.w * 3.14159265 * (u + 1.0) * 0.5));
-			float sharp = 1.0 - smoothstep(0.10, 0.85, dn);
+			float sharp = 1.0 - smoothstep(0.18, 1.0, dn);
 			body *= mix(1.0, smoothstep(0.05, 0.55, pane), sharp);
 		}
 
@@ -152,7 +152,7 @@ void fragment() {
 		// never end up on different curves. Weighted toward `energy` rather than
 		// `radiance`: morning light on a floor is the floor being visible, not a
 		// glowing patch laid over it.
-		radiance += shaft_col[i].rgb * lit * 0.55;
+		radiance += shaft_col[i].rgb * lit * 0.75;
 		energy += lit * 0.90;
 	}
 

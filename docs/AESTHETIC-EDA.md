@@ -101,11 +101,17 @@ are inside". Necesse goes further: each *room* inside a building has its own
 floor.
 
 The house obeys this now. It is 19×15 with real walls, a sealed footprint whose
-only exit is the front door, and **three rooms on four floor materials** — the
-bedroom on plank, the kitchen on tile, the hall on boards, and a rug in front of
-the bed so the first cell you stand on is not the same cell as the last one. Two
-internal walls with three doorways between them, so the space has to be walked
-rather than seen.
+only exit is the front door, and **four rooms on four floor materials** — the
+parlour on plank, the kitchen on tile, the hall on boards, an unheated pantry on
+stone, and a rug beside the bed so the first cell you stand on is not the same
+cell as the last one. Three wall runs with four doorways between them, so the
+space has to be walked rather than seen.
+
+The pantry is the load-bearing one and it came out of the layout research rather
+than the art research: a room holding one of everything reads as a storage unit,
+and the historical fix is the three-cell cottage's unheated service room. Give
+the clutter a room that is *supposed* to be full of clutter and the other three
+stop being it.
 
 The geometry lives in one function, `house_plan()` in `tools/make_world.py`, and
 every other pass reads that description rather than recomputing it. The old code

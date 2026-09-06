@@ -291,6 +291,7 @@ static func invalidate() -> void:
 	_indexed = false
 	_buckets.clear()
 	_shaft_buckets.clear()
+	traced_at = -1.0
 
 
 static func index_world(world: HJWorld) -> void:
@@ -588,16 +589,31 @@ static func any_shafts() -> bool:
 ## never asked again; only the trace down the beam depends on the sun.
 static func _place_shaft(world: HJWorld, cell: Vector2i, key: Vector2i,
 		spec: Dictionary) -> void:
+	# Flat, not nested. Every field here is read once per aperture per frame, and
+	# a nested `spec` dictionary meant fifteen Variant probes per window rather
+	# than eight — the same reason the emitter list is packed rather than a list
+	# of dictionaries. The optics are copied out of the manifest entry once.
+	var tint: Color = spec["colour"]
 	var entry := {
 		"cell": cell,
 		"inward": _inward(world, cell),
-		"spec": spec,
+		"reach": float(spec["length"]),
+		"half": float(spec["width"]),
+		"spread": float(spec["spread"]),
+		"bars": float(spec["bars"]),
+		"gain": float(spec["intensity"]),
+		"tint": tint,
 		# Filled by refresh(); -1 means "never traced".
 		"stamp": -1.0,
+		"from": Vector2.ZERO,      ## mouth offset from the cell centre, in tiles
 		"dir": Vector2.RIGHT,
-		"mouth": 0.0,
-		"length": 0.0,
+		"span": 0.0,               ## mouth to far wall, in tiles
 		"gate": 0.0,
+		# The beam's tile-space bounding box, so a frame can reject an aperture
+		# whose light cannot reach the view with four integer compares and no
+		# floating point at all. Only the bearing moves it.
+		"lo": cell,
+		"hi": cell,
 	}
 	if _shaft_buckets.has(key):
 		(_shaft_buckets[key] as Array).append(entry)
@@ -673,8 +689,8 @@ static func refresh_shaft(entry: Dictionary, stamp: float, travel: Vector2,
 	if is_equal_approx(float(entry["stamp"]), stamp):
 		return
 	entry["stamp"] = stamp
+	var cell: Vector2i = entry["cell"]
 	var inward: Vector2 = entry["inward"]
-	var spec: Dictionary = entry["spec"]
 	var gate := 1.0
 	var dir := travel
 	if inward != Vector2.ZERO:
@@ -683,14 +699,23 @@ static func refresh_shaft(entry: Dictionary, stamp: float, travel: Vector2,
 		gate = smoothstep(0.05, 0.55, travel.dot(inward))
 		if gate <= 0.002:
 			entry["gate"] = 0.0
-			entry["length"] = 0.0
+			entry["span"] = 0.0
+			entry["lo"] = cell
+			entry["hi"] = cell
 			return
 		dir = (travel + inward * SUN_REVEAL).normalized()
 	entry["dir"] = dir
 	entry["gate"] = gate
-	var span := _trace(entry["cell"], dir, float(spec["length"]) * reach)
-	entry["mouth"] = span.x
-	entry["length"] = span.y
+	var span := _trace(cell, dir, float(entry["reach"]) * reach)
+	entry["from"] = dir * span.x
+	entry["span"] = span.y - span.x
+	# The box the beam can touch: the segment, grown by the widest it ever gets.
+	var tip := dir * span.y
+	var pad := ceili(float(entry["half"]) + span.y * float(entry["spread"])) + 1
+	entry["lo"] = cell + Vector2i(
+		floori(minf(0.0, tip.x)) - pad, floori(minf(0.0, tip.y)) - pad)
+	entry["hi"] = cell + Vector2i(
+		ceili(maxf(0.0, tip.x)) + pad, ceili(maxf(0.0, tip.y)) + pad)
 
 
 ## Returns (distance to the first floor, distance to the far wall), in tiles.
@@ -716,10 +741,29 @@ static func _trace(cell: Vector2i, dir: Vector2, reach: float) -> Vector2:
 	return Vector2(mouth, minf(t - TRACE_STEP, reach))
 
 
+## The bearing every aperture was last traced against. The frame compares this
+## once instead of asking each aperture in turn, so a player walking around a
+## house under a still sun makes no call into refresh_shaft() whatsoever.
+static var traced_at: float = -1.0
+
+
+static func shafts_are_stale(stamp: float) -> bool:
+	if is_equal_approx(traced_at, stamp):
+		return false
+	traced_at = stamp
+	return true
+
+
 ## Every aperture whose bucket overlaps a tile rectangle, same contract as
-## buckets_over().
+## buckets_over() — with the difference that the array is reused between frames
+## rather than allocated, because unlike the emitters this one is walked by a
+## pass that owns it and does not keep it.
+static var _shaft_scratch: Array = []
+
+
 static func shaft_buckets_over(from: Vector2i, to: Vector2i) -> Array:
-	var out: Array = []
+	var out: Array = _shaft_scratch
+	out.clear()
 	if _shaft_buckets.is_empty():
 		return out
 	for by in range(from.y / BUCKET, to.y / BUCKET + 1):

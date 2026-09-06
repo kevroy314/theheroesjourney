@@ -55,8 +55,8 @@ func _ready() -> void:
 	var out: String = args[0] if args.size() > 0 else "/tmp"
 	var tag: String = args[1] if args.size() > 1 else "shaft"
 	var solo := tag == "solo"
-	var w := 1500
-	var h := 1450
+	var w := int(args[2]) if args.size() > 2 else 1500
+	var h := int(args[3]) if args.size() > 3 else 1450
 	var world := HJWorld.shared()
 	if not world.loaded:
 		printerr("world did not load")
@@ -83,8 +83,7 @@ func _ready() -> void:
 	sub.add_child(g)
 
 	var overlay := HJLightOverlay.new()
-	overlay.size = Vector2(w, h)
-	g.add_child(overlay)
+	g.add_child(overlay)   # PRESET_FULL_RECT: it sizes itself to the ground
 
 	var cam := g.camera(Vector2(w, h))
 	HJLighting.indoors = true
@@ -94,7 +93,7 @@ func _ready() -> void:
 	lpos.resize(HJLighting.MAX_LIGHTS)
 	lcol.resize(HJLighting.MAX_LIGHTS)
 
-var hours := [["dawn", 0.27], ["midmorning", 0.33], ["late", 0.40],
+	var hours := [["dawn", 0.27], ["midmorning", 0.33], ["late", 0.40],
 		["noon", 0.52], ["night", 0.05]]
 	for shot in hours:
 		HJLighting.time_of_day = float(shot[1])
@@ -150,4 +149,63 @@ var hours := [["dawn", 0.27], ["midmorning", 0.33], ["late", 0.40],
 		HJLighting._by_plane.clear()
 		HJLighting.load_manifest()
 		HJLighting.index_world(world)
+	_bench(overlay, lpos, lcol, Vector2(w, h), world)
 	get_tree().quit()
+
+
+func _bench(overlay: HJLightOverlay, lpos: PackedVector4Array,
+		lcol: PackedVector4Array, view: Vector2, world: HJWorld) -> void:
+	var N := 4000
+	HJLighting.time_of_day = 0.27
+	# warm: one submit runs the traces once, so the loop below measures the
+	# steady state a walking player actually pays.
+	overlay.submit(lpos, lcol, 0, view)
+	var t0 := Time.get_ticks_usec()
+	for i in range(N):
+		overlay.submit(lpos, lcol, 0, view)
+	var on := float(Time.get_ticks_usec() - t0) / float(N)
+	HJLighting._shaft_by_plane.clear()
+	HJLighting._shaft_buckets.clear()
+	overlay.submit(lpos, lcol, 0, view)
+	t0 = Time.get_ticks_usec()
+	for i in range(N):
+		overlay.submit(lpos, lcol, 0, view)
+	var off := float(Time.get_ticks_usec() - t0) / float(N)
+	# split: gather only, no uniform upload
+	HJLighting._read = false
+	HJLighting._indexed = false
+	HJLighting._buckets.clear()
+	HJLighting._by_plane.clear()
+	HJLighting.load_manifest()
+	HJLighting.index_world(world)
+	overlay.submit(lpos, lcol, 0, view)
+	t0 = Time.get_ticks_usec()
+	for i in range(N):
+		overlay._gather_shafts(view, Vector2.INF, 0.0)
+	var gather := float(Time.get_ticks_usec() - t0) / float(N)
+	print("  of which gather=%.1f us, uniform upload=%.1f us"
+		% [gather, on - off - gather])
+	print("submit(): %.1f us with shafts, %.1f us without  ->  +%.1f us/frame"
+		% [on, off, on - off])
+
+	# and the cost of one bearing step: every aperture in the world re-marched.
+	HJLighting._read = false
+	HJLighting._indexed = false
+	HJLighting._buckets.clear()
+	HJLighting._by_plane.clear()
+	HJLighting.load_manifest()
+	HJLighting.index_world(world)
+	var all: Array = []
+	for key in HJLighting._shaft_buckets:
+		for e in HJLighting._shaft_buckets[key]:
+			all.append(e)
+	var travel := HJLighting.sun_travel()
+	var reach := HJLighting.sun_reach()
+	t0 = Time.get_ticks_usec()
+	var steps := 200
+	for i in range(steps):
+		for e in all:
+			HJLighting.refresh_shaft(e, float(i), travel, reach)
+	var march := float(Time.get_ticks_usec() - t0) / float(steps)
+	print("apertures in world: %d; one bearing step re-marches all of them in %.1f us"
+		% [all.size(), march])
