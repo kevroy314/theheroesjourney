@@ -32,9 +32,20 @@ extends RefCounted
 const MANIFEST := "res://assets/tiles/tiles.json"
 
 ## Hard ceiling on lights fed to the shader in one frame. Must match
-## MAX_LIGHTS in assets/shaders/world_light.gdshader. Twelve is far more than a
-## 7x7-tile viewport can hold and still leaves the uniform block tiny.
-const MAX_LIGHTS := 12
+## MAX_LIGHTS in assets/shaders/world_light.gdshader.
+##
+## Was twelve, sized when the only emitters in the world were seven lampposts,
+## six street lamps and the props inside one house. Every building in the town
+## now carries lit windows, and the gather rectangle is the viewport grown by
+## the longest reach — about 25 cells square — which on the high street holds
+## more than twelve. Past the ceiling the renderer drops whichever emitter is
+## furthest from the middle of the view, so what the player saw was lamps
+## switching on and off as they walked, one street back.
+##
+## Twenty is not expensive. The fragment loop breaks at `light_count`, so a
+## frame with three lamps in it costs three iterations at twenty exactly as it
+## did at twelve; what grows is the uniform block, by 128 bytes.
+const MAX_LIGHTS := 20
 
 
 ## --- the clock -------------------------------------------------------------------
@@ -224,6 +235,64 @@ const AMBIENT := [
 ## brightness knob; everything else about a lamp comes from its own entry.
 const GLOW := 0.34
 
+
+## --- daylight --------------------------------------------------------------------
+##
+## WHY THE RAMP ABOVE CANNOT DO THIS, AND WHY IT LOOKED LIKE IT COULD
+##
+## The ramp was written as a night effect and it is a good one: it takes the art
+## away and hands it back. What nobody noticed is that its noon stop is a no-op,
+## and a no-op at noon means *midday is whatever the tileset happens to be*. The
+## tileset is dark — cold turf, wet slate, brown earth, all of it authored to sit
+## under a night overlay — so the whole town measured mean 46 of 255 at eleven in
+## the morning against 40 at midnight. Five grey levels between noon and
+## midnight. Every screenshot anyone took read as dusk, at every hour, and the
+## first thing blamed for it was the lamps.
+##
+## The lamps were a real fault and a small one. This is the large one, and it is
+## not fixable by tuning the ramp: raising the noon mix moves every pixel toward
+## one colour, so it brightens and flattens in exactly equal measure. Noon needs
+## the opposite — the same spread, higher. See the note on `daylight` in
+## assets/shaders/world_light.gdshader for why that has to be an add.
+##
+## Keep the night alone. Below 0.25 and above 0.76 this term is exactly zero and
+## the overlay does what it always did.
+
+## What a full sun adds, as a fraction of white. Sized against the measurement:
+## the unlit town is mean 38, and 0.26 of white puts noon at about 104 with the
+## art's own contrast intact — a bright day rather than a bleached one.
+const DAYLIGHT_LIFT := 0.26
+
+## Sunlight is not white, and here it must not be: an add of pure grey raises
+## every channel equally, which desaturates in proportion to how much it lifts,
+## and the town came out under a flat haze. Warm enough that the lift itself
+## reads as sun on the ground rather than as fog — cold turf goes olive under it
+## instead of going grey, which is the tell that decided the number.
+const DAYLIGHT_COLOUR := Color(1.0, 0.955, 0.850)
+
+## How much of that is in the sky, keyframed on the hour. Two things are being
+## said here that a curve on the sun's elevation could not say on its own:
+##
+##   * it starts LATE and ends EARLY. At 0.25 the sun is on the horizon and the
+##     world is lit by the sky, which is what the blue AMBIENT stop already
+##     draws; adding sunlight there would erase the dawn. The lift only starts
+##     once the sun is properly up, which is also where AMBIENT starts letting go.
+##   * the shoulders are long. The interesting hours are the ones between, and a
+##     day that goes dark-to-bright in twenty minutes has no morning in it.
+const DAYLIGHT := [
+	[0.00, 0.00],
+	[0.22, 0.00],   # the last of the true dark
+	[0.27, 0.13],   # first light: thin, and the blue AMBIENT stop still owns it
+	[0.33, 0.42],
+	[0.40, 0.80],   # the light comes up fast through the first two hours
+	[0.52, 1.00],   # noon
+	[0.62, 0.90],
+	[0.68, 0.58],
+	[0.74, 0.16],   # the golden hour: AMBIENT is going warm as this lets go
+	[0.78, 0.00],   # last light, on the same stop AMBIENT calls dusk
+	[1.00, 0.00],
+]
+
 ## What a lamp is worth at the moment the sky first needs it, against 1.0 in a
 ## dead-black hour. See _settle().
 const LAMP_DUSK := 0.62
@@ -360,6 +429,7 @@ static var _cache_gain: float = 0.0
 static var _cache_lamp: float = 0.0
 static var _cache_fire: float = 0.0
 static var _cache_window: float = 0.0
+static var _cache_day: Color = Color.BLACK
 
 
 static func _resample() -> void:
@@ -426,6 +496,14 @@ static func _settle(mix: float, colour: Color) -> void:
 	# A window is a lamp behind glass that is only lit while somebody is in.
 	_cache_window = _cache_lamp * _ramp(OCCUPIED, time_of_day)
 
+	# The sun on the ground. Zero indoors for the same reason the wash is: the
+	# roof is between. Without that, the room the run opens in would come up to
+	# full daylight at noon with the ambient still floored at INTERIOR_MIX under
+	# it, which is a lit room and a dark tint fighting each other.
+	var lift := 0.0 if indoors else _ramp(DAYLIGHT, time_of_day) * DAYLIGHT_LIFT
+	_cache_day = Color(DAYLIGHT_COLOUR.r * lift, DAYLIGHT_COLOUR.g * lift,
+		DAYLIGHT_COLOUR.b * lift)
+
 
 ## Linear sample of a keyframed [time, value] table on the 0..1 day. Sorted, and
 ## the last stop must repeat the first's value at 1.0 so the day loops.
@@ -466,6 +544,14 @@ static func ambient_mix() -> float:
 static func ambient_colour() -> Color:
 	_resample()
 	return _cache_colour
+
+
+## What the sun adds to every pixel right now, already scaled by the hour.
+## Black outside daylight hours and black indoors, at which point the shader
+## line it feeds is an add of zero.
+static func daylight() -> Color:
+	_resample()
+	return _cache_day
 
 
 ## --- the manifest --------------------------------------------------------------

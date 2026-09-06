@@ -156,11 +156,16 @@ def read(path):
 
 
 def func_body(path, name):
-    """The lines of `func name(...)`, up to the next top-level declaration."""
+    """The lines of `func name(...)`, up to the next top-level declaration.
+
+    `static func` counts. HJLighting is a RefCounted with no instance and every
+    function in it is static, so a matcher that only saw plain `func` would
+    silently report "could not read" for a file whose arms are right there.
+    """
     lines = read(path).splitlines()
     start = None
     for i, line in enumerate(lines):
-        if re.match(r"^func\s+%s\s*\(" % re.escape(name), line):
+        if re.match(r"^(?:static\s+)?func\s+%s\s*\(" % re.escape(name), line):
             start = i + 1
             break
     if start is None:
@@ -727,8 +732,21 @@ def world_pass(report, docs, schema):
             report.error("assets/tiles/tiles.json",
                          "%s flicker is %r; it must be between 0.0 and 1.0"
                          % (where, flicker))
+        # `kind` is optional and defaults to 'lamp', so its failure mode is not
+        # a dark prop -- it is a forge that goes out at breakfast, or a street
+        # lamp that burns through noon. Silent and wrong rather than silent and
+        # absent, which is the worse of the two, so a word the lighting pass
+        # cannot resolve is an error and not a warning.
+        if "kind" in light:
+            kind = light.get("kind")
+            if kind not in schema["vocabulary"]["light_kinds"]:
+                report.error("assets/tiles/tiles.json",
+                             "%s kind is %r; it must be one of %s"
+                             % (where, kind,
+                                ", ".join(schema["vocabulary"]["light_kinds"])))
+        allowed = spec_light.get("required", []) + spec_light.get("optional", [])
         for key in light:
-            if key not in spec_light.get("required", []):
+            if key not in allowed:
                 report.warn("assets/tiles/tiles.json",
                             "%s carries '%s', which nothing reads" % (where, key))
 
@@ -813,6 +831,27 @@ def world_pass(report, docs, schema):
             if key not in allowed:
                 report.warn("assets/tiles/tiles.json",
                             "%s carries '%s', which nothing reads" % (where, key))
+
+    # The flat contract. A prop's `flat` says it is texture lying on the ground
+    # rather than a thing standing up off it, and scatter_props() in
+    # tools/make_world.py reads it to decide what may be placed in a lane the
+    # player walks down. So a prop that claims to be flat AND solid is asking
+    # for an invisible boulder in the middle of a road, and a `flat` that is not
+    # a boolean reads as truthy for any non-empty value -- which puts a tree in
+    # the lane on a typo. Both are errors rather than warnings for that reason.
+    for prop in tiles["props"]["list"]:
+        if "flat" not in prop:
+            continue
+        where = "prop '%s'" % prop["id"]
+        if not isinstance(prop["flat"], bool):
+            report.error("assets/tiles/tiles.json",
+                         "%s flat is %r; it must be true or false"
+                         % (where, prop["flat"]))
+        elif prop["flat"] and prop.get("solid"):
+            report.error("assets/tiles/tiles.json",
+                         "%s is both flat and solid. Flat means it lies on the "
+                         "ground and the player walks over it, which is the one "
+                         "thing a solid prop cannot do." % where)
 
     # An aperture nothing ever places throws no light anywhere. The same is not
     # worth saying about a lamp -- a lamppost with a density scatters itself --
@@ -986,6 +1025,16 @@ def main():
               "HJCritters._conditions_met")
     reconcile(report, schema, const_array(critters_gd, "EVENTS"), "critter_events",
               "HJCritters.EVENTS")
+
+    # The light kinds. A prop declares WHEN its light burns by naming one of
+    # these in assets/tiles/tiles.json, and HJLighting.gain_for() is the only
+    # thing that knows what a name means -- so a word in the schema with no arm
+    # behind it is a lamp that silently falls back to being some other lamp,
+    # and an arm with no word in the schema is a behaviour the art is forbidden
+    # to ask for. Both directions matter, which is what reconcile() is for.
+    lighting_gd = os.path.join(SCRIPTS, "ui", "Lighting.gd")
+    reconcile(report, schema, arms(lighting_gd, "gain_for"), "light_kinds",
+              "HJLighting.gain_for")
 
     id_sets = build_id_sets(docs, schema)
     schema_pass(report, docs, schema, id_sets)

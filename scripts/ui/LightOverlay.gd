@@ -22,6 +22,7 @@ var _live := false          ## false when the frame is a no-op; skips the draw
 var _last_view := Vector2.ZERO
 var _last_mix := -1.0
 var _last_colour := Color(-1, -1, -1)
+var _last_day := Color(-1, -1, -1)
 
 ## The frame's shafts, packed the same way the light list is and for the same
 ## reason — this runs every frame and must not allocate.
@@ -86,11 +87,18 @@ func submit(positions: PackedVector4Array, colours: PackedVector4Array,
 	if not has_shader():
 		return
 	var mix := HJLighting.ambient_mix()
+	var day := HJLighting.daylight()
 	_gather_shafts(view, cam, scale)
-	# Nothing to darken and nothing to light. Skip the fill entirely rather than
-	# drawing a transparent quad — at noon in a world whose tileset declares no
-	# lamps this system must cost exactly nothing.
-	var live := count > 0 or _scount > 0 or mix > 0.0005
+	# Nothing to darken, nothing to light and no sun to add. Skip the fill
+	# entirely rather than drawing a transparent quad — at the two minutes either
+	# side of sunrise, in a world whose tileset declares no lamps, this system
+	# must cost exactly nothing.
+	#
+	# `day` is in the test because it is the one term that is at its LARGEST when
+	# the other two are at zero: leaving it out meant the overlay switched itself
+	# off at precisely the hour the daylight lift was supposed to be doing all
+	# the work, and midday came out unlit.
+	var live := count > 0 or _scount > 0 or mix > 0.0005 or day.r > 0.0005
 	if live != _live:
 		_live = live
 		queue_redraw()
@@ -107,6 +115,13 @@ func submit(positions: PackedVector4Array, colours: PackedVector4Array,
 	if colour != _last_colour:
 		_last_colour = colour
 		_material.set_shader_parameter("ambient_colour", colour)
+	# Pushed as a Vector3 rather than a Color: the uniform is a vec3 and handing
+	# a Color to a vec3 costs a conversion in the rendering server every time it
+	# moves, which for a value that changes on every clock tick is worth the one
+	# line here.
+	if day != _last_day:
+		_last_day = day
+		_material.set_shader_parameter("daylight", Vector3(day.r, day.g, day.b))
 
 	_material.set_shader_parameter("light_count", count)
 	if count > 0:

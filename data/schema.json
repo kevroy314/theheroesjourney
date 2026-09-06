@@ -191,6 +191,12 @@
       "player",
       "home"
     ],
+    "_comment_light_kinds": "What SORT of light a prop's `light` entry is, and therefore at which hours it burns. Reconciled in both directions against the `match` in HJLighting.gain_for(), so a word here that the lighting pass cannot resolve is an error rather than a lamp that quietly behaves like some other lamp. 'lamp' is a street or floor light somebody puts out at dawn and lights at dusk, and it is also the default a `light` with no `kind` takes -- which is what every emitter in the tileset did before kinds existed. 'fire' is a hearth, forge, stove or campfire: washed out by daylight the way any small source is, but never out. 'window' is a lamp behind glass that is only lit while somebody is home, which is the one that makes a street read as inhabited.",
+    "light_kinds": [
+      "lamp",
+      "fire",
+      "window"
+    ],
     "_comment_statecodes": "Test start states. See scripts/game/StateCode.gd. Unlike the vocabularies above, statecode_anchors is NOT reconciled against the engine by tools/validate_data.py -- the anchors are a match in HJStateCode._anchor and adding an arm there means adding a word here by hand. It is a debug affordance with one reader, so the cost of drift is a preset that starts you at the spawn point instead of the door.",
     "statecode_anchors": [
       "spawn",
@@ -1256,9 +1262,13 @@
         "color",
         "flicker"
       ],
+      "optional": [
+        "kind"
+      ],
       "radius": "float greater than 0, in tiles",
       "color": "#RRGGBB, the colour at the source; the falloff belongs to the renderer",
-      "flicker": "float 0.0 to 1.0, 0 is a steady lamp"
+      "flicker": "float 0.0 to 1.0, 0 is a steady lamp",
+      "kind": "one of vocabulary.light_kinds; omitted means 'lamp', which is what every emitter did before kinds existed"
     },
     "_indoors": "Optional. { x, y, w, h } in cells, the footprint of the building the player wakes in, walls included. The Boon of the White Room is free walking inside it and breaks on the first cell outside, and that same crossing unlocks the Hearth and triggers the Spite encounter (Beat 5). Classified by shape as a marker with w and h as editable properties, so it is a rectangle the designer can drag rather than a rule derived from the floor material.",
     "_interactables": "Optional. A list of { x, y, type, label? } records naming an entry of the interactables catalogue in data/content/. Classified by shape as an object layer, so Tiled can place, drag and retype them with no tooling change. tools/validate_data.py does not yet check that `type` resolves \u2014 the world pass would need one loop, mirroring the anomaly `area` check.",
@@ -1293,6 +1303,7 @@
       "bars": "integer 0 or more, panes across the aperture; 2 is one mullion, 0 is an unframed hole",
       "color": "#RRGGBB; defaults to the prop's own `light` colour, or to first light",
       "intensity": "float 0.0 to 1.0, default 1.0"
-    }
+    },
+    "_prop_flat": "Whether a prop is texture lying ON the ground rather than a thing standing up off it -- grit, a rut, fallen leaves, a damp patch, a rug. Derived in _p() from the three declarations that already say it (no collision, no cast shadow, no outline) and emitted so that the reader in the other tool does not have to re-derive it: scatter_props() in tools/make_world.py uses it to decide what may stand in a lane the player walks down. Absent reads as false, which keeps everything off the road that was ever off the road. A prop that is both flat and solid is an error -- see world_pass()."
   }
 }

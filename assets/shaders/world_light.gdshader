@@ -27,7 +27,7 @@ shader_type canvas_item;
 
 render_mode blend_premul_alpha, unshaded;
 
-const int MAX_LIGHTS = 12;      // must match HJLighting.MAX_LIGHTS
+const int MAX_LIGHTS = 20;      // must match HJLighting.MAX_LIGHTS
 
 // Local pixel size of the quad, so UV can be turned back into pixels. Using
 // FRAGCOORD instead would be wrong the moment the control is not at the origin.
@@ -43,6 +43,28 @@ uniform vec4 light_col[MAX_LIGHTS];
 uniform float ambient_mix : hint_range(0.0, 1.0) = 0.46;
 uniform vec3 ambient_colour = vec3(0.16, 0.19, 0.34);
 uniform float glow : hint_range(0.0, 1.0) = 0.34;
+
+// DAYLIGHT, and why it is an ADD and not a brighter ambient.
+//
+// The ramp above can only take the art away: `out = base*(1-k) + tint*k` moves
+// every pixel toward one colour, so raising the mid-day level with it flattens
+// the picture in exact proportion to how much it brightens it. That is the
+// right operation for night, where the whole point is that detail is being
+// lost, and the wrong one for noon.
+//
+// The blend cannot multiply. `blend_premul_alpha` is
+// `out = COLOR.rgb + base*(1.0 - COLOR.a)`, and COLOR.a is clamped to 0..1 on
+// an 8-bit target, so the only factor available on `base` is one that makes it
+// darker. Exposure — the operation this actually wants — needs the destination,
+// which means a backbuffer copy, which is the one cost the whole design is
+// arranged to avoid on a mobile tiler.
+//
+// So: an add, at alpha zero. It raises the mean without touching the *spread* —
+// two pixels that differed by twenty levels still differ by twenty — which is
+// the closest an LDR canvas blend gets to opening the aperture. The shadows come
+// up with everything else, which is also what a sunlit exterior does: the sky is
+// a second, softer source filling the shade.
+uniform vec3 daylight = vec3(0.0);
 
 // MORNING LIGHT THROUGH A HOLE
 // ---------------------------
@@ -175,5 +197,8 @@ void fragment() {
 	// k is how much of the art the night takes. A lamp buys it back locally,
 	// which is why the ground inside a pool looks lit rather than merely tinted.
 	float k = ambient_mix * (1.0 - energy);
-	COLOR = vec4(ambient_colour * k + radiance * glow, k);
+	// `daylight` rides on rgb with nothing added to alpha, so it is pure
+	// addition over whatever the ramp and the lamps have already done. At noon k
+	// is zero and this line reduces to `base + daylight`.
+	COLOR = vec4(ambient_colour * k + radiance * glow + daylight, k);
 }
