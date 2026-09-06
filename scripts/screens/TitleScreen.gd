@@ -22,7 +22,16 @@ func build() -> void:
 	if active:
 		var card := HJUI.panel("panel", "accent")
 		var cv := HJUI.vbox(6)
-		cv.add_child(HJUI.label(String(run.area.get("name", "")), HJUI.FS_BODY, "text"))
+		# Outside an anomaly there is no area, and the card's first line came up
+		# empty. Same answer as the walk screen's header: the world knows where
+		# you are even when the run does not.
+		var where := String(run.area.get("name", ""))
+		if where == "":
+			var at := run.world_pos
+			if at.x < 0:
+				at = HJWorld.shared().nearest_walkable(HJWorld.shared().spawn)
+			where = HJWorld.shared().place_name(at)
+		cv.add_child(HJUI.label(where, HJUI.FS_BODY, "text"))
 		cv.add_child(HJUI.label("Ring %d · %s left" % [run.zone, HJClock.format_remaining(run.seconds_left())],
 			HJUI.FS_SMALL, "warn" if run.seconds_left() < 12 * 3600 else "muted"))
 		card.add_child(cv)

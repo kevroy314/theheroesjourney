@@ -270,13 +270,25 @@ func _load_baseline() -> void:
 	_elapsed = int(cfg.get_value("steps", "elapsed", 0))
 
 
+## What the budget reads as while god mode is on. Large enough to walk the
+## whole map, small enough to still look like a number rather than a bug.
+const GOD_BUDGET := 99999
+
 ## What is left to walk with. Real steps are multiplied; granted steps are not,
 ## because they have already been priced by whatever handed them out.
 func budget() -> int:
+	# God mode promises nothing costs anything, and until now it meant everything
+	# except the one currency you need to reach anything: an emulator reports no
+	# steps at all, so a device test could not walk out of the first room.
+	if Debug.god:
+		return GOD_BUDGET
 	return maxi(0, int(floor(float(walked) * multiplier)) + granted - spent)
 
 
 func spend(n: int = 1) -> bool:
+	if Debug.god:
+		budget_changed.emit()
+		return true
 	var charge := float(n) * step_cost()
 	_burn_debt += charge
 	var whole := int(floor(_burn_debt))

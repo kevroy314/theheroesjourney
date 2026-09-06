@@ -62,6 +62,8 @@ var regions: Dictionary = {}          ## area id -> Vector2i
 ## floor material would break the first time someone lays a plank floor on a
 ## porch; a rectangle the map editor can drag is honest and adjustable.
 var indoors: Array[Rect2i] = []
+## What each rect of `indoors` is called, index for index. Empty means "Home".
+var _indoor_names: Array[String] = []
 var spawn := Vector2i.ZERO
 var loaded := false
 
@@ -109,10 +111,17 @@ func load_world() -> void:
 	# Accepts one rect or a list of them, because a floor plan that is not a
 	# rectangle is normal and the alternative is the map lying about itself.
 	var rooms: Variant = parsed.get("indoors", [])
+	_indoor_names.clear()
 	for entry in (rooms if rooms is Array else [rooms]):
 		if entry is Dictionary:
 			indoors.append(Rect2i(int(entry.get("x", 0)), int(entry.get("y", 0)),
 				int(entry.get("w", 0)), int(entry.get("h", 0))))
+			# A rect may say what building it is. Until the town's buildings
+			# carry names, every interior answered "Home", which is why they
+			# could not be added to this list at all: the tavern would have
+			# introduced itself as the player's house. A rect with no name
+			# still means home, so the house needs no entry.
+			_indoor_names.append(String(entry.get("place", "")))
 	interactables = parsed.get("interactables", [])
 	_interactable_at.clear()
 	for entry in interactables:
@@ -215,8 +224,10 @@ func walkable(x: int, y: int) -> bool:
 ## told they were in "Area". The world knows better than the run does: it has
 ## named regions and it knows what is indoors.
 func place_name(cell: Vector2i) -> String:
-	if is_indoors(cell):
-		return "Home"
+	var inside := indoor_index(cell)
+	if inside >= 0:
+		var named := _indoor_names[inside] if inside < _indoor_names.size() else ""
+		return named if named != "" else "Home"
 	var best := ""
 	var best_d := 1 << 30
 	for id in regions:
@@ -239,6 +250,15 @@ func place_name(cell: Vector2i) -> String:
 	# spot is called when you are merely near it.
 	var area := Content.area(best)
 	return String(area.get("place", area.get("name", best)))
+
+
+## Which building this cell is inside, or -1. Separate from `is_indoors` so a
+## caller that only wants the yes-or-no is not made to care about the index.
+func indoor_index(cell: Vector2i) -> int:
+	for i in indoors.size():
+		if indoors[i].has_point(cell):
+			return i
+	return -1
 
 
 ## Is this cell inside a building?

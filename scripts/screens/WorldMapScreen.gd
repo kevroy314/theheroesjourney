@@ -271,6 +271,11 @@ class MapView extends Control:
 
 	# --- input --------------------------------------------------------------
 
+	## How far a finger may slide and still count as a tap rather than a pan.
+	const TAP_SLOP := 12.0
+
+	var _tapped_at := Vector2.ZERO
+
 	func _gui_input(event: InputEvent) -> void:
 		if event is InputEventScreenTouch:
 			_on_touch(event)
@@ -298,12 +303,33 @@ class MapView extends Control:
 		if event.pressed:
 			_gesture = "touch"
 			_touches[event.index] = event.position
+			_tapped_at = event.position
 		else:
+			# A one-finger press that never became a drag is a tap, and under
+			# god mode a tap on the map is where you would like to be standing.
+			# Verifying anything at the far end of a 256x256 world otherwise
+			# means holding a direction button for several minutes.
+			if Debug.god and _touches.size() == 1 \
+					and _tapped_at.distance_to(event.position) < TAP_SLOP:
+				_teleport(_to_world(event.position))
 			_touches.erase(event.index)
 			if _touches.is_empty():
 				_gesture = ""
 		_sync_pinch()
 		accept_event()
+
+	## Put the player on the nearest walkable cell to where they pointed, and
+	## show them standing there. Nearest-walkable rather than exact, because a
+	## tap lands on water and a wall as readily as on a street.
+	func _teleport(to: Vector2) -> void:
+		var run: HJRun = Game.run
+		if run == null:
+			return
+		var cell := HJWorld.shared().nearest_walkable(Vector2i(to.round()))
+		run.world_pos = cell
+		Game.say("Moved to %d, %d — %s." % [cell.x, cell.y,
+			HJWorld.shared().place_name(cell)], "warn")
+		Game.goto("overworld")
 
 	func _on_touch_drag(event: InputEventScreenDrag) -> void:
 		_touches[event.index] = event.position
