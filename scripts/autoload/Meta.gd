@@ -19,6 +19,11 @@ var last_active_day: String = ""
 var rest_used_day: String = ""         ## a Rest Token was spent on this day
 
 var rooms_owned: Array = []            ## Mind Palace room ids bought
+## What the player has been *shown*. Distinct from what they own: a room they
+## cannot afford yet is still something they know exists, and a room further
+## down the ladder is not. Everything unrevealed renders redacted rather than
+## absent, so the shape of what is coming is visible without the content.
+var revealed: Array = []
 var room_grid: Dictionary = {}         ## "x,y" -> room id
 var palace_size: int = 0               ## 0 = not initialised yet
 ## Legacy. Runs live in History (user://history.ndjson) now, appended and never
@@ -518,6 +523,7 @@ func save_game() -> void:
 		"resolve": resolve, "levels": levels, "unlocked": unlocked,
 		"inventory": inventory, "claimed": claimed,
 		"rooms_owned": rooms_owned, "room_grid": room_grid, "palace_size": palace_size,
+		"revealed": revealed,
 		"streak": streak, "best_streak": best_streak,
 		"last_active_day": last_active_day, "rest_used_day": rest_used_day,
 		"codex": codex, "axis_tasks": axis_tasks,
@@ -562,6 +568,7 @@ func load_game() -> void:
 			inventory = parsed.get("inventory", {})
 			claimed = parsed.get("claimed", [])
 			rooms_owned = parsed.get("rooms_owned", [])
+			revealed = parsed.get("revealed", [])
 			room_grid = parsed.get("room_grid", {})
 			palace_size = int(parsed.get("palace_size", 0))
 			history = parsed.get("history", [])
@@ -615,6 +622,7 @@ func wipe() -> void:
 	deepest_ring = 0
 	anomalies_closed = 0
 	resume_at = Vector2i(-1, -1)
+	revealed = []
 	loops = 0
 	runs_today = {}
 	seen_first_reset = false
@@ -651,6 +659,34 @@ func note_ring(tier: int) -> void:
 	deepest_ring = tier
 	save_game()
 	Events.meta_changed.emit()
+
+
+## Show the player something exists. Returns true only the first time, so the
+## caller can raise a notification without having to remember whether it already
+## did — "reveal, and tell me if that was news" is the whole of what callers want.
+func reveal(id: String) -> bool:
+	if id == "" or revealed.has(id):
+		return false
+	revealed.append(id)
+	save_game()
+	Events.meta_changed.emit()
+	return true
+
+
+## Is this Mind Palace room visible yet?
+##
+## A room is revealed by its own flag, by having been bought, or by the room
+## before it on the ladder having been bought. The ladder is declared in
+## rooms.json as `reveal_after`, so reordering the unlock sequence is a content
+## change. Debug.god shows everything, as everywhere else.
+func room_revealed(id: String) -> bool:
+	if Debug.god or revealed.has(id) or rooms_owned.has(id):
+		return true
+	var room := Content.room(id)
+	if bool(room.get("revealed_by_default", false)):
+		return true
+	var after := String(room.get("reveal_after", ""))
+	return after != "" and rooms_owned.has(after)
 
 
 ## Record an anomaly actually closed, as opposed to walked away from.

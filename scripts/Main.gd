@@ -5,7 +5,10 @@ extends Control
 
 const SCREENS := {
 	"title": preload("res://scripts/screens/TitleScreen.gd"),
-	"menu": preload("res://scripts/screens/MenuScreen.gd"),
+	# The Menu is the fourth wall and holds nothing but preferences, so it *is*
+	# the settings screen rather than a list with one entry on it. Everywhere you
+	# can actually go is reached through HJUI.nav_bar and the Mind Palace.
+	"menu": preload("res://scripts/screens/SettingsScreen.gd"),
 	"palace": preload("res://scripts/screens/MindPalaceScreen.gd"),
 	"gym": preload("res://scripts/screens/GymScreen.gd"),
 	"workshop": preload("res://scripts/screens/WorkshopScreen.gd"),

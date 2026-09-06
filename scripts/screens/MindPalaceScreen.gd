@@ -142,6 +142,23 @@ func _cell(x: int, y: int, cell_size: float) -> Control:
 	return card
 
 
+## A room the player has not been shown: a shape where a room will be.
+##
+## Deliberately not a blurred name or a "???" — both invite guessing at a
+## specific thing. A struck-through bar of blocks says "withheld" and stops
+## there, and the varying width keeps the column from reading as a placeholder
+## grid.
+func _redacted(index: int) -> Control:
+	var card := HJUI.panel("panel")
+	card.modulate.a = 0.45
+	var cv := HJUI.vbox(6)
+	var bar := HJUI.label("█".repeat(6 + (index * 3) % 7), HJUI.FS_BODY, "muted")
+	cv.add_child(bar)
+	cv.add_child(HJUI.label("█".repeat(14 + (index * 5) % 11), HJUI.FS_TINY, "muted"))
+	card.add_child(cv)
+	return card
+
+
 func _tap_cell(x: int, y: int) -> void:
 	var id := Meta.room_at(x, y)
 
@@ -220,11 +237,31 @@ func _unplaced(body: VBoxContainer) -> void:
 		body.add_child(card)
 
 
+## The market, with everything past the next rung of the ladder redacted.
+##
+## Showing the whole catalogue on a cold open is a spoiler and a wall of prices
+## at once: it tells a player who has never earned Resolve exactly how much of
+## the game they have not got to, which is discouraging rather than enticing. A
+## redacted row does the opposite job — it says there is more, without saying
+## what — and a name struck out reads as something withheld rather than absent.
 func _market(body: VBoxContainer) -> void:
 	var buyable: Array = Content.rooms.filter(func(r): return not Meta.rooms_owned.has(r.get("id", "")))
-	if not buyable.is_empty():
+	var shown: Array = buyable.filter(func(r): return Meta.room_revealed(String(r.get("id", ""))))
+	var hidden: int = buyable.size() - shown.size()
+
+	if not shown.is_empty():
 		body.add_child(HJUI.label("ROOMS YOU COULD BUILD", HJUI.FS_SMALL, "muted"))
-	for room in buyable:
+	elif hidden > 0:
+		# The first-run line. It means nothing yet, and everything after the
+		# first loop closes and the player finds out what does not come back.
+		var flavour := HJUI.panel("panel")
+		var fv := HJUI.vbox(4)
+		fv.add_child(HJUI.label("We only keep what we take with us.", HJUI.FS_BODY, "accent_2"))
+		fv.add_child(HJUI.label("The rest of the house is dark.", HJUI.FS_SMALL, "muted"))
+		flavour.add_child(fv)
+		body.add_child(flavour)
+
+	for room in shown:
 		var cost := Meta.price(int(room.get("cost", 0)))
 		var afford := Meta.resolve >= cost
 		var card := HJUI.panel("panel", "accent" if afford else "")
@@ -247,6 +284,9 @@ func _market(body: VBoxContainer) -> void:
 		cv.add_child(buy)
 		card.add_child(cv)
 		body.add_child(card)
+
+	for i in range(hidden):
+		body.add_child(_redacted(i))
 
 	var expand := Meta.expand_cost()
 	if expand >= 0:

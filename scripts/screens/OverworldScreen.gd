@@ -50,12 +50,13 @@ func build() -> void:
 		allow.pressed.connect(func() -> void: Steps.ask_permission())
 		titles.add_child(allow)
 	head.add_child(titles)
-	var back := HJUI.button("Map", "quiet")
-	back.custom_minimum_size = Vector2(120, 62)
-	back.size_flags_horizontal = Control.SIZE_SHRINK_END
-	back.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	back.pressed.connect(func(): Game.goto("worldmap"))
-	head.add_child(back)
+	# Everywhere else in the game, not just the map. This screen used to offer
+	# the map and nothing else, which left a player who had closed their first
+	# anomaly standing in the world with no route to two thirds of the game.
+	var nav := HJUI.nav_bar("overworld")
+	nav.size_flags_horizontal = Control.SIZE_SHRINK_END
+	nav.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	head.add_child(nav)
 	head_panel.add_child(head)
 	v.add_child(head_panel)
 

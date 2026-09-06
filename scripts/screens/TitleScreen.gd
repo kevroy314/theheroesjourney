@@ -30,10 +30,16 @@ func build() -> void:
 
 	v.add_child(HJUI.spacer())
 
+	# Resolve at zero is a gentle needle and belongs on a cold open. The other
+	# two are spoilers: "Loops 0" tells a first-time player they are going to
+	# fail before they have tried, and a streak counter implies a habit before
+	# there is one. Each appears the moment it means something.
 	var chips := HJUI.hbox(10)
 	chips.add_child(HJUI.chip(Palette.word("resolve"), str(Meta.resolve), "accent", "resolve"))
-	chips.add_child(HJUI.chip(Palette.word("streak"), "%d d" % Meta.streak, "accent_2", "streak"))
-	chips.add_child(HJUI.chip("Loops", str(Meta.loops), "muted", "loop"))
+	if Meta.streak > 0 or Meta.best_streak > 0:
+		chips.add_child(HJUI.chip(Palette.word("streak"), "%d d" % Meta.streak, "accent_2", "streak"))
+	if Meta.loops > 0:
+		chips.add_child(HJUI.chip("Loops", str(Meta.loops), "muted", "loop"))
 	v.add_child(chips)
 
 	if active:
@@ -45,10 +51,11 @@ func build() -> void:
 		begin.pressed.connect(func(): Game.start_run())
 		v.add_child(begin)
 
-	# Settings have to be reachable from a cold start. The Hearth is a Mind Palace
-	# room you buy for 40 Resolve, and app-level concerns — updates, reminders,
-	# the theme — cannot sit behind an in-game purchase: a player who has not
-	# bought a room still has to be able to update the app they are running.
+	# Two different things, and the build used to conflate them. The Menu is the
+	# fourth wall — settings, and later graphics, sound and controls. The Mind
+	# Palace is diegetic: it is somewhere inside the character's head, and every
+	# room in it is bought. App-level concerns cannot sit behind an in-game
+	# purchase, which is why Settings is in the Menu and not in the Hearth.
 	var menu := HJUI.button("Menu", "ghost")
 	menu.custom_minimum_size.y = 74
 	menu.pressed.connect(func(): Game.goto("menu"))

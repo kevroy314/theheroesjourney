@@ -414,6 +414,51 @@ static func run_header(title: String, subtitle: String) -> HJRunHeader:
 	return HJRunHeader.new(title, subtitle)
 
 
+## The route out of wherever you are, as icons.
+##
+## This exists because of a real dead end: once the first anomaly closed, the
+## walk screen offered "Map" and a movement pad and nothing else. No Menu, no
+## Mind Palace, no bag. The player was standing in a world with no way to reach
+## two thirds of the game.
+##
+## A screen with no way off it is a bug every time, so the fix is a shared strip
+## rather than another button on one screen. `omit` drops the destination you
+## are already looking at — an icon that navigates to here is a lie.
+static func nav_bar(omit: String = "") -> Control:
+	const DESTS := [
+		["worldmap", "threshold", "Map"],
+		["inventory", "cache", "Bag"],
+		["palace", "mind", "Palace"],
+		["menu", "loop", "Menu"],
+	]
+	var row := hbox(8)
+	row.alignment = BoxContainer.ALIGNMENT_END
+	for d in DESTS:
+		var dest := String(d[0])
+		if dest == omit:
+			continue
+		# The bag is a run inventory; outside a run it has nothing to show.
+		if dest == "inventory" and not Game.has_active_run():
+			continue
+		var b := button("", "quiet")
+		b.custom_minimum_size = Vector2(64, 62)
+		b.tooltip_text = String(d[2])
+		b.add_child(_centred_icon(String(d[1])))
+		b.pressed.connect(func() -> void: Game.goto(dest))
+		row.add_child(b)
+	return row
+
+
+## An icon centred inside a Button, which lays out no children of its own.
+static func _centred_icon(id: String) -> Control:
+	var wrap := CenterContainer.new()
+	wrap.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if has_icon(id):
+		wrap.add_child(icon(id, 32, "text"))
+	return wrap
+
+
 ## A panel that reports taps — Button cannot hold a multi-line themed layout.
 ##
 ## Two things it has to get right, both of which it once got wrong:

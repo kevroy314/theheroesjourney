@@ -519,6 +519,8 @@
         "adjacency"
       ],
       "optional": [
+        "reveal_after",
+        "revealed_by_default",
         "starter"
       ],
       "enum": {
