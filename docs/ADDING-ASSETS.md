@@ -112,7 +112,7 @@ and 3x, because 1:1 is where a sprite is actually judged.
 still a well at 1:1 on a phone.
 
 The verify block prints the art-direction checks as numbers. Every threshold is
-calibrated against the 70 props already in the game, so "fails a check" means
+calibrated against the 233 props already in the game, so "fails a check" means
 "unlike anything else in this world", not "unlike my taste":
 
 ```
