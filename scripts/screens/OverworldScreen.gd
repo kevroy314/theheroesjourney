@@ -376,30 +376,23 @@ func _swap_act(replacement: Button) -> void:
 ## Entering is not automatic. The anomaly resets the deadline and prices the
 ## walk out, so walking over one by accident on the way somewhere else would be
 ## a decision made for the player.
+## Walking onto a hole in reality.
+##
+## It takes you. There is no button, because a hole in the world does not ask —
+## and a confirm dialog in front of the most dramatic thing in the game is the
+## surest way to make it feel like a menu. The player finds it by walking, which
+## is the decision; stepping in is the consequence, not a second decision.
+##
+## Deferred rather than immediate: this fires from inside HJTileWorld's movement
+## resolution during _process, and swapping the screen out from under the node
+## that is mid-step is the same class of problem as redirecting during build().
 func _on_anomaly(cell: Vector2i) -> void:
 	var spawn := HJWorld.shared().anomaly_at(cell)
 	if spawn.is_empty():
 		return
 	var run: HJRun = Game.run
-	if run != null and run.anomalies_cleared.has(Game._cell_key(cell)):
+	if run == null or run.anomalies_cleared.has(Game._cell_key(cell)):
 		return
-	var tier := int(spawn.get("tier", 0))
-	_set_anomaly_act(tier, cell)
+	Game.enter_anomaly.call_deferred(cell)
 
 
-func _set_anomaly_act(tier: int, cell: Vector2i) -> void:
-	if _act == null or not is_instance_valid(_act):
-		return
-	var names := ["a stall", "an eddy", "a seam", "a hollow", "a wound"]
-	var label := "Step into %s" % names[clampi(tier, 0, names.size() - 1)]
-	var replacement := HJUI.button(label, "primary")
-	replacement.custom_minimum_size.y = 84
-	replacement.size_flags_vertical = Control.SIZE_SHRINK_END
-	replacement.pressed.connect(func() -> void: Game.enter_anomaly(cell))
-	var parent := _act.get_parent()
-	var index := _act.get_index()
-	parent.remove_child(_act)
-	_act.queue_free()
-	_act = replacement
-	parent.add_child(_act)
-	parent.move_child(_act, index)

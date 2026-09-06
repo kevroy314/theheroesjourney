@@ -60,6 +60,15 @@ func note_moved(cell: Vector2i) -> void:
 		Dialogue.open("spite_doorstep")
 
 
+## Beat: the first task with a wait long enough to notice.
+##
+## The timers are a choice, and a player logging their real day at eleven at
+## night should be told so once — in front of the bar that is making them wait,
+## which is the only moment the offer means anything.
+func note_task_gate(seconds: int) -> void:
+	HJPrefs.hint_timers(seconds)
+
+
 ## Beat 2. The first anomaly does not let you walk back out.
 ##
 ## Every later one does — leaving early is a priced choice, not a failure, and

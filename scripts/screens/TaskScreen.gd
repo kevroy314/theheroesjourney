@@ -256,6 +256,12 @@ func _build_active(node: Dictionary) -> void:
 	# The plausibility gate. Absent entirely when the player has turned timers
 	# off — an empty progress bar that is always full is worse than no bar, and
 	# the screen should look like what it is doing.
+	#
+	# Cleared first: these outlive a rebuild, and a rebuild that draws no gate
+	# would otherwise leave _update_gate writing into the previous build's
+	# widgets on their way to being freed.
+	_timer_label = null
+	_timer_bar = null
 	var wait := _required_seconds()
 	if wait > 0:
 		var gate := HJUI.panel("panel")
@@ -296,7 +302,7 @@ func _build_active(node: Dictionary) -> void:
 	# Once in the lifetime of a save, and only in front of a wait long enough to
 	# be worth complaining about: the timers are a choice. Tapping the toast
 	# lands in Settings with that row lit up, and Back comes straight back here.
-	HJPrefs.hint_timers(wait)
+	Game.tutorial.note_task_gate(wait)
 
 
 func _headline(units: int, unit_name: String) -> String:

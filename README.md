@@ -15,7 +15,9 @@ anomalies, palettes, vocabulary, every tunable number — lives in JSON under
 ```bash
 npm run bump patch  # version: package.json is the source of truth
 ./build_android.sh  # signed APK + AAB, published for over-the-air update
+npm run check       # validate data/ — no engine needed, seconds
 npm test            # headless end-to-end check
+npm run verify      # both, in that order
 ```
 
 **The web export is a development tool, not a target.** It is how a UI change is
@@ -54,6 +56,9 @@ none of it done.
 | [`docs/DATA.md`](docs/DATA.md) | every JSON schema, and how to add content |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | build, caching, PWA, hosting |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | the visual language: two registers, the persistence rule, marks |
+| [`docs/MAP-EDITING.md`](docs/MAP-EDITING.md) | the world in Tiled: the round trip, what survives a regeneration |
+| [`docs/AESTHETIC-EDA.md`](docs/AESTHETIC-EDA.md) | what this genre actually puts on screen, and what we are missing |
+| [`docs/FIRST-THIRTY.md`](docs/FIRST-THIRTY.md) | the tutorial beat sheet, beat by beat |
 | [`docs/TESTING-ON-DEVICE.md`](docs/TESTING-ON-DEVICE.md) | the Android emulator from WSL: `emu:*`, state over adb, what it cannot tell you |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | the loop, branch/PR practice, conventions |
 | [`.claude/skills/`](.claude/skills) | agent skills: the traps already hit, written up so nobody hits them twice |
@@ -78,27 +83,49 @@ A failed run still pays, which is what makes failure survivable.
 Deadlines are firm. Miss one and the loop resets — which is not a game-over
 screen, it is the plot.
 
-## The Waking Room
+## Anomalies are memories
 
-Build order was: this area, end to end, before anything else. The escalation
-is the level design.
+An anomaly is a memory of a life adjacent to yours. Stepping into one means
+playing the role of the version of yourself who acted. **Some memories are
+false**, and the area says which it claims to be — `truth` is `true`, `false` or
+`unclear`, rendered above the intro. Nothing checks the claim.
+
+The **first** one, The Asking, is not a task chain at all. It is the memory
+asking who you are:
 
 ```
-Open your eyes  (free)
+Your name        → [text entry]
+Your strength    I'm  [weak of muscle] [strong of muscle] [unsure of my strength]
+What you eat     I'm  [overnourished]  [undernourished]   [a sweet tooth]
+Your sleep       I'm  [rested]         [running on empty] [awake at the wrong hours]
+Other people     I    [reach out]      [wait to be asked] [have let it go quiet]
       ↓
-The First Rep   1 rep of any Move movement you have
+one action, chosen by the answers — and always a do-this, never a stop-doing-that
       ↓
-A Set           same movement, set size from its data
+The Way Back
+```
+
+Each of those is a `choice` node: no timer, no exertion, no honesty gate,
+because there is nothing to make plausible about a sentence you finished about
+yourself. Answers land as run tags *and* in `Meta.self_description`, so the rest
+of the area can read them immediately through `has_tag` and the game still knows
+next loop. Every answer pays the same Grit — paying differently would price
+honesty.
+
+After it, the escalation *is* the level design. The House is the shape:
+
+```
+The Kitchen   (free)
       ↓
-Again           second set
+First, Water        one glass
+      ↓
+Something Real      one food task
       ↓
    ┌──────────────┴──────────────┐
-Something New              One More
-1 rep, different           third set
-+10 Grit, "varied"         +30 Grit, better loot
+One More Glass             Make It Properly
    └──────────────┬──────────────┘
       ↓
-The Door        area cleared, streak ticks
+The Front Door      area cleared, streak ticks
 ```
 
 Side nodes (Echo, cache, mirror, a glass of water) roll in from slot tables, so
@@ -112,9 +139,16 @@ produces either surveillance or theatre. So:
 1. **Commit** — tapping a node starts it and shows the movement, its cue and its
    easier variants.
 2. **Do it.**
-3. **Confirm** — press and hold. The hold stays disabled until
-   `units × seconds_per_unit` has plausibly elapsed. A five-minute walk really
-   does gate for five minutes.
+3. **Confirm** — a deliberate act that says *yes, I did that*. It stays disabled
+   until `units × seconds_per_unit` has plausibly elapsed, so a five-minute walk
+   really does gate for five minutes.
+
+The confirm verb matches the movement: **hold** for the soft and social axes,
+**tap fast** for the brisk ones, declared as `confirm` on the movement or its
+axis and resolved by `HJGestures`. A plank and a burpee are the same axis and
+not the same feeling, which is why the per-movement override exists. It is a
+skin on the confirm and never a second way to finish a task, and an
+accessibility setting forces hold everywhere.
 
 Alongside it, always: **"I couldn't do this one."** It logs partial Grit and
 never scolds. Scaling down is a normal choice, and `Scaling Chalk` makes it free.
@@ -127,7 +161,12 @@ data/rulesets/*.json    run-wide modifiers and event hooks
 data/movements/*.json   the movement library, grouped into purchasable packs
 data/areas/*.json       the eight authored node graphs, plus slot tables
 data/echoes/*.json      the story, in fragments
-data/content/           config, anomalies, items, trinkets, loot, spite, the Wheel
+data/dialogue/*.json    speakers, and the conversations they have
+data/objectives/*.json  what you are trying to do, and how it is measured
+data/content/           config, anomalies, items, trinkets, loot, spite, the Wheel,
+                        rooms, upgrades, buffs, interactables, critters
+data/world/*.json       the overworld: packed tile planes, where the interactables
+                        stand, and where the house is
 ```
 
 ### Adding a movement
@@ -158,9 +197,18 @@ ops: `set · add · mul · min · max`, applied in that order.
 conditions: `tier_gte · tier_lte · zone_gte · phase · region · kind · axis ·
 has_relic · hp_below · has_tag · lacks_tag`.
 
-The same schema drives traits, rulesets, trinkets and Wheel rewards. Hooks
-(`on_run_start`, `on_task_complete`, `on_area_enter`, `on_area_clear`) fire
-effects: `grit`, `item`, `deadline`, `log`.
+The same schema drives traits, rulesets, trinkets, buffs and Wheel rewards.
+Hooks (`on_run_start`, `on_task_complete`, `on_area_enter`, `on_area_clear`)
+fire effects: `grit`, `item`, `deadline`, `log`, `buff`, `tag` — and
+`Game.apply_effects` is the only thing that implements any of them, so an
+interactable, a trinket, a dialogue line and a dog all make things happen the
+same way.
+
+**Buffs** are that discipline applied to time: a set of ordinary modifiers with
+a wall-clock expiry and an icon, handed to `Rules` as a source. Not a second way
+to change a number. Expiry is persisted and settled against the clock at load,
+because four hours away from a three-hour coffee has to leave exactly one hour
+of crash whether or not Android let the process live.
 
 `Rules.explain("run.grit_mult", ctx)` prints a key's base value and every source
 that moved it.
@@ -169,11 +217,14 @@ that moved it.
 
 `task` (the core) · `free` · `threshold` (the way out) · `echo` (story) ·
 `cache` (Grit) · `mirror` (foreshadowing) · `trinket` (a charm offer) ·
-`spite` (the companion) · `warden` (the Summit).
+`spite` (the companion) · `warden` (the Summit) · `choice` (a question, not a
+demand).
 
 A node's `next` lists what it opens; `exclusive_next` makes a fork close its
-siblings. `$choose:axis`, `$other:axis`, `$same` and `$set` are how one authored
-graph works across every movement in the library.
+siblings and `select_next` makes the *memory* choose instead of the player, by
+taking the first branch whose `when` passes. `$choose:axis`, `$other:axis`,
+`$same` and `$set` are how one authored graph works across every movement in the
+library.
 
 ## Story
 
@@ -192,11 +243,63 @@ The first Summit is a scripted loss. The way out opens when the Wheel is
 balanced — every spoke off the mark — which is the whole thesis of the app
 expressed as a boss gate.
 
-## The Mind Palace
+Spite **talks**. Conversations are graphs in `data/dialogue/`: a few lines, then
+either a way on or a set of replies, with the replies gated by the same `when`
+dictionary a modifier carries. There is one condition language in this repo, so
+`zone_gte` means the same thing on a trinket and in a sentence someone says to
+you. Spite is also who hands over the first **objective** — objectives are given
+rather than earned, their progress outlives the loop, and the Hearth is where
+you read them.
 
-Home base and main menu. The only thing you carry between loops is yourself, so
-home is a place inside your own head — and building it out is a small placement
-puzzle rather than a settings list.
+## The world, and what you have seen of it
+
+The overworld is 256×256 cells of packed tile planes, walked one real step at a
+time, generated by `tools/make_world.py` and editable in Tiled — see
+[`docs/MAP-EDITING.md`](docs/MAP-EDITING.md). Standing next to something and
+acting on it is the **interactables** system: a catalogue of verbs and prices in
+`data/content/`, and placements in the world file. The front door is the case
+that shows the shape — it is an unwalkable cell until the Grit is paid, so every
+path query respects it without a special case in the movement code. Grit buying
+the world is the lesson; making it a wall rather than a button is what teaches
+it.
+
+The map hides what you have not walked, in **three** states rather than two:
+
+| | shown as |
+|---|---|
+| never seen | hidden |
+| seen on a previous loop | faded, showing what was there *then* |
+| seen this run | full, overwriting that memory block by block |
+
+The third state is the one that matters, because anomalies move between loops. A
+map that showed *this* run's anomalies through the fog would contradict the
+memory it exists to show.
+
+Discovery is stored as 4×4-cell blocks inside 64×64-cell chunks, sparse, keyed
+by absolute coordinates — so growing or regenerating the world at a different
+size invalidates nothing, and only chunks the player has actually entered exist
+at all. Fully explored, an 800×800 world is under 10 KB stored; the obvious
+per-cell bitset would have been 80 KB, rewritten every few steps as the player
+walks. 4×4 is also the visually *correct* resolution: fog with a per-tile edge
+reads as a rendering bug, not as fog. The sizes are tabulated in
+`scripts/autoload/Discovery.gd`.
+
+## The Mind Palace, and the Menu
+
+They are not the same kind of thing, and conflating them is what made the menu
+incoherent:
+
+| | **The Menu** | **The Mind Palace** |
+|---|---|---|
+| what it is | the fourth wall | diegetic — it is *in* the fiction |
+| holds | settings: updates, notifications, pause, wiping the save | the rooms |
+| progression | none. Settings are settings | every room is bought with Resolve |
+
+The only thing you carry between loops is yourself, so home is a place inside
+your own head — and building it out is a small placement puzzle rather than a
+settings list. `HJUI.nav_bar()` is the shared strip that reaches the Map, the
+Bag, the Palace and the Menu from every screen, because a screen with no way off
+it is a bug every time.
 
 Rooms are bought with Resolve and placed on a grid that starts at 3x3 (widenable
 to 5x5). Two rooms that pay a bonus for touching cannot all touch at once, which
@@ -205,18 +308,24 @@ is the whole game of it:
 | Room | What it is | Pays when next to |
 |---|---|---|
 | **The Atrium** | You. Free, placed from the start, and it does not move. | Hearth, Study |
-| **The Gym** | Movement wiki, unlock list and pack shop, tiered by ring | Identity, Hearth |
-| **The Identity** | The Wheel | Gym, Observatory |
-| **The Study** | The Codex | Atrium, Observatory |
+| **The Hearth** | What you are trying to do: the objectives | Atrium, Gym |
 | **The Stores** | Items: what you hold and what you could buy | Workshop, Gym |
+| **The Gym** | Movement wiki, unlock list and pack shop, tiered by ring | Identity, Hearth |
+| **The Study** | The Codex | Atrium, Observatory |
+| **The Identity** | The Wheel | Gym, Observatory |
 | **The Workshop** | Permanent traits | Stores, Identity |
-| **The Hearth** | Theme, ruleset, and pause mode | Atrium, Gym |
 | **The Observatory** | The run log and every lifetime stat | Identity, Study |
 
-Adjacency bonuses are ordinary rule-engine modifiers declared in
-`data/content/rooms.json`, so a new room is a data change. They can be
-axis-conditioned — Gym next to Identity gives +12% Grit **on Move tasks only**,
-via `"when": { "axis": "move" }`.
+That is also the order they are **revealed** in. A room past the next rung of
+the ladder renders as a redacted bar rather than a price the player has no way
+to pay yet — it says there is more without saying what. The ladder is
+`reveal_after` in `data/content/rooms.json`, so resequencing it is a content
+edit.
+
+Adjacency bonuses are ordinary rule-engine modifiers declared in the same file,
+so a new room is a data change. They can be axis-conditioned — Gym next to
+Identity gives +12% Grit **on Move tasks only**, via
+`"when": { "axis": "move" }`.
 
 The Gym is the movement shop, and packs open in tiers: each declares a
 `min_ring`, so a pack opens once you have walked that far out from town. Resolve
@@ -291,26 +400,52 @@ Decided once, not relitigated:
 
 ```
 Main.tscn / scripts/Main.gd     app shell: screen swapping, toasts, 1s tick
-scripts/autoload/
-  Events.gd    signal bus
-  Content.gd   loads everything under data/
-  Rules.gd     the modifier pipeline + condition evaluator
-  Meta.gd      persistent save: Resolve, unlocks, inventory, streak, Codex, Wheel
-  Palette.gd   active theme
-  Notify.gd    deadline reminders
-  Game.gd      run orchestrator; the only thing that mutates player state
+scripts/autoload/               registered in project.godot, in this order
+  Events.gd      signal bus
+  Debug.gd       knobs, cheats, state report (early: HJUI reads knobs)
+  Content.gd     loads everything under data/
+  Rules.gd       the modifier pipeline + condition evaluator
+  Buffs.gd       modifier bundles with a wall-clock expiry, resolved as a source
+  Meta.gd        persistent save: Resolve, unlocks, inventory, streak, Codex, Wheel
+  Palette.gd     active theme
+  Notify.gd      deadline reminders
+  Game.gd        run orchestrator; the only thing that mutates player state
+  Steps.gd       real steps in, in-game steps out; two platform backends
+  History.gd     every run you have ever walked, kept
+  Objectives.gd  what you are trying to do, and how far along it is
+  Discovery.gd   fog of war: what you have seen, and what you saw there
+  Dialogue.gd    conversation graphs, and the state machine that walks one
+  Critters.gd    (lives under scripts/game/) the animals' state machines
+  Updater.gd     over-the-air APK updates
 scripts/game/   what Game delegates to, so Game stays readable
-  Outcomes.gd  what a resolved node yields: loot, echoes, Spite, boons, the Warden
-  Items.gd     the verbs items perform
-  RunStore.gd  reading and writing the in-flight run
+  Outcomes.gd      what a resolved node yields: loot, echoes, Spite, boons, the Warden
+  Items.gd         the verbs items perform
+  RunStore.gd      reading and writing the in-flight run
+  Interactables.gd the catalogue of things you can act on, and their placements
+  Survey.gd        what happens when a `choice` node is answered
+  Tutorial.gd      the first-run beats, and nothing else
+  Gestures.gd      how a task is confirmed; one script each under gestures/
+  MapFog.gd        discovery turned into something the map can draw over itself
+  CritterSim.gd    a headless proof that the animal vocabulary is enough
 scripts/model/  Clock, Run, AreaGen   (pure logic, no UI)
 scripts/screens/  one script per screen, built in code so themes can restyle them
-scripts/ui/     UI builders, Screen base, RunHeader, AreaGraph, Wheel
+scripts/ui/     UI builders, Screen base, RunHeader, AreaGraph, Wheel, World,
+                TileWorld, and Lighting + LightOverlay (the atmosphere pass)
 ```
+
+Four of those autoloads keep **their own file under `user://`** rather than a
+field in the save blob — History, Objectives, Discovery and Dialogue.
+`Meta.save_game()` runs on nearly every meaningful action and rewrites the whole
+blob each time; these change a handful of times per run, and fog changes every
+few steps. Each carries a `use_path()` override so the self-test does not write
+into the player's own files, which is a lesson every one of them learned
+separately.
 
 `scripts/game/` reaches back through a reference to Game passed in at
 construction rather than the `Game` global, so each file declares what it needs
-in its constructor instead of hiding it in the body.
+in its constructor instead of hiding it in the body. `Critters.gd` is the
+exception that is an autoload anyway: nothing that owns it steps it, and both
+the renderer and the interactables read it.
 
 Two things worth knowing before changing anything:
 
@@ -348,14 +483,30 @@ hours are enforced server-side. See [`docs/DEPLOY.md`](docs/DEPLOY.md#push-notif
 - **Guilds** — trans-dimensional status sharing with others in their own loops.
   Status only, never items or help. `Meta.guild_id` is the reserved seam.
 - Rep counting from device motion, Health Connect / HealthKit import.
-- Art: the language is not locked yet — see issues #1–#3.
+- Art: the rendering language is not locked yet, and there is no portrait for
+  anyone who speaks — see issues #1 and #3. `Dialogue.portrait_path()` is the
+  seam waiting for it.
 
 ## Testing
 
-`./test.sh` plays six full journeys headlessly through the real systems and the
-real screens, then checks the things that are easy to break and hard to notice:
+`./test.sh` plays full journeys headlessly through the real systems and the real
+screens, then checks the things that are easy to break and hard to notice:
 persistence round-trips, firm deadlines closing the loop, pause freezing the
 clock, streak arithmetic across day boundaries, the Wheel's balance gate, the
-Warden's scripted first loss and the true ending, and the rule engine.
+Warden's scripted first loss and the true ending, the rule engine, and every
+tutorial beat from the Boon of the White Room to Spite's objective.
 
-It snapshots and restores your save, so it is safe to run against a real one.
+**An engine error fails the run even when every assertion passes.** The grep
+started as the three parse and compile shapes and missed an entire class:
+`Lambda capture … was freed` is a *runtime* error, and it had been firing twice
+a run, unnoticed, for a long time. `ENGINE_ERRORS` in `test.sh` now also catches
+`USER ERROR`, `Attempt to call`, `Invalid access`, `nonexistent` and failed
+`Condition "` assertions. Widen it there if you find another.
+
+It snapshots and restores your save, so it is safe to run against a real one —
+and it takes a lockfile, because two harnesses sharing one backup path is how a
+save once came back with a Warden already met and a full Codex.
+
+`python3 tools/validate_data.py` is the other half and needs no engine: it reads
+the files on disk, so a bad content edit fails in seconds instead of after the
+self-test has downloaded Godot. `npm run verify` is both, in order.

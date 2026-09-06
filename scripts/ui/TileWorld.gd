@@ -84,6 +84,16 @@ var _anomaly_lights: Array[Vector4] = []      ## x, y, radius in tiles, unused
 ## key -> { cell: Vector2i, radius: float, colour: Color, flicker: float }.
 var _dynamic: Dictionary = {}
 
+## The frame's motion terms, sampled once in _draw and read by the passes below.
+##
+## Members rather than arguments because _draw_cell is called once per visible
+## cell and threading two more floats through it — and through the overlay
+## planner it delegates to — would cost more to read than the motion does to
+## draw. `_mgain` is the `motion` debug knob: at 0 every path below takes the
+## branch it took before this existed.
+var _mnow := 0.0
+var _mgain := 0.0
+
 
 func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
 	run = run_ref
@@ -123,6 +133,11 @@ func _ready() -> void:
 	_props = load("res://assets/tiles/props.png")
 	_cliffs = load("res://assets/tiles/cliffs.png")
 	_player = load("res://assets/sprites/player.png")
+	# Once per launch, beside the texture loads for the same reason the light
+	# index is: measuring the props atlas is a fact about the art, not about
+	# this frame, and it must not happen on the first frame the player sees.
+	HJMotion.load_manifest()
+	HJMotion.index_atlas(_props)
 	if HJLighting.enabled:
 		var overlay := HJLightOverlay.new()
 		if overlay.has_shader():
@@ -198,6 +213,8 @@ func _draw() -> void:
 	if world == null or not world.loaded or _tiles == null:
 		return
 	var scale := float(TILE * ZOOM)
+	_mnow = float(Time.get_ticks_msec()) * 0.001
+	_mgain = HJMotion.gain()
 
 	# Camera: the character sits in the middle of the view, except near the edges
 	# of the map, where the view stops rather than showing void.
@@ -257,6 +274,12 @@ func _draw_cell(x: int, y: int, dst: Rect2) -> void:
 	else:
 		draw_texture_rect_region(_variants, dst,
 			Rect2(mine * TILE, (variant - 1) * TILE, TILE, TILE))
+
+	# Water, before the overlays rather than after, so the shore still laps over
+	# the sea: a glint sitting on top of the sand that bleeds into this cell
+	# would be a highlight on a beach.
+	if _mgain > 0.0 and HJMotion.shimmers(mine):
+		_draw_shimmer(x, y, dst)
 
 	if _overlays == null:
 		return
@@ -375,6 +398,10 @@ const PROP_W := 64
 const PROP_H := 96
 const PROP_COLS := 8
 
+## An animal's frame. Square and one cell wide, unlike the player, who is a tile
+## and a half tall because he stands up.
+const CRITTER := 32
+
 ## Props and the character, drawn together in one Y-sorted pass.
 ##
 ## A prop is 64x96 standing on a 32x32 cell, so it reaches up and out of the
@@ -398,12 +425,24 @@ func collapse_anomaly(cell: Vector2i) -> void:
 func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 	if _props == null:
 		return
+	# Asked once per frame, not once per row: views() rebuilds its list and
+	# home_cells() its dictionary on every call, and there are only ever two
+	# animals in them.
+	var critters := Critters.views()
+	var homes := Critters.home_cells()
 	var here := _cell.y
 	var drawn_character := false
 	for y in range(maxi(0, first.y - 1), mini(world.h, last.y + 3)):
 		if not drawn_character and y > here:
 			_draw_character(cam)
 			drawn_character = true
+		# On the row *above*, for the same reason the character is: an actor
+		# standing on row R must be in front of everything on row R and behind
+		# everything on row R+1, so it is drawn as the loop leaves its row.
+		for v in critters:
+			var view: Dictionary = v
+			if int((view["cell"] as Vector2i).y) + 1 == y:
+				_draw_critter(view, cam)
 		for x in range(maxi(0, first.x - 1), mini(world.w, last.x + 2)):
 			# Drawn from inside the Y-sorted row loop rather than as a child node,
 			# which is the whole reason this is a sprite strip and not a shader: a
@@ -418,18 +457,71 @@ func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 			var plane := world.prop_at(x, y)
 			if plane == 0:
 				continue
+			# The prop plane still carries a painted dog and a painted cat on
+			# the cells they were placed on, from before either could walk. The
+			# live animal is drawn above; without this the dog leaves a copy of
+			# himself on the rug the moment he gets up.
+			if homes.has(Vector2i(x, y)):
+				continue
 			var slot := plane - 1
 			# Anchored bottom-centre of the cell: the art grows upward from the
 			# ground the prop is standing on, which is what makes it sit in the
 			# world rather than float on the grid.
 			var origin := Vector2(x * TILE + TILE / 2 - PROP_W / 2,
 				y * TILE + TILE - PROP_H)
-			draw_texture_rect_region(_props,
-				Rect2(origin * float(ZOOM) - cam, Vector2(PROP_W, PROP_H) * float(ZOOM)),
-				Rect2((slot % PROP_COLS) * PROP_W, (slot / PROP_COLS) * PROP_H,
-					PROP_W, PROP_H))
+			var at := origin * float(ZOOM) - cam
+			# A prop that declares no motion, or motion switched off, takes the
+			# single untransformed blit it always took. This is the whole of the
+			# "degrade" clause: there is no branch inside the common path, only
+			# a branch around the uncommon one.
+			var spec: Dictionary = HJMotion.for_plane(plane) if _mgain > 0.0 else {}
+			if spec.is_empty():
+				draw_texture_rect_region(_props,
+					Rect2(at, Vector2(PROP_W, PROP_H) * float(ZOOM)),
+					Rect2((slot % PROP_COLS) * PROP_W, (slot / PROP_COLS) * PROP_H,
+						PROP_W, PROP_H))
+			else:
+				_draw_prop_moving(slot, at, spec, Vector2i(x, y))
 	if not drawn_character:
 		_draw_character(cam)
+
+
+## Sheets are loaded on first sight rather than in _ready: which animals exist
+## is a fact about data/content/critters.json, and the renderer should not have
+## to know the list to draw them.
+var _critter_sheets: Dictionary = {}      ## sprite name -> Texture2D or null
+
+
+func _critter_sheet(sprite: String) -> Texture2D:
+	if _critter_sheets.has(sprite):
+		return _critter_sheets[sprite]
+	var path := Critters.sheet_path(sprite)
+	var tex: Texture2D = load(path) if ResourceLoader.exists(path) else null
+	if tex == null:
+		push_warning("HJTileWorld: no sheet at %s; that animal will not be drawn" % path)
+	_critter_sheets[sprite] = tex
+	return tex
+
+
+## One animal. 32x32 on a 32x32 cell, sheet laid out like the player's — rows
+## down/up/left/right, column 0 neutral — so this is the character's blit with
+## the frame size and the cycle handed in rather than worked out.
+##
+## Deliberately not swayed. HJMotion is a contract a *prop kind* declares, and
+## the animals are not props any more; a dog that leant in the wind would be a
+## dog with a bug.
+func _draw_critter(view: Dictionary, cam: Vector2) -> void:
+	var tex := _critter_sheet(String(view["sprite"]))
+	if tex == null:
+		return
+	var at := Vector2(view["from"] as Vector2i).lerp(
+		Vector2(view["cell"] as Vector2i), float(view["t"]))
+	var origin := (at * float(TILE) + Vector2(0.0, float(TILE - CRITTER))) \
+		* float(ZOOM) - cam
+	draw_texture_rect_region(tex,
+		Rect2(origin, Vector2(CRITTER, CRITTER) * float(ZOOM)),
+		Rect2(int(view["col"]) * CRITTER, int(view["row"]) * CRITTER,
+			CRITTER, CRITTER))
 
 
 func _draw_character(cam: Vector2) -> void:
@@ -452,6 +544,86 @@ func _draw_character(cam: Vector2) -> void:
 		Vector2(FRAME_W, FRAME_H) * float(ZOOM))
 	draw_texture_rect_region(_player, dst,
 		Rect2(col * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H))
+
+
+## --- motion ---------------------------------------------------------------------
+
+## The bend profile: how far along the lean a point is, given how far up the
+## sprite it is. Zero at the base, one at the tip.
+##
+## Quadratic, because that is what a stalk does — it is stiff where it meets the
+## ground and it is the last few pixels that whip. Linear (a plain shear) drags
+## a tree's trunk sideways with its canopy, which reads as the whole tree
+## sliding rather than the wind blowing through it.
+static func _profile(u: float) -> float:
+	return u * u
+
+
+## A prop that moves, drawn as a stack of sheared bands.
+##
+## Each band is one `draw_texture_rect_region` under its own affine transform,
+## which maps
+##
+##     x' = x + m*y + c          the lean, a straight line through the band
+##     y' = y*sy + base*(1 - sy) the breath, a stretch anchored at the base
+##
+## Adjacent bands share a source row, and both maps depend on that row alone, so
+## the shared edge lands on identical coordinates from either side: no seam to
+## hide and nothing to fudge. The transform must be cleared afterwards — it is
+## renderer state, and the character is drawn from inside the same loop.
+func _draw_prop_moving(slot: int, at: Vector2, spec: Dictionary, cell: Vector2i) -> void:
+	var z := float(ZOOM)
+	var top: int = int(spec["top"])
+	var base: int = int(spec["base"])
+	var span := float(maxi(base - top, 1))
+	var lean := HJMotion.sway(cell, spec, _mnow, _mgain)
+	# The breath is authored as pixels the tip travels, the same unit as the
+	# lean, so one number in the manifest means one thing. Turning it into a
+	# scale is the renderer's job because only the renderer knows how tall the
+	# sprite turned out to be.
+	var sy := 1.0 + HJMotion.breathe(cell, spec, _mnow, _mgain) / span
+	var base_y := at.y + float(base) * z
+	var col := float((slot % PROP_COLS) * PROP_W)
+	var row_px := float((slot / PROP_COLS) * PROP_H)
+
+	var bands: int = int(spec["bands"])
+	var lower := base
+	for i in range(bands):
+		var upper := base - int(round(span * float(i + 1) / float(bands)))
+		upper = maxi(upper, top)
+		if upper >= lower:
+			continue                # a sprite shorter than the band count
+		var y_low := at.y + float(lower) * z
+		var y_high := at.y + float(upper) * z
+		var off_low := lean * _profile(float(base - lower) / span)
+		var off_high := lean * _profile(float(base - upper) / span)
+		var m := (off_high - off_low) / (y_high - y_low)
+		draw_set_transform_matrix(Transform2D(Vector2(1.0, 0.0), Vector2(m, sy),
+			Vector2(off_low - m * y_low, base_y * (1.0 - sy))))
+		draw_texture_rect_region(_props,
+			Rect2(at.x, y_high, float(PROP_W) * z, y_low - y_high),
+			Rect2(col, row_px + float(upper), float(PROP_W), float(lower - upper)))
+		lower = upper
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+
+## Crests on one cell of water.
+##
+## Water is 22.9% of the overworld, so this is the largest single surface in the
+## game and the one whose stillness the eye reads first. Drawn as flat dashes
+## rather than as a shader pass: at 96 screen pixels per tile a viewport holds
+## about seventy cells of sea, so the worst case is ~140 rectangles — cheaper
+## than the second texture and the per-frame mask upload a masked full-screen
+## shader would need, and correctly ordered underneath the props and the
+## character for free, which a child CanvasItem is not.
+func _draw_shimmer(x: int, y: int, dst: Rect2) -> void:
+	var z := float(ZOOM)
+	for i in range(HJMotion.GLINTS):
+		var g := HJMotion.glint(x, y, i, _mnow, TILE)
+		if g.w <= 0.0:
+			continue
+		draw_rect(Rect2(dst.position + Vector2(g.x, g.y) * z, Vector2(g.z, 1.0) * z),
+			Color(HJMotion.GLINT_COLOUR, g.w * _mgain))
 
 
 ## --- light ---------------------------------------------------------------------

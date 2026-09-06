@@ -32,8 +32,11 @@ extends Node
 ##     see resolve_on_return().
 ##
 ## Steps are the player's currency and the player's alone. A critter's movement
-## is on a wall-clock pace expressed as a multiple of `critter.tick_seconds`,
-## so it costs nothing and does not stop when the step budget does.
+## is on a wall clock — `pace` is seconds per cell, and 0.17 is exactly the
+## player's own `walk.step_time` — so it costs nothing and does not stop when
+## the step budget does. `critter.tick_seconds` is only how often an animal
+## reconsiders, and is deliberately finer than any pace so that no animal's
+## speed is quantised to it.
 ##
 ## The renderer reads views() and draws what it says. It is not told about
 ## states, distances or paths — see the header on views().
@@ -74,6 +77,10 @@ const MAX_CATCHUP := 6
 
 ## Position changes constantly, so it is not written on every one of them.
 const SAVE_SECONDS := 3.0
+
+## Seconds per cell for a state that does not name a `pace`. Slower than the
+## player, so an animal that has not been thought about ambles.
+const DEFAULT_PACE := 0.30
 
 ## Overridable, so the simulation harness and the self-test do not write
 ## critters into the player's own file. Same reasoning as HJBuffs.path.
@@ -137,11 +144,15 @@ func _process(delta: float) -> void:
 
 func _on_screen_changed(screen_name: String) -> void:
 	if screen_name == "overworld":
+		# Before _ensure, not after: arriving on the overworld is the first
+		# moment a new run is visible here, and spawning yesterday's animals for
+		# one frame and then wiping them is a flicker nobody would ever find.
+		_check_run()
 		_ensure()
 		var run: HJRun = Game.run
 		if run != null and run.world_pos.x >= 0:
 			resolve_on_return(run.world_pos)
-	elif _dirty:
+	elif _dirty and Game.has_active_run():
 		save_state()
 
 
@@ -354,8 +365,7 @@ func clear_all() -> void:
 	_trail.clear()
 	_spawned = false
 	_dirty = false
-	if FileAccess.file_exists(path):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	_erase()
 	changed.emit()
 
 
@@ -377,7 +387,29 @@ func clear_all() -> void:
 #           the same rule.
 #
 # Nothing in here is a Godot type the renderer has to interpret, and nothing
-# about state, distance or pathing leaks through.
+# about state, distance or pathing leaks through. In HJTileWorld's row loop,
+# inside _draw_scenery, the whole integration is:
+#
+#     var critters := Critters.views()          # once per _draw, not per row
+#     var homes := Critters.home_cells()
+#     ...
+#     for y in ...:                              # the existing row loop
+#         for v in critters:
+#             if int(v["cell"].y) != y:
+#                 continue                       # sorted with the props and the player
+#             var at: Vector2 = Vector2(v["from"]).lerp(Vector2(v["cell"]), v["t"])
+#             var origin := (at * TILE + Vector2(0, TILE - 32)) * float(ZOOM) - cam
+#             draw_texture_rect_region(_sheets[v["sprite"]],
+#                 Rect2(origin, Vector2(32, 32) * float(ZOOM)),
+#                 Rect2(int(v["col"]) * 32, int(v["row"]) * 32, 32, 32))
+#
+# and, in the prop branch of the same loop, `if homes.has(Vector2i(x, y)):
+# continue` — the tileset still draws a static dog and a static cat on their
+# start cells, and without that skip the dog leaves a copy of himself behind.
+# The sheets load once in _ready from Critters.sheet_path(id).
+#
+# The per-row scan is two comparisons today. If the entity list ever grows past
+# a handful this wants bucketing by row here rather than a loop there.
 func views() -> Array:
 	_ensure()
 	var out: Array = []
@@ -505,13 +537,20 @@ func think(seconds: float) -> void:
 	for entry in _live:
 		var c: Dictionary = entry
 		c["held"] = float(c["held"]) + seconds
-		c["cool"] = maxf(0.0, float(c["cool"]) - seconds)
+		c["cool"] = float(c["cool"]) - seconds
 		_transition(c, "")
 		if float(c["cool"]) > 0.0:
 			continue
 		var st := _state_def(c)
-		var pace := maxf(0.05, float(st.get("pace", 1.0))) * tick_seconds()
-		c["cool"] = pace
+		var pace := maxf(0.03, float(st.get("pace", DEFAULT_PACE)))
+		# The remainder is carried, not discarded. Resetting the cooldown to a
+		# whole `pace` on every move quantises the animal's speed to the think
+		# tick: at a 0.17s pace on a 0.06s tick it actually moves every 0.18s,
+		# which is a follower that falls one cell further behind every seventeen
+		# steps, forever. That is precisely the drift a distance series is for
+		# and precisely what a ten-second look at the screen will not show.
+		# Bounded below at one pace so a long pause cannot buy a sprint.
+		c["cool"] = maxf(float(c["cool"]) + pace, -pace)
 		_move(c, st, pace)
 
 
@@ -654,8 +693,10 @@ func _move(c: Dictionary, st: Dictionary, span: float) -> void:
 
 	if step == Vector2i.ZERO:
 		# Facing still matters when standing: a cat that watches you is doing
-		# something, and a cat frozen facing a wall is a bug that looks like art.
-		if goal == "hold" or goal == "wander":
+		# something, and a cat frozen facing a wall is a bug that looks like art
+		# direction. Not for `wander` — a mooching animal keeps whichever way it
+		# last walked, which is what makes it look aimless rather than watchful.
+		if goal == "hold":
 			_face_toward(c, _target_cell(c, st, 0))
 		if goal == "approach" and before > keep:
 			_lose_ground(c, st)
@@ -954,6 +995,9 @@ func load_state() -> bool:
 	if int(doc.get("version", 0)) != VERSION:
 		return false
 	if int(doc.get("seed", 0)) != _run_seed_now():
+		# Yesterday's animals, from a loop that has closed. Deleted rather than
+		# left, so the store never accumulates a run nobody is playing.
+		_erase()
 		return false
 	_run_seed = _run_seed_now()
 	_seed_seen = _run_seed
@@ -978,6 +1022,11 @@ func load_state() -> bool:
 	_spawned = true
 	changed.emit()
 	return not _live.is_empty()
+
+
+func _erase() -> void:
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _run_seed_now() -> int:

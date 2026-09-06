@@ -1060,7 +1060,7 @@
       ]
     },
     "critter_states": {
-      "_comment": "One state. `goal` is what it does while it is here; `keep` is the distance it is trying to hold, read as a floor by `retreat` and a ceiling by `approach`; `trail` aims it at where the target was N moves ago rather than where it is, which is the lag that makes a follower read as a companion rather than as a mirror; `pace` is seconds per cell as a multiple of critter.tick_seconds, so 1.0 is exactly the player's walking speed; `recover` is how many move attempts may make no progress before the animal abandons the path and reappears at the edge of its band, which is what stops a follower wedged behind furniture from being lost for the run. No `id`: the state's name is its key in the map.",
+      "_comment": "One state. `goal` is what it does while it is here; `keep` is the distance it is trying to hold, read as a floor by `retreat` and a ceiling by `approach`; `trail` aims it at where the target was N moves ago rather than where it is, which is the lag that makes a follower read as a companion rather than as a mirror; `pace` is seconds per cell -- 0.17 is exactly walk.step_time, the player's own, and anything larger is an amble; `recover` is how many move attempts may make no progress before the animal abandons the path and reappears at the edge of its band, which is what stops a follower wedged behind furniture from being lost for the run. No `id`: the state's name is its key in the map.",
       "files": {
         "dir": "content",
         "paths": [

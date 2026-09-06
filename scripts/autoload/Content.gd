@@ -32,6 +32,8 @@ var palace: Dictionary = {}
 ## side-loader so the in-game validator sees them like everything else.
 var buffs: Array = []
 var interactables: Array = []
+## Animals with a behaviour. A `critter` key on an interactable names one.
+var critters: Array = []
 var config: Dictionary = {}
 ## Who talks, and what they say. See scripts/autoload/Dialogue.gd.
 var speakers: Dictionary = {}     ## id -> speaker
@@ -113,6 +115,8 @@ func load_all() -> void:
 			buffs.append_array(doc["buffs"])
 		if doc.has("interactables"):
 			interactables.append_array(doc["interactables"])
+		if doc.has("critters"):
+			critters.append_array(doc["critters"])
 		if doc.has("axes"):
 			achievements = doc
 		for t in doc.get("trinkets", []):
@@ -204,6 +208,10 @@ func buff(id: String) -> Dictionary:
 
 func interactable(id: String) -> Dictionary:
 	return _by_id(interactables, id)
+
+
+func critter(id: String) -> Dictionary:
+	return _by_id(critters, id)
 
 
 static func _by_id(pool: Array, id: String) -> Dictionary:

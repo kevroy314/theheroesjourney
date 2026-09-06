@@ -59,6 +59,12 @@ var runs_today: Dictionary = {}        ## day -> completed runs, for falloff
 var seen_first_reset: bool = false
 var seen_warden: bool = false
 var paused: bool = false               ## injury / illness / life. Freezes deadlines.
+## The plausibility wait, and how a task is confirmed. Both are the player's
+## own hand on the rules: somebody logging their real day at eleven at night
+## should not be made to sit through a three-minute bar per task, and somebody
+## who cannot tap quickly should not be locked out of half the movements.
+var timers_on: bool = true
+var hold_confirm: bool = false
 var pause_started: int = 0
 
 var selected_theme: String = ""
@@ -161,6 +167,12 @@ func active_modifiers() -> Array:
 		if claimed.has(node.get("id", "")):
 			out.append_array(node.get("modifiers", []))
 	out.append_array(palace_modifiers())
+	# The player's own hand on the plausibility wait. TaskScreen resolves the
+	# gate through task.time_gate_mult, so switching timers off is a modifier
+	# like any other rather than an `if` in the screen — which also means
+	# Rules.explain() attributes it, and a ruleset could bend the wait too.
+	if not timers_on:
+		out.append({"key": "task.time_gate_mult", "op": "mul", "value": 0})
 	return out
 
 
@@ -542,6 +554,7 @@ func save_game() -> void:
 		"loops": loops, "runs_today": runs_today,
 		"seen_first_reset": seen_first_reset, "seen_warden": seen_warden,
 		"paused": paused, "pause_started": pause_started,
+		"timers_on": timers_on, "hold_confirm": hold_confirm,
 		"selected_theme": selected_theme, "selected_ruleset": selected_ruleset,
 		"guild_id": guild_id, "stats": stats, "notify_prefs": notify_prefs,
 	}
@@ -604,6 +617,9 @@ func load_game() -> void:
 			seen_first_reset = bool(parsed.get("seen_first_reset", false))
 			seen_warden = bool(parsed.get("seen_warden", false))
 			paused = bool(parsed.get("paused", false))
+			# Note the asymmetric default: timers are on until turned off.
+			timers_on = bool(parsed.get("timers_on", true))
+			hold_confirm = bool(parsed.get("hold_confirm", false))
 			pause_started = int(parsed.get("pause_started", 0))
 			selected_theme = String(parsed.get("selected_theme", ""))
 			selected_ruleset = String(parsed.get("selected_ruleset", ""))
@@ -640,6 +656,8 @@ func wipe() -> void:
 	seen_first_reset = false
 	seen_warden = false
 	paused = false
+	timers_on = true
+	hold_confirm = false
 	selected_theme = ""
 	selected_ruleset = ""
 	stats = {"runs": 0, "clears": 0, "tasks": 0, "scaled": 0, "grit_earned": 0, "resolve_earned": 0}

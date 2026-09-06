@@ -10,7 +10,7 @@ extends SceneTree
 ## a known path, tick the real state machine, and print what the distance
 ## actually did, with the assertions stated as bands rather than as eyeballs.
 ##
-## Four things are proved here:
+## Seven things are proved here:
 ##
 ##   1. FOLLOW. The dog's distance stays inside a band and never exceeds a
 ##      bound, over a long walk with turns.
@@ -18,11 +18,19 @@ extends SceneTree
 ##      failure this design exists to avoid and it is invisible in a still.
 ##   3. HYSTERESIS. The cat's distance goes up, comes back to a hold band, and
 ##      then stops changing. Oscillation is counted, not judged.
-##   4. AN ESCORT IS EXPRESSIBLE. A species that is not shipped -- the mountain
+##   4. PATHING. He walks round a wall through its one gap rather than through
+##      the wall, and he is on the far side of it at the end.
+##   5. GIVING UP. Sealed in a pocket with no exit, he strays, abandons the
+##      path and reappears in his band -- the failure mode that otherwise loses
+##      a follower for the rest of the run.
+##   6. AN ESCORT IS EXPRESSIBLE. A species that is not shipped -- the mountain
 ##      woman's friend from #78, "follow, but stop if the player gets too far,
 ##      and fail after N tiles apart" -- is built here as data alone and driven
 ##      to its fail state with no engine change. If this stops passing, #57 has
 ##      built the wrong primitive.
+##   7. THE CONTRACTS. It survives a save and a load, a save from another run is
+##      discarded, and views() carries everything the renderer needs and nothing
+##      it has to interpret.
 ##
 ## Nothing here writes to the player's save: the critter store is pointed at a
 ## scratch path and g.run is a bare model that is put back afterwards.
@@ -46,6 +54,7 @@ var _failures: Array[String] = []
 ## autoload identifiers are live and the compile succeeds.
 var g: Node        ## the Game autoload
 var cr: Node       ## the Critters autoload
+var ru: Node       ## the Rules autoload
 var _WorldClass: GDScript
 var _RunClass: GDScript
 
@@ -53,6 +62,7 @@ var _RunClass: GDScript
 func _initialize() -> void:
 	g = root.get_node("Game")
 	cr = root.get_node("Critters")
+	ru = root.get_node("Rules")
 	_WorldClass = load("res://scripts/ui/World.gd")
 	_RunClass = load("res://scripts/model/Run.gd")
 	var previous_run = g.run
@@ -119,15 +129,20 @@ func _place(world, id: String, at: Vector2i) -> String:
 	return key
 
 
-## Walk the player along `path`, one cell per tick, and return the distance to
-## the critter after each step. One tick per cell because critter.tick_seconds
-## is the player's own walk.step_time: a pace of 1.0 is exactly walking speed.
+## Walk the player along `path` at the player's real walking speed, and return
+## the distance to the critter after each cell.
+##
+## The critter clock is finer than the player's stride on purpose -- a pace is
+## seconds per cell and must not be quantised to the think tick -- so a step of
+## the player's is however many think-ticks fit inside walk.step_time.
 func _walk(key: String, path: Array, per_step: int = 1) -> Array[int]:
 	var out: Array[int] = []
 	var tick: float = cr.tick_seconds()
+	var stride: float = ru.value("walk.step_time", {}, 0.17)
+	var ticks := maxi(1, int(round(stride / tick)))
 	for cell in path:
 		cr.note_player(cell)
-		for _i in range(per_step):
+		for _i in range(per_step * ticks):
 			cr.think(tick)
 		out.append(cr.distance_to_player(key))
 	return out
@@ -290,14 +305,14 @@ func _cat_flees_then_holds_without_oscillating() -> void:
 
 	# The player does not move. Everything below is the cat's own clock, which
 	# is the point: the animal is not waiting for you to spend a step.
-	var d: Array[int] = _wait(key, 120)
+	var d: Array[int] = _wait(key, 340)
 	print("    distance: %s" % _series(d))
 	var peak := 0
 	for v in d:
 		peak = maxi(peak, v)
 	_check(peak >= 6, "it ran to at least 6 cells (peak %d)" % peak)
 
-	var last := d.slice(d.size() - 40)
+	var last := d.slice(d.size() - 110)
 	var lo := 99
 	var hi := 0
 	var turns := 0
@@ -306,10 +321,10 @@ func _cat_flees_then_holds_without_oscillating() -> void:
 		hi = maxi(hi, last[i])
 		if i > 0 and last[i] != last[i - 1]:
 			turns += 1
-	print("    last 40 ticks: %d..%d, %d changes of distance, state '%s'"
+	print("    last 110 ticks: %d..%d, %d changes of distance, state '%s'"
 		% [lo, hi, turns, cr.state_of(key)])
 	_check(lo >= 3 and hi <= 4, "it settles in the 3..4 hold band (%d..%d)" % [lo, hi])
-	_check(turns == 0, "and stops moving there -- %d changes in 40 ticks" % turns)
+	_check(turns == 0, "and stops moving there -- %d changes in 110 ticks" % turns)
 	_check(cr.state_of(key) == "watching", "it ends up `watching`")
 
 
@@ -323,7 +338,7 @@ func _cat_breaks_off_when_crowded() -> void:
 	# of you yet, and if it fled at two cells you could never reach it to pet it
 	# at one. Wariness is something you teach it.
 	cr.event(key, "petted")
-	_wait(key, 100)
+	_wait(key, 300)
 	var held: String = cr.state_of(key)
 	var at: int = cr.distance_to_player(key)
 	print("    holding at %d in state '%s'" % [at, held])
@@ -343,7 +358,8 @@ func _cat_breaks_off_when_crowded() -> void:
 		# a post-tick distance reports where it ran to rather than what set it
 		# off -- which reads as a threshold one cell wider than the data says.
 		var d: int = cr.distance_to_player(key)
-		cr.think(cr.tick_seconds())
+		for _t in range(3):
+			cr.think(cr.tick_seconds())
 		broke_state = cr.state_of(key)
 		print("    player closes to %d -> state '%s'" % [d, broke_state])
 		if broke_state == "bolting" and broke_at < 0:
@@ -397,7 +413,8 @@ func _escort_is_expressible_in_data() -> void:
 	for _i in range(14):
 		here += Vector2i(2, 0)
 		cr.note_player(here)
-		cr.think(tick)
+		for _t in range(maxi(1, int(round(float(ru.value("walk.step_time", {}, 0.17)) / tick)))):
+			cr.think(tick)
 		d.append(cr.distance_to_player(key))
 		seen[cr.state_of(key)] = true
 	print("    distance: %s" % _series(d))

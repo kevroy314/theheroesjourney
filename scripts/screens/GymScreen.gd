@@ -78,7 +78,7 @@ func _pack_card(pack_id: String) -> PanelContainer:
 
 	if not owned:
 		if not reached:
-			var locked := HJUI.button("Opens at Chapter %d" % needed, "ghost", false)
+			var locked := HJUI.button("Opens at ring %d" % needed, "ghost", false)
 			locked.custom_minimum_size.y = 70
 			cv.add_child(locked)
 		else:

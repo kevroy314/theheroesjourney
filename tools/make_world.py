@@ -1418,8 +1418,12 @@ def main():
           % (len(reach), 100.0 * len(reach) / max(1, sum(
               1 for y in range(H) for x in range(W) if world.walkable(x, y)))))
     filled = sum(1 for row in props for v in row if v)
+    # `blocked` is solid prop footprints UNION cliff cells, so reporting its
+    # size as "of them solid" over-counted every prop report by the number of
+    # cliffs printed on the very next line — 2,337 against 1,759 actually solid.
+    solid_props = len(blocked - faces)
     print("props: %d placed (%.1f%% of cells), %d of them solid"
-          % (filled, 100.0 * filled / (W * H), len(blocked)))
+          % (filled, 100.0 * filled / (W * H), solid_props))
     print("cliff cells: %d" % len(faces))
     house_anom = [a for a in anomalies if a.get("area") == "waking_room"][0]
     print("house: %dx%d at (%d,%d), %d walkable cells inside, sealed but for the door"

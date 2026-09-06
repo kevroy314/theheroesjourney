@@ -53,7 +53,7 @@
     "emu:log": "$HOME/.claude/skills/android-device/scripts/ux.sh log",
     "emu:wipe": "$HOME/.claude/skills/android-device/scripts/ux.sh app clear com.kevinhorecka.heroesjourney",
     "icons": "python3 tools/make_icons.py",
-    "tiles": "python3 tools/make_tiles.py",
+    "tiles": "python3 tools/make_tiles.py && python3 tools/add_prop.py reapply",
     "sprites": "python3 tools/make_sprites.py",
     "export:linux": "mkdir -p build/linux && \"${GODOT_BIN:-$npm_package_config_godotBin}\" --headless --path . --export-release Linux build/linux/heroes.x86_64",
     "selftest:build": "npm run export:linux && ./build/linux/heroes.x86_64 --headless -- --selftest"

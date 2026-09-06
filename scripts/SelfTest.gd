@@ -28,6 +28,7 @@ const OBJECTIVES_SCRATCH := "user://objectives_selftest.json"
 const DIALOGUE_SCRATCH := "user://dialogue_selftest.json"
 const BUFFS_SCRATCH := "user://buffs_selftest.json"
 const DISCOVERY_SCRATCH := "user://discovery_selftest.json"
+const CRITTERS_SCRATCH := "user://critters_selftest.json"
 
 ## Held for the length of a run, so two harnesses cannot overlap.
 ##
@@ -39,8 +40,14 @@ const DISCOVERY_SCRATCH := "user://discovery_selftest.json"
 ## those things — and the failures it caused looked like bugs in the working
 ## tree for an hour.
 const LOCK := "user://selftest.lock"
-## Old enough to be a corpse rather than a peer. A suite run is minutes.
-const LOCK_STALE_SECONDS := 1800
+## Old enough to be a corpse rather than a peer.
+##
+## A suite run is about three minutes, so ten is already three times the longest
+## honest one. Thirty was the first guess and it was wrong in the expensive
+## direction: a killed process — which happens, one agent killed another's Godot
+## by accident this session — leaves the file behind, and every run for the next
+## half hour is refused with no way to tell a corpse from a peer.
+const LOCK_STALE_SECONDS := 600
 
 
 static func run_all(host: Node) -> int:
@@ -92,6 +99,8 @@ static func run_all(host: Node) -> int:
 	# player's own fog, which is the whole thing History's comment warns about.
 	_discard_scratch(DISCOVERY_SCRATCH, Discovery.PATH)
 	Discovery.use_path(DISCOVERY_SCRATCH)
+	_discard_scratch(CRITTERS_SCRATCH, Critters.SAVE_PATH)
+	Critters.use_path(CRITTERS_SCRATCH)
 
 	var saved_meta := _snapshot()
 	var backup := FileAccess.open(BACKUP, FileAccess.WRITE)
@@ -178,6 +187,8 @@ static func run_all(host: Node) -> int:
 	Buffs.use_path(Buffs.SAVE_PATH)
 	_discard_scratch(DISCOVERY_SCRATCH, Discovery.PATH)
 	Discovery.use_path(Discovery.PATH)
+	_discard_scratch(CRITTERS_SCRATCH, Critters.SAVE_PATH)
+	Critters.use_path(Critters.SAVE_PATH)
 
 	_restore(saved_meta)
 	# The run finished, so the on-disk copy has done its job. Leaving it would

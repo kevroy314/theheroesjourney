@@ -1,8 +1,9 @@
 # Ideas not yet built
 
-Kevin's list, captured verbatim in substance and grouped. **Nothing here is
-implemented.** It is here so it is not lost, and so that when something *is*
-built the thinking behind it has somewhere to live.
+Kevin's list, captured verbatim in substance and grouped. It is here so it is
+not lost, and so that when something *is* built the thinking behind it has
+somewhere to live. **Assume nothing here is implemented unless the entry says
+otherwise** — one is, so far.
 
 Order below is grouping, not priority.
 
@@ -11,8 +12,11 @@ Order below is grouping, not priority.
 - **Fast travel at a step cost.** Think Pokémon travel items rather than a menu
   teleport — a consumable you carry, so the decision is "do I spend this here".
   Fits the step economy directly: distance is already the currency.
-- **Hunter / finder items.** Something that tells you where the interesting
-  thing is, rather than walking the whole ring to find it.
+- **Hunter / finder items.** ~~Something that tells you where the interesting
+  thing is, rather than walking the whole ring to find it.~~ **Built.** The
+  Finder is Spite's gift at Beat 6: a bar that fills as you near the closest
+  open anomaly, with `finder.noise` deliberately in it so it guides rather than
+  solves. `Objectives.finder_reading()`.
 
 ## The town as an economy
 

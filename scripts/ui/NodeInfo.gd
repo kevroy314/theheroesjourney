@@ -59,10 +59,21 @@ static func mark_of(node: Dictionary, fallback: String) -> String:
 ## streak. The partial-scale penalty is deliberately *not* applied — it is a
 ## choice the player has not made yet, so this is what the node pays for doing
 ## it as written, which is the honest headline.
-static func task_grit(run: HJRun, node: Dictionary) -> int:
-	var axis := axis_of(node)
+## What a task pays. **The only implementation** — `Game.complete_task` calls
+## this rather than keeping its own copy, because a preview that promises one
+## number while the payer computes another is worse than no preview at all, and
+## two copies of an arithmetic chain drift the first time anybody tunes it.
+##
+## `scaled` is the partial-credit case; `axis_override` is for the payer, which
+## knows the axis of the movement the player actually chose. A preview only has
+## the node's token, and for `$same` that is not yet an answer.
+static func task_grit(run: HJRun, node: Dictionary, scaled: bool = false,
+		axis_override: String = "") -> int:
+	var axis := axis_override if axis_override != "" else axis_of(node)
 	var ctx: Dictionary = run.ctx({"axis": axis}) if axis != "" else run.ctx()
 	var multiplier: float = Rules.value("run.grit_mult", ctx, 1.0) * Meta.streak_multiplier()
+	if scaled:
+		multiplier *= clampf(Rules.value("task.partial_grit", ctx, 0.6), 0.0, 1.0)
 	return maxi(1, int(round(float(node.get("grit", 5)) * multiplier)))
 
 

@@ -65,15 +65,11 @@ static func set_flag(id: String, value: bool) -> void:
 ## resolved through Rules like every other tunable, which means a ruleset or a
 ## trinket could bend the wait too and Rules.explain() will say who did.
 ##
-## The setting itself belongs in Meta.active_modifiers() as
-## { "key": "task.time_gate_mult", "op": "mul", "value": 0 } when timers are
-## off. Until it is there, the branch below honours the setting directly; once
-## it is, `mult` already arrives as zero and the branch cannot fire.
+## The setting contributes { "key": "task.time_gate_mult", "op": "mul",
+## "value": 0 } from Meta.active_modifiers() when timers are off, so there is no
+## branch here reading the flag a second time — the rule engine already knows.
 static func gate_mult(ctx: Dictionary) -> float:
-	var mult := maxf(0.0, Rules.value("task.time_gate_mult", ctx, 1.0))
-	if mult > 0.0 and not get_flag("timers_on"):
-		return 0.0
-	return mult
+	return maxf(0.0, Rules.value("task.time_gate_mult", ctx, 1.0))
 
 
 # --- the tutorial's one word about all this ------------------------------------

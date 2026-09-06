@@ -42,7 +42,11 @@ Every reference draws a hard distinction:
 Necesse's buildings are the clearest case: a wall is a light stone cap with a
 darker vertical face below it, so the building reads as an extrusion from the
 ground rather than a painted rectangle. That single two-tone treatment is what
-gives a top-down scene its depth, and it is the thing our world has none of.
+gives a top-down scene its depth, and until recently our world had none of it.
+The wall sets are drawn that way now — `tools/make_tiles.py` renders a lit cap
+and a driven-down face from the same hue, with a two-pixel joint where they
+meet, and that joint is what makes the cap sit *on* the face rather than beside
+it.
 
 Y-sorting is necessary but not sufficient. The sprite has to *look* like it
 stands up.
@@ -52,7 +56,9 @@ stands up.
 
 ## 3. Light is the atmosphere, and it is radial and coloured
 
-This is the single biggest gap, and it is what the user clocked.
+This was the single biggest gap, and it is what the user clocked. It is now
+built: an ambient day/night ramp plus a per-emitter light list, both in
+`scripts/ui/Lighting.gd` and one shader pass. See DESIGN.md.
 
 Core Keeper's entire mood is one mechanic: **darkness is the default state and
 light is a warm radial gradient from a source.** Not a brightness multiplier — a
@@ -72,7 +78,11 @@ The implications for us are large and cheap:
   everything not lit sitting in cool blue shadow.
 - Day/night becomes an atmosphere dial, not just a clock.
 
-> **Asset need:** none. This is a shader and a light list. See #49.
+> **Asset need:** none, and there never was one. This is a shader and a light
+> list, and the art declares a source by adding
+> `"light": { "radius", "color", "flicker" }` to a prop in
+> `assets/tiles/tiles.json`. Six props carry one: the lamppost, the street lamp,
+> the floor lamp, the stove, the candle and the lit window.
 
 ## 4. Roads have edges
 
@@ -90,11 +100,17 @@ wood plank, patterned tile, rug — and the change of material is what says "you
 are inside". Necesse goes further: each *room* inside a building has its own
 floor.
 
-Our house has neither walls nor an interior floor. It is currently a patch of
-terrain with furniture standing on it.
+The house obeys this now. It is 19×15 with real walls, a sealed footprint whose
+only exit is the front door, and **three rooms on four floor materials** — the
+bedroom on plank, the kitchen on tile, the hall on boards, and a rug in front of
+the bed so the first cell you stand on is not the same cell as the last one. Two
+internal walls with three doorways between them, so the space has to be walked
+rather than seen.
 
-> **Asset need:** interior floors (plank, board, tile, rug), interior walls with
-> a cap/face, a door object, a window object that emits light.
+The geometry lives in one function, `house_plan()` in `tools/make_world.py`, and
+every other pass reads that description rather than recomputing it. The old code
+worked the internal wall out twice, differently, which is how a chair came to be
+placed inside a wall and silently dropped.
 
 ## 6. Props come in variants, and the variants are the point
 
@@ -107,7 +123,10 @@ The rule the references follow: **anything that appears more than ten times in
 a screen needs at least three variants.** Trees, rocks, grass tufts, fence
 posts, floor boards.
 
-Our world places 6,037 props from 17 kinds. That ratio is the homogeneity.
+Our world places **7,587 props drawn from a catalogue of 233**, across 12
+biomes — about 33 placements per entry, where it used to be several hundred. 94
+of the 233 are `_v2` / `_v3` variants of something else, which is this rule
+being obeyed rather than described.
 
 ## 7. The portal is a big object, not a tile
 
@@ -213,6 +232,21 @@ driven by a player action. Getting them working in one room, where the space is
 small and bugs are obvious, is worth more than speculating about mob AI in the
 abstract.
 
+That rehearsal is done, and it came out better than the brief. Both animals are
+**data** — a state machine per species in `data/content/critters.json`, over a
+vocabulary of four goals and six conditions in `scripts/game/Critters.gd`, which
+knows nothing about dogs or cats. The escort in #78 is three states and four
+transitions in the same shape and needs no new code; `CritterSim.gd` builds and
+runs exactly that as a headless proof.
+
+The one lesson worth carrying forward: **the thresholds in each direction must
+differ.** The cat breaks off at 2, runs to 6, comes back in to 4 and only sets
+off again at 5, so its resting band is 3–4 and no two rules disagree at any
+distance. Matching the numbers produces an animal that vibrates on the boundary.
+And `dozing` deliberately does *not* break on proximity, because a cat that
+flees at two cells has an unreachable Pet verb — the wariness is something you
+teach it.
+
 ### Sources
 
 - [Environmental Storytelling in Video Games](https://gamedesignskills.com/game-design/environmental-storytelling/)
@@ -226,23 +260,27 @@ abstract.
 
 ## The asset backlog this implies
 
-Ordered by effect per unit of work.
+Ordered by effect per unit of work, and this is a live list rather than a
+record — the top of it has been worked through.
 
-| Priority | Asset | Count | Notes |
+| Priority | Asset | Count | State |
 |---|---|---|---|
-| 1 | Light sources + shader | — | Code, not art. Biggest single win. |
-| 2 | Interior walls (cap + face) | ~16 | Unblocks the house entirely |
-| 3 | Interior floors | 4–6 | plank, board, tile, rug |
-| 4 | Ground scatter, per biome | 6–10 × 6 | tiny, sub-tile offset, non-colliding |
-| 5 | Door + lit window | 4 | window emits light |
-| 6 | Prop variants for the top 6 props | ×3 each | trees, rocks, tufts, fences |
-| 7 | Road kerb pieces | ~8 | edge where paving meets ground |
-| 8 | The portal, as a large animated object | 1 | 3×3 tiles, radial swirl |
-| 9 | Task-type icons | ~8 | physical, social, mental, drink, eat, rest, mind, bond |
-| 10 | Furniture set for a real house | ~15 | bed, table, chairs, stove, counter, shelf |
-| 11 | Dog and cat, 4-dir idle + walk | 2 | the entity-system rehearsal, above |
-| 12 | "Evidence of use" props | ~8 | pulled-out chair, cup, boots, worn path, open book |
+| 1 | Light sources + shader | — | **done.** Ambient ramp + light list; 6 emitting props |
+| 2 | Interior walls (cap + face) | ~16 | **done.** `wall_timber`, `wall_stone`, drawn as cap + face |
+| 3 | Interior floors | 4–6 | **done.** plank, boards, tile, rug |
+| 5 | Door + lit window | 4 | **done.** `window_lit` emits; the front door is a real gate |
+| 6 | Prop variants for the top props | ×3 each | **done.** 94 of the 233 catalogue entries are `_v2` / `_v3` |
+| 10 | Furniture set for a real house | ~15 | **done.** bed, table, chairs, stove, counter, shelves, chest, crate |
+| 11 | Dog and cat, 4-dir idle + walk | 2 | **done.** `assets/sprites/dog.png`, `cat.png`, driven by the critter state machines |
+| 12 | "Evidence of use" props | ~8 | **done.** pulled-out chair, cup, boots, open book, bottle |
+| 4 | Ground scatter, per biome | 6–10 × 6 | **open (#51).** Props sit on the cell grid; there is no sub-tile scatter layer, which is the whole point of this one |
+| 7 | Road kerb pieces | ~8 | **open.** Paths still meet grass with no edge |
+| 8 | The portal, as a large animated object | 1 | **open (#72).** Still a tile |
+| 9 | Task-type icons | ~8 | **open.** The six axes have marks; the task *types* do not |
 
 `tools/make_tiles.py`, `make_sprites.py` and `add_prop.py` already exist and the
-five-tool contract through `tiles.json` holds, so most of this is prompt-and-
-place rather than new pipeline.
+five-tool contract through `tiles.json` holds, so most of what is left is
+prompt-and-place rather than new pipeline. The done rows are here rather than
+deleted because they are the evidence that the contract holds: every one of them
+was an asset change with no renderer change behind it, except the light list,
+which was always going to be code.

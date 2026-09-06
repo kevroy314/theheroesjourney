@@ -11,17 +11,24 @@ tools/make_world.py  ──►  data/world/overworld.json  ──►  world/over
                                     └──────── you edit ──────────┘
 ```
 
-## The three commands
+## The commands
 
 ```sh
 npm run world:edit      # open world/overworld.tmj in Tiled
 npm run world:export    # data/world/overworld.json  ->  world/overworld.tmj
 npm run world:import    # world/overworld.tmj        ->  data/world/overworld.json
+npm run world:check     # what an import would change, writing nothing
+npm run check           # validate data/, including the world file
 ```
 
 Import is the one the game cares about — nothing you draw reaches the game until
-you run it. `npm run world:import -- --check` says what an import *would* change
-without writing anything.
+you run it. `world:check` is `world:import -- --check` under a shorter name.
+
+`npm run check` is a different thing and catches a different class of mistake:
+it is `tools/validate_data.py`, it reads `data/world/overworld.json` and never
+the `.tmj`, and it is what tells you an interactable is typed as something that
+is in no catalogue. **The import will happily write a nonsense `type`**; only
+this notices. Run it after any session in Tiled.
 
 Tiled itself is not installed by the project. `npm run world:edit` finds it on
 `PATH`, in `~/Applications/Tiled-*.AppImage`, or in Flatpak, and prints the three
@@ -30,20 +37,57 @@ ways to install it if there is none. Currently installed here:
 
 ## What is in the map
 
-| Layer | Yours? | What it is |
-| --- | --- | --- |
-| `base` | **no** — locked | The generated terrain. Overwritten in full by the next export. |
-| `edits` | **yes** | Your overrides. A tile here wins over `base`; an empty cell means "leave the generated tile alone". |
-| `regions` | yes | Region anchors, as point objects named by region id. |
-| `props` | **yes** | Every tree, barrel and bed in the world, as tile objects you can drag, retype, delete and add. 4,802 of them. |
-| `cliffs` | **yes** | Every cell of every terrace edge, as tile objects. Presence is all you say; the left/middle/right pieces are worked out for you. |
-| `markers` | yes | Single points the world file carries on its own — `spawn` today. |
-| *others* | yes | One object layer per collection the world model grows: anomalies, whatever comes next. |
+Layers come out in this order, and every name except `base`, `edits` and
+`markers` is **a top-level key of the world file**, not a hardcoded string.
+
+| # | Layer | Type | Yours? | What it is |
+| --- | --- | --- | --- | --- |
+| 1 | `base` | tile | **no** — locked | The generated terrain. Overwritten in full by the next export. |
+| 2 | `edits` | tile | **yes** | Your overrides. A tile here wins over `base`; an empty cell means "leave the generated tile alone". |
+| 3 | `regions` | object | yes | Region anchors, as point objects named by region id. |
+| 4 | `anomalies` | object | yes | Where the holes in reality are, with their tier and the area each opens. |
+| 5 | `interactables` | object | yes | The door, the stove, the counter, the animals — points naming a catalogue entry. |
+| 6 | `props` | object | **yes** | Every tree, barrel and bed in the world, as tile objects you can drag, retype, delete and add. **7,587** of them. |
+| 7 | `cliffs` | object | **yes** | Every cell of every terrace edge, as tile objects. Presence is all you say; the left/middle/right pieces are worked out for you. |
+| 8 | `markers` | object | yes | Every key the world file carries as a single `{x, y, …}`: `centre`, `spawn` and `indoors`. |
+| — | *others* | object | yes | One layer per collection the world model grows. Add a whole new object layer and it becomes a new top-level key. |
 
 `base` is locked in the editor because a lock is the honest representation of
 what it is: paint there and the next export deletes it without asking. To change
 generated terrain, paint the same cell in `edits` instead — that is what the
 layer is for. You can still eyedrop from `base` (`I` in Tiled) to match a tile.
+
+### `interactables`, and how a door is edited
+
+An interactable placement is `{ x, y, type, label? }`, where `type` names an
+entry in `data/content/interactables.json` — the catalogue that says what a
+*kind* of thing is: its verb, its price, what it does. So the world says
+**where**, and the catalogue says **what**, and dragging the stove somewhere
+else or retyping it as a counter is a map edit with no code in it. Retyping
+`dog` to `cat` genuinely produces a cat, with the cat's behaviour, because the
+catalogue entry names the critter.
+
+Edit the `type` **property** in the sidebar. Editing Tiled's own **Class** field
+does nothing: the import never reads it, and the next export overwrites it with
+the layer name. And a mistyped `type` is not caught here — the import writes it
+happily and the affordance silently never appears in game. `npm run check` is
+what catches it.
+
+### `indoors` is a rectangle wearing a point
+
+`indoors` is `{ x, y, w, h }` — the footprint of the building the player wakes
+in, walls included, and the thing the Boon of the White Room is scoped to. But
+the exporter classifies by shape, and its question is only "is this a dict with
+a numeric `x` and `y`", so `indoors` lands in `markers` as a **point**, at the
+top-left cell, with its extent demoted to two integer properties.
+
+**So you cannot resize it by dragging.** Converting the point to a rectangle and
+pulling a corner changes Tiled's own width and height, which the import does not
+read. Edit the `w` and `h` properties instead.
+
+Neither `indoors` nor `interactables` is in the schema's `world.required` list,
+so deleting one loses it with no validator complaint — unlike `spawn` or
+`centre`, which are caught.
 
 **Objects are objects, not tiles.** A region anchor is a point you drag, not a
 special tile id, so it can sit on any terrain and cannot be painted over by
@@ -52,17 +96,38 @@ editable in Tiled's property sidebar. You can add objects the generator has
 never heard of; they come through the import as new entries in the same
 collection.
 
+Three things about object *names*, because they are load-bearing in a way that
+does not look it:
+
+* A collection stored as a **dict** — `regions`, `markers` — is keyed by the
+  object's name. Rename a region and you have made a different region and
+  deleted the old one.
+* A collection stored as a **list** — `anomalies`, `interactables` — has no
+  names of its own, so the exporter numbers them `"0"`, `"1"`, `"2"`. The import
+  throws those away, but the *export* reconciles on them, so reordering or
+  deleting one shifts every object after it against the generator's records.
+* **Two objects with the same name, or two without one, silently collapse to
+  one** on the next export. If you duplicate an object, rename it.
+
 **Leave anything starting `hj_` alone.** Those are the round trip's bookkeeping:
-the map's `hj_schema` property is a complete description of the world file's
-shape, `hj_gen_planes` is the props and cliffs the generator last produced, and
-`hj_gen_x` / `hj_gen_y` on each object is where the generator last put it.
-Delete `hj_schema` and the import refuses to run.
+
+| property | on | is |
+|---|---|---|
+| `hj_schema` | the map | a complete description of the world file's shape and key order. Delete it and the import refuses to run |
+| `hj_gen_planes` | the map | the props and cliffs the generator last produced |
+| `hj_gen_x` / `hj_gen_y` | every object | where the generator last put it — the pin test |
+| `hj_keys` | records with more than `x`/`y` | the record's original key order, which is half of why the round trip is byte-identical |
+| `hj_json` | rarely | which fields were structured and had to be JSON-encoded into a string property |
+| `hj_marker` | marker objects | written, and read by nothing. The importer routes markers by layer name |
+
+An `hj_`-prefixed name can therefore never be a field of the world schema, since
+the import skips every one of them.
 
 ## Props and cliffs
 
 These used to be invisible. The world file carries them as byte planes —
 `props_b64_deflate`, `cliffs_b64_deflate`, one byte per cell — and a byte is the
-one thing Tiled cannot show you, so 4,802 props shipped as an opaque blob and
+one thing Tiled cannot show you, so 7,587 props shipped as an opaque blob and
 you could not move a single barrel.
 
 They are object layers now. **The plane is still what the game loads**; the
@@ -71,7 +136,7 @@ is deliberate:
 
 * `scripts/ui/TileWorld.gd` indexes the prop plane per cell inside `_draw`, every
   frame. A plane answers that in O(1) with no work at load time.
-* 4,802 objects is about 280 KB of JSON. Parsing that at every launch, on a
+* 7,587 objects is about 440 KB of JSON. Parsing that at every launch, on a
   phone, to build a lookup one byte already answers, buys nothing.
 * One byte per cell is the *runtime's* constraint — there is nowhere to draw two
   props on one cell. Making objects the source of truth would let you express a
@@ -127,7 +192,7 @@ meaningful by the map remembering what the generator last said. The export
 reports all four counts:
 
 ```
-  props   4802 objects — 3 placed by hand, 1 deleted, 0 retyped
+  props   7587 objects — 3 placed by hand, 1 deleted, 0 retyped
 ```
 
 Overrides are addressed by cell, so a resize moves them with the `edits` layer
@@ -176,7 +241,7 @@ npm run world:export            # base layer replaced; edits layer untouched
 npm run world:import            # base + edits composited back for the game
 ```
 
-Three rules, and between them they cover everything:
+Four rules, and between them they cover everything:
 
 1. **Tiles.** `base` is thrown away and re-seeded. `edits` is never written by
    the generator, so every override is re-applied on top of the new terrain at
@@ -188,10 +253,23 @@ Three rules, and between them they cover everything:
 3. **Objects you added.** Never touched. Objects the generator has *stopped*
    producing are also kept, so a region the world model drops does not silently
    vanish from a map you have been working on.
+4. **Objects you deleted**, and this is the one that is asymmetric. A deleted
+   **prop or cliff** survives a regeneration, because the empty cell is itself
+   an override in the plane. A deleted **region, anomaly, interactable or
+   marker** does not: there is no tombstone, so the next export re-adds it at
+   the generator's position. Deleting one of those is only durable once you have
+   imported and then not re-run `make_world.py`.
 
 There is no separate "reseed just this region" mode because it would not buy
 anything: the generator may rewrite as much or as little of the terrain as it
 likes, and the overrides sitting on top survive wherever they are.
+
+**A nudge pins an anchor even when it changes nothing.** The pin test is exact
+pixel equality against `hj_gen_x` / `hj_gen_y`, while the import floors a point
+to its cell. So dragging a region anchor one pixel is a no-op in the world file
+*and* stops that anchor following the generator forever, with nothing on screen
+to say so. Props are the opposite — they round to the nearest cell on both
+sides, so a small nudge really is not an edit.
 
 ### The one thing that can go wrong
 
@@ -236,13 +314,13 @@ props and cliffs layers from `hj_gen_planes`, drops everything hand-added,
 imports that, and compares against the real file:
 
 ```
-world/overworld.tmj  256x256, 25 tiles in the set
+world/overworld.tmj  256x256, 29 tiles in the set
   base    re-seeded from data/world/overworld.json (locked)
   edits   0 cells kept
-  objects 0 pinned by hand, 24 new from the generator, 0 kept ...
+  objects 0 pinned by hand, 45 new from the generator, 0 kept ...
   cliffs  504 objects — 0 placed by hand, 0 deleted, 0 retyped
-  props   4802 objects — 0 placed by hand, 0 deleted, 0 retyped
-  round trip: byte-identical (50894 bytes reproduced exactly)
+  props   7587 objects — 0 placed by hand, 0 deleted, 0 retyped
+  round trip: byte-identical (62579 bytes reproduced exactly)
 ```
 
 That includes `blocked_b64_deflate`, which is *recomputed* rather than copied —
@@ -257,6 +335,14 @@ the check working, not a nuisance.
 The zlib compression level is *measured* on export (whichever level reproduces
 the generator's exact blob) rather than assumed, which is what makes the base64
 match rather than merely decompress to the same bytes.
+
+**What the map can hold that the world file cannot.** Byte-identity is only
+promised for what the schema describes, and Tiled offers a good deal more than
+that. None of the following survives an import, so do not encode meaning in it:
+object rotation, an object's own width and height, tile flip flags, the Class
+field on a point object, the name of an object in a list collection, per-object
+colour or visibility, two props stacked on one cell (the topmost wins, and the
+import says which two), and anything painted into `base`.
 
 ## Exporting twice in a row is safe
 
@@ -300,19 +386,20 @@ from the map alone. The reverse is not true: delete the `.tmj` and the edits are
 gone.
 
 The tile layers are stored as base64 + zlib, so a map diff is one long opaque
-line. That is deliberate — 48,000 CSV integers per layer is a 200 KB diff that
+line. That is deliberate — 65,536 CSV integers per layer is a 270 KB diff that
 is no more readable — but it does mean `git diff` will not show you what you
 painted. `npm run world:import -- --check` will.
 
-The props and cliffs, being objects, are the opposite: 5,306 of them make
-`overworld.tmj` about **1.3 MB**, and a moved barrel is four readable lines of
+The props and cliffs, being objects, are the opposite: 8,091 of them make
+`overworld.tmj` about **1.9 MB**, and a moved barrel is four readable lines of
 diff. That is the price of being able to see them, and it is paid in the map,
-not in the game — `data/world/overworld.json` is 51 KB and does not grow.
+not in the game — `data/world/overworld.json` is 61 KB, and it grows with the
+prop count and with nothing else.
 
-### Living with 5,000 objects in Tiled
+### Living with 8,000 objects in Tiled
 
 - Turn the `props` layer off (the eye in the Layers panel) while you are painting
-  terrain. Tiled draws every object in a visible layer, and 4,802 sprites of
+  terrain. Tiled draws every object in a visible layer, and 7,587 sprites of
   64x96 is enough to make panning stutter on a big view.
 - **Select the layer before you select an object.** With `props` active, a
   rubber-band selection across a screen of forest selects a few hundred objects
@@ -320,8 +407,9 @@ not in the game — `data/world/overworld.json` is 51 KB and does not grow.
 - Deleting a prop is `Delete`, and deleting a *hundred* is fine — the export
   records it as a hundred one-cell overrides, which is what makes clearing a
   glade for a building stick across regeneration.
-- A small nudge is not an edit. Positions round to the nearest cell, so pushing
-  a tree a few pixels while dragging the map leaves it exactly where it was.
+- A small nudge to a *prop* is not an edit. Prop positions round to the nearest
+  cell, so pushing a tree a few pixels while dragging the map leaves it exactly
+  where it was. A nudged region anchor is a different story — see above.
 - Object *ids* are assigned in row-major cell order, so an unchanged layer
   re-exports to the same ids and the diff stays small.
 
@@ -330,13 +418,19 @@ not in the game — `data/world/overworld.json` is 51 KB and does not grow.
 The tileset is derived from `assets/tiles/tileset.png` and `tools/make_tiles.py`
 at run time: tile size from `N`, names and walkability from `ORDER` and
 `WALKABLE`, tile count from the atlas's own dimensions. There is no copy of the
-tile list in the map tooling, and no hardcoded 17.
+tile list in the map tooling and no hardcoded tile count. There are 29 today;
+adding a thirtieth changes nothing here.
 
 The world file is *classified*, not named. Each top-level key is sorted by shape
 into: the width, the height, the compressed tile grid, a collection of
-`{x, y, ...}` records (→ an object layer), a single `{x, y}` (→ a marker), a
-one-byte-per-cell plane (→ an object layer, or derived), or something opaque
-(→ carried verbatim in `hj_schema` and written straight back).
+`{x, y, ...}` records (→ an object layer), **any** dict with a numeric `x` and
+`y` (→ a marker), a one-byte-per-cell plane (→ an object layer, or derived), or
+something opaque (→ carried verbatim in `hj_schema` and written straight back).
+
+That marker rule is deliberately loose, and `indoors` is where the looseness
+shows: a `{x, y, w, h}` rectangle satisfies it, so it becomes a point with two
+extra properties rather than a shape you can drag a corner of. Cheap and
+correct, and worth knowing before you try to resize the house.
 
 The planes are the one exception, and only half an exception. *Which* plane is
 the props plane is a fact about the art, not about the value — every plane in the
@@ -344,9 +438,11 @@ file is the same 65,536 bytes — so `PLANE_KEYS` in `world_to_tiled.py` names t
 by key prefix. That is three words of hardcoding. Everything behind it, including
 the atlas geometry, the cell size and the catalogue of what each byte means, is
 read out of `assets/tiles/tiles.json` at run time.
-An elevation field, difficulty rings and anomaly spawn points all pass through
-this without a code change; anomalies land as a `anomalies` object layer you can
-drag, and elevation rides along untouched.
+An elevation field, difficulty rings, anomaly spawn points and the
+interactables list all passed through this without a code change: anomalies and
+interactables land as object layers you can drag, `indoors` joined `markers`,
+and elevation rides along untouched. That is the claim this design makes, and it
+is the evidence for it.
 
 ### What will actually break, and when
 

@@ -860,6 +860,11 @@ def main():
     reconcile(report, schema, arms(outcomes, "_apply_spite_effect"), "spite_effects",
               "HJOutcomes._apply_spite_effect")
     reconcile(report, schema, arms(items_gd, "use"), "item_uses", "HJItems.use")
+    # A confirm gesture named in data that no class implements is a task the
+    # player cannot finish, and the schema cannot see the registry on its own.
+    gestures = os.path.join(SCRIPTS, "game", "Gestures.gd")
+    reconcile(report, schema, const_dict_keys(gestures, "KINDS"),
+              "confirm_kinds", "HJGestures.KINDS")
     reconcile(report, schema, arms(meta, "wheel_met"), "wheel_reqs", "Meta.wheel_met")
     reconcile(report, schema, arms(game, "tap_node"), "node_types", "Game.tap_node")
     reconcile(report, schema, arms(outcomes, "_award"), "loot_types", "HJOutcomes._award")

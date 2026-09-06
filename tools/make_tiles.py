@@ -3035,9 +3035,14 @@ PROPS = [
     _p("bottle", "clutter", "placed", 0.0, shadow=False, kind="bottle"),
     _p("street_lamp", "structure", "placed", 0.0, solid=True, kind="street_lamp",
        light=dict(radius=7.5, color="#FFD08A", flicker=0.10)),
-    _p("dog", "animal", "placed", 0.0, solid=True, pal="wood",
+    # Not solid. An animal that walks is not a wall: marking these solid baked a
+    # 1 into the world's `blocked` plane exactly where the dog was lying, so he
+    # could walk off his own cell and never back onto it. The live critter is
+    # what the player interacts with; this art is only what stands there before
+    # HJCritters takes over the cell.
+    _p("dog", "animal", "placed", 0.0, solid=False, pal="wood",
        w=8, h=13, leg=4, head=6, ear=3, tail=9),
-    _p("cat", "animal", "placed", 0.0, solid=True, pal="pale",
+    _p("cat", "animal", "placed", 0.0, solid=False, pal="pale",
        w=6, h=10, leg=3, head=5, ear=4, tail=11, stripes=True, bright_eyes=True),
 ]
 

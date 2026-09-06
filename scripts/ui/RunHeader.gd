@@ -12,7 +12,6 @@ var _clock: PanelContainer
 var _clock_flashed := false
 ## The clock chip's caption, so the note can say what the number means. "LEFT"
 ## over "+20h" is the one reading of this chip that would be false.
-var _clock_caption: Label
 
 
 func _init(title_text: String, subtitle_text: String) -> void:
@@ -31,7 +30,6 @@ func _init(title_text: String, subtitle_text: String) -> void:
 	chips.add_child(_grit)
 	chips.add_child(_streak)
 	chips.add_child(_clock)
-	_clock_caption = _caption_of(_clock)
 	v.add_child(chips)
 	# Buffs outlive the walk into an anomaly, so the mark has to follow them in.
 	v.add_child(HJUI.BuffStrip.new())
@@ -42,21 +40,6 @@ func _init(title_text: String, subtitle_text: String) -> void:
 func _ready() -> void:
 	Events.tick.connect(sync)
 	sync()
-
-
-## HJUI.chip publishes its value label and keeps its caption to itself, so the
-## caption is found by walking. Wanted here and nowhere else so far; if a second
-## caller turns up it belongs in HJUI as `set_chip_caption`.
-static func _caption_of(chip: PanelContainer) -> Label:
-	var value: Variant = chip.get_meta("value_label", null)
-	var stack: Array = [chip]
-	while not stack.is_empty():
-		var node: Node = stack.pop_front()
-		for child in node.get_children():
-			if child is Label and child != value:
-				return child as Label
-			stack.append(child)
-	return null
 
 
 func set_titles(title_text: String, subtitle_text: String) -> void:
@@ -115,16 +98,14 @@ func _sync_clock(run: HJRun) -> void:
 		# that normally counts down, and swells once. A floating number here as
 		# well would be a second thing shouting next to a counter that is already
 		# counting.
-		if _clock_caption != null:
-			_clock_caption.text = "GAINED"
+		HJUI.set_chip_caption(_clock, "gained")
 		HJUI.set_chip(_clock, _hours(gained), "accent_2")
 		if not _clock_flashed:
 			_clock_flashed = true
 			HJGritFx.flash(_clock)
 		return
 
-	if _clock_caption != null and _clock_caption.text != "LEFT":
-		_clock_caption.text = "LEFT"
+	HJUI.set_chip_caption(_clock, "left")
 	var left := run.seconds_left()
 	var role := "good"
 	if left < 3 * 3600:

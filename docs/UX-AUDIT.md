@@ -1,5 +1,11 @@
 # UX audit — The Heroes' Journey
 
+**This is a snapshot, not a description of the current build.** It audits the
+version that still had chapters, a Menu that listed the run, and a Hearth full
+of settings; findings that have since been acted on are recorded as issues, and
+several are closed. Read it for the *method* and for the findings still open —
+not as a statement of what any screen looks like today.
+
 Method: every screen in `SCREENS` (`scripts/Main.gd`) visited in a headed Edge
 browser at 420x860 against the running build on `:8070`, driven over CDP, with
 the debug God-mode grid and the "Do" cheats used to reach gated screens. Every

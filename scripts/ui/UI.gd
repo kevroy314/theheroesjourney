@@ -347,7 +347,22 @@ static func chip(caption: String, value: String, role: String = "accent", icon_i
 		p.add_child(v)
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	p.set_meta("value_label", value_label)
+	# Published for the same reason the value is: a caption that can change with
+	# the value needs reaching without walking the tree to find it, and a chip
+	# reading "LEFT / +20h" is the one state of the clock that would be a lie.
+	p.set_meta("caption_label", cap)
 	return p
+
+
+## The caption, for the rare chip whose caption is not a constant.
+static func set_chip_caption(p: PanelContainer, caption: String, role: String = "") -> void:
+	if p == null or not p.has_meta("caption_label"):
+		return
+	var l: Label = p.get_meta("caption_label")
+	if is_instance_valid(l):
+		l.text = caption.to_upper()
+		if role != "":
+			l.add_theme_color_override("font_color", tint(Palette.c(role), "text"))
 
 
 static func set_chip(p: PanelContainer, value: String, role: String = "") -> void:

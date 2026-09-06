@@ -374,13 +374,13 @@ func complete_task(movement_id: String, scaled: bool) -> void:
 		run.chosen_movement = movement_id
 
 	var ctx := run.ctx({"axis": axis})
-	var multiplier := Rules.value("run.grit_mult", ctx, 1.0) * Meta.streak_multiplier()
-	if scaled and not run.full_scale:
-		multiplier *= clampf(Rules.value("task.partial_grit", ctx, 0.6), 0.0, 1.0)
+	# One implementation, in HJNodeInfo, because the area screen previews this
+	# number on the card before the player taps it. Two copies of the chain
+	# would drift the first time anyone tuned it, and the card would promise
+	# what the payer does not pay.
+	var award := HJNodeInfo.task_grit(run, node, scaled and not run.full_scale, axis)
 	if run.full_scale:
 		run.full_scale = false
-
-	var award := maxi(1, int(round(float(node.get("grit", 5)) * multiplier)))
 	add_grit(award)
 
 	for tag in node.get("grants", []):

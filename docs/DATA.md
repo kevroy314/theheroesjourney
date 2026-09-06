@@ -101,6 +101,13 @@ already reads them, and so can any screen.
 - `seconds_per_unit` — drives the honesty gate. `units × seconds_per_unit` must
   elapse before Confirm unlocks, so a 5-minute walk really does gate 5 minutes.
 - `scaling` — easier variants, offered on the task screen at no penalty.
+- `confirm` — which gesture ends the task: `hold` or `tap_rapid`. Optional, and
+  resolved most-specific-first by `HJGestures.for_movement`: the "always hold"
+  accessibility setting, then this, then `confirm` on the **axis** in
+  `achievements.json`, then `HJGestures.AXIS_DEFAULTS`. Hold for the soft and
+  social axes, tap for the brisk ones — and a plank overriding to `hold` on a
+  tapping axis is the case the per-movement key exists for. A gesture is a skin
+  on the confirm, never a second way to finish a task.
 
 Packs carry `cost` and `min_ring`, so the shop opens as you walk further out.
 
@@ -112,8 +119,8 @@ asserts this.
 
 ```jsonc
 {
-  "id": "waking_room", "name": "The Waking Room",
-  "intro": "…", "outro": "…",
+  "id": "the_house", "name": "The House",
+  "intro": "…", "outro": "…", "truth": "unclear",
   "nodes": [
     { "id": "rep", "type": "task", "label": "The First Rep",
       "task": { "movement": "$choose:move", "units": 1 },
@@ -226,17 +233,289 @@ and geometric shapes as tofu.
 `screen` names the screen the room opens. Adjacency is evaluated on the grid
 and folded into `Meta.active_modifiers()`.
 
+### The reveal ladder
+
+A price the player has no way to pay yet is noise, and a menu that shows the
+whole game on the first run spoils it. So a room is either **revealed** — bought
+or buyable, with its name and price — or **redacted**, a bar that says there is
+more without saying what.
+
+| key | meaning |
+|---|---|
+| `revealed_by_default` | visible from the first launch. The Atrium and the Hearth |
+| `reveal_after` | the room whose purchase reveals this one |
+| `starter` | placed on the grid from the start and cannot be moved. The Atrium |
+
+`Meta.room_revealed()` is the whole rule: own it, be flagged, or have bought
+what `reveal_after` names. **Reordering the unlock sequence is therefore a
+content edit**, not a code change — the chain today runs Hearth → Stores → Gym →
+Study → Identity → Workshop → Observatory.
+
+## Buffs
+
+A buff is a set of modifiers with an expiry and an icon. It is deliberately
+**not** a second way to change a number: every effect in `buffs.json` is an
+ordinary modifier, handed to `Rules` as a source alongside the ruleset, the
+trinkets, the traits and the Palace, and resolved by the same five ops in the
+same order. What is actually new here is expiry.
+
+```jsonc
+{ "id": "coffee", "name": "Coffee", "desc": "Faster on your feet for three hours.",
+  "icon": "move", "hours": 3, "then": "coffee_crash",
+  "apply_text": "Hot, and a little too strong.",
+  "expire_text": "The coffee lets go of you.",
+  "modifiers": [ { "key": "walk.step_time", "op": "mul", "value": 0.7 } ] }
+```
+
+| key | |
+|---|---|
+| `hours` | a **wall-clock** timer |
+| `break_on` | a list of events; anyone may call `Buffs.trigger("outdoors")` |
+| `then` | a second buff applied the instant this one ends |
+| `icon` | a mark in `assets/icons`, drawn in the buff strip |
+| `apply_text` / `expire_text` | what is said when it lands and when it lapses |
+
+**Expiry is wall-clock and persisted**, because a run spans real days and
+Android will kill a backgrounded app. Four hours away from a three-hour coffee
+leaves exactly one hour of crash, whether or not the process lived to see it.
+
+**A buff with neither `hours` nor `break_on` runs until something breaks it.**
+The Boon of the White Room ends when you step outside, which is an event and not
+a duration.
+
+**`then` is settled from the expiry, not from now** — an app closed through the
+whole of a coffee starts the crash on time rather than late. The chain is
+bounded at `Buffs.MAX_CHAIN` because a `then` that loops would settle forever,
+which no current data does and one typo would.
+
+A buff the player cannot see is a number that changed for no reason, so
+`HJUI.BuffStrip` draws `Buffs.active()` with a countdown on every screen that
+wants it.
+
+## Interactables
+
+Something you can stand beside and act on. Two halves, deliberately apart:
+
+| | lives in | says |
+|---|---|---|
+| the **catalogue** | `data/content/interactables.json` | what a *kind* of thing is: verb, price, effect |
+| the **placements** | `data/world/overworld.json`, an `interactables` list | where they stand: `{ x, y, type, label? }` |
+
+One catalogue entry serves every stove in the world, and the placement shape is
+already what the Tiled round trip classifies as an object layer — so a designer
+drags a door and retypes a stove as a counter with no code involved. See
+[`MAP-EDITING.md`](MAP-EDITING.md).
+
+```jsonc
+{ "id": "front_door", "name": "The front door", "verb": "Open",
+  "desc": "Shut, and it means it. Outside is a purchase.",
+  "icon": "threshold", "reach": "adjacent", "cost_key": "interact.door_cost",
+  "once": true, "spent_text": "It is already open.",
+  "blocks_until_tag": "front_door_open",
+  "effect": { "type": "tag", "tag": "front_door_open",
+              "text": "The lock turns. The morning is out there." } }
+```
+
+- `reach` is `on` or `adjacent` — whether you stand on the cell or beside it.
+- **`cost_key` names a config key, never a number**, so the price resolves
+  through `Rules` and a trinket can bend it. Same treatment as `run.clear_bonus`.
+- `effect` is one entry of the hook vocabulary above, applied by
+  `Game.apply_effects`.
+- `once` plus `spent_text` makes a thing that can only be done once.
+- `blocks_until_tag` is how the front door is a **wall** rather than a button:
+  `HJWorld.walkable()` returns false on its cell until that tag is set, so every
+  path query respects it with no special case in the movement code. Grit buying
+  the world is the lesson; making it a wall is what teaches it.
+- `critter` names a species — see below.
+
+## Critters
+
+An animal that moves: a named state machine over the tile grid.
+`scripts/game/Critters.gd` implements the goals and the conditions and knows
+nothing about dogs or cats, so **the next animal is a data file**.
+
+```jsonc
+{ "id": "dog", "name": "the dog", "sprite": "dog", "start": "waiting",
+  "states": {
+    "waiting":   { "goal": "hold" },
+    "following": { "goal": "approach", "target": "player",
+                   "keep": 1, "trail": 2, "pace": 0.17, "recover": 10,
+                   "say": "He gets up. He is coming with you." } },
+  "transitions": [
+    { "from": "waiting",   "on": "petted", "to": "following" },
+    { "from": "following", "on": "petted", "to": "waiting" } ] }
+```
+
+**goals**: `hold`, `approach`, `retreat`, `wander`. A state's other keys tune it:
+
+| key | |
+|---|---|
+| `target` | `player` or `home` — home is where the placement put it |
+| `keep` | the distance it is trying to hold: a **ceiling** for `approach`, a **floor** for `retreat` |
+| `trail` | aim at where the target was N moves ago. The lag is what makes a follower read as a companion instead of a mirror |
+| `pace` | seconds per cell. `0.17` is exactly `walk.step_time`, the player's own, and anything larger is an amble. `critter.tick_seconds` is only how often the animal *reconsiders*, and is deliberately finer than any pace so no speed is quantised to it |
+| `recover` | move attempts that may make no progress before it abandons the path and reappears at the edge of its band — what stops an animal wedged behind furniture being lost for the run |
+| `restless` | how readily a `wander` gets up |
+| `say` | one line, on entering the state |
+
+**transitions** are an ordered list and **first match wins, so order is
+priority.** `from` is a state id, a list of them, or `"*"`. `on` names an event
+fired at the animal (`petted` today); a transition with no `on` is tested every
+tick. `when` is a set of conditions — `dist_gte`, `dist_lte`, `held_gte`,
+`stray_gte`, `has_tag`, `lacks_tag` — which is the one place in the data that
+does *not* speak `Rules.passes`, because distance is a thing the run does not
+know. `effect` is one entry of the hook vocabulary, so an escort that fails can
+set a run tag without this system knowing what a quest is.
+
+**Placement is not here.** An interactables record whose catalogue entry carries
+a `critter` spawns one where it stands, reach follows the animal as it walks,
+and `critter_event` (default `petted`) is what acting on it fires. That one key
+is why petting the dog and petting the cat do opposite things with no branch
+anywhere in the code, and why retyping the dog as a cat in Tiled is a data edit.
+
+**The thresholds in each direction should differ.** The cat breaks off at 2,
+runs to 6, comes back in to 4 and only sets off again at 5, so its resting band
+is 3–4 and no two rules disagree at any distance. Matching the numbers produces
+an animal that vibrates on the boundary.
+
+## Dialogue
+
+`data/dialogue/*.json` carries `speakers` and `dialogues`. A conversation is a
+graph: each node is a few lines in order and then either a way on or a set of
+replies.
+
+```jsonc
+{ "speakers": [
+    { "id": "spite", "name": "Spite", "portrait": "spite", "accent": "warn" } ],
+  "dialogues": [
+    { "id": "spite_doorstep", "speaker": "spite", "start": "arrival", "once": true,
+      "nodes": [
+        { "id": "arrival", "lines": ["…", "…"], "mood": "wary", "replies": [
+            { "text": "\"What do you want?\"", "goto": "want" },
+            { "text": "Say nothing.", "goto": "silence" } ] },
+        { "id": "want", "lines": ["…"], "mood": "wary",
+          "effects": [ { "type": "objective",
+                         "objective": "close_town_anomalies" } ],
+          "replies": [ { "text": "\"Fine.\"", "goto": "gift" } ] },
+        { "id": "gift", "lines": ["…"], "mood": "kind",
+          "effects": [ { "type": "item", "item": "finder", "silent": true } ],
+          "replies": [
+            { "text": "\"I have been out past…\"", "goto": "smug",
+              "when": { "zone_gte": 2 } },
+            { "text": "Take it.", "goto": "end" } ] },
+        { "id": "end", "lines": ["…"], "end": true } ] } ] }
+```
+
+**Node ids are unique within their own conversation, not across all of them** —
+every graph is allowed an `end`. `Dialogue.problems()` checks that every
+`start`, `next` and `goto` names a node in its own graph, which is the half of
+the check the schema cannot see.
+
+Two things it deliberately does not invent: a reply's `when` is the same
+dictionary a modifier's `when` is, and a node's or reply's `effects` are handed
+to `Objectives.apply_effects`, which delegates the paying ones straight back to
+`Game.apply_effects`.
+
+`mood` selects a portrait variant and is drawn from the Spite alter list.
+`portrait` is a named seam: no art exists yet, and
+`Dialogue.portrait_path()` turns it into
+`assets/portraits/<portrait>_<mood>.png` the moment some does.
+
+`once: true` means once across the whole save, not once per run — `seen` lives
+in `user://dialogue.json`.
+
+## Objectives
+
+What you are trying to do, and whether it is done yet. The Hearth renders them.
+
+```jsonc
+{ "id": "close_town_anomalies",
+  "title": "Close every anomaly in town",
+  "desc": "Spite says the town is full of holes. …",
+  "giver": "spite",
+  "goal": { "type": "anomalies_in_ring", "ring": 0 },
+  "reward": [ { "type": "resolve", "amount": 12 },
+              { "type": "log", "kind": "good", "text": "The town is quiet. …" } ] }
+```
+
+**goal types**: `anomalies_in_ring` (with `ring`). One today; the list is
+`vocabulary.objective_goals` and `Objectives.progress()` is its implementation.
+
+Three things separate this from the Wheel, which is the closest existing system:
+
+- an objective is **given**, not earned. Spite hands the first one over on the
+  doorstep; nothing about your play unlocks it.
+- **progress outlives the run.** The loop takes the world back and leaves the
+  errand standing, which is the whole point of it.
+- it is **displayed**. `active()` and `progress()` are a read API somebody else
+  renders.
+
+Progress is *derived*, not counted: `Objectives.note_closed()` records the cells
+of every anomaly ever closed, harvested off `run_changed`. `run.anomalies_cleared`
+is per-run and dies with the loop; `Meta.anomalies_closed` is a lifetime count
+that cannot tell "the two in town" from "two out past the foothills". Neither can
+answer "is the town finished", so the cells themselves are what is stored.
+
+### Story effects
+
+Dialogue lines, dialogue replies and objective rewards carry `effects`, a
+slightly wider vocabulary than a hook's: `grit`, `deadline`, `resolve`, `item`,
+`tag`, `objective`, `log`. `Objectives.apply_effects` is the one implementation,
+and it hands `grit`, `deadline` and the unnamed `item` straight to
+`Game.apply_effects` rather than paying them a second way. `objective` takes an
+`objective` id and starts it.
+
+## The world file
+
+`data/world/overworld.json` is not loaded by `Content` — `World.gd` reads it,
+and the file-side validator is the only thing that checks it. Two of its keys
+are content rather than terrain:
+
+| key | shape | |
+|---|---|---|
+| `indoors` | `{ x, y, w, h }` in cells | the footprint of the building the player wakes in, walls included |
+| `interactables` | `[{ x, y, type, label? }]` | placements naming a catalogue entry |
+
+`indoors` is what the Boon of the White Room is scoped to: walking is free
+inside it and breaks on the first cell outside, and that same crossing unlocks
+the Hearth and triggers the Spite encounter. It is a rectangle a designer can
+edit rather than a rule derived from the floor material, so a second building is
+a data change.
+
+Both are **optional** and neither is in the schema's `world.required` list, so
+deleting them loses them quietly — see the caveat in
+[`MAP-EDITING.md`](MAP-EDITING.md#what-is-in-the-map).
+
+Everything else — the packed planes, the regions, the anomalies, the props — is
+[`MAP-EDITING.md`](MAP-EDITING.md)'s subject.
+
 ## Config keys
+
+Every tunable number, with its base value in `data/content/config.json` and
+every read through `Rules.value()`. `data/content/critters.json` carries a
+`config` block of its own, merged into the same table.
 
 ```
 run.grit_mult  run.resolve_rate  run.loop_keep  run.clear_bonus  run.repeat_falloff
 streak.per_day  streak.cap_days
 area.slot_bonus  area.reveal_sides  area.deadline_bonus_hours
-task.partial_grit  task.min_seconds  task.hold_seconds
+task.partial_grit  task.min_seconds  task.hold_seconds  task.tap_count
+task.tap_decay  task.time_gate_mult
 loot.cache_mult  loot.echo_weight  loot.trinket_weight
 shop.discount
-spite.chance  spite.kind_weight
+spite.kind_weight
+steps.reward_per_node  steps.multiplier_per_node  steps.starting_grant
+steps.burn_penalty  steps.cost_mult
+walk.step_time
+interact.door_cost  interact.coffee_cost  interact.breakfast_cost
+finder.range  finder.noise
+critter.tick_seconds  critter.fidget_seconds  critter.path_budget
 ```
+
+A key here is only legal if some `Rules.value()` call reads it — see
+Vocabulary, below. `cost_key` and `scaled_by` are the two fields whose *value*
+is a key resolved at runtime rather than a literal, so a key that appears only
+there is still genuinely read.
 
 ## Validation
 
@@ -274,11 +553,23 @@ refusing to start is a worse answer than a slightly wrong number.
 
 2. **References.** Every node `next` names a node in its own area; every slot
    `attach` likewise (it becomes the generated side node's `side_of`, which
-   gates when the node opens); every world region and anomaly `area` resolves; every
-   `loot` names a table; every `movement` is a real movement or a legal `$`
-   token; every Palace adjacency key names a room; every overworld region and
-   anomaly points at a real area; every prop `biome` is a real material *the
-   world actually contains cells of*.
+   gates when the node opens); every `loot` names a table; every `movement` is a
+   real movement or a legal `$` token; every Palace adjacency key names a room;
+   every overworld region and anomaly points at a real area; every world
+   `interactables` placement names a `type` in the catalogue; every catalogue
+   `critter` names a species and every species' `sprite` has a PNG under
+   `assets/sprites/`; every objective `giver` and dialogue `speaker` is a
+   speaker; every prop `biome` is a real material *the world actually contains
+   cells of*, and every prop `light` carries all three of `radius`, `color` and
+   `flicker`.
+
+   Two of these are checked by the Python tool alone rather than declared as
+   schema `refs`, and the reason is worth knowing before you "tidy" them into
+   the schema: `Content.gd` builds its id sets from `runtime` paths and does not
+   merge a `critters` key, so a `refs` entry would resolve against an empty set
+   and make the **in-game** validator reject every placement on a player's
+   device. A check that is right on disk and wrong on a phone is worse than one
+   that only runs on disk.
 
 3. **Vocabulary.** Every modifier `op` is one of the five `Rules` applies, every
    `when` condition is one `Rules.passes` implements, every hook is one

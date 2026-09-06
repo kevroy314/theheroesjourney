@@ -1,7 +1,7 @@
 {
-  "_comment": "Animals that move. A critter is a named state machine over the tile grid, and everything about how it behaves — which states exist, what each one does, the distances it keeps and what moves it between them — is in this file. scripts/game/Critters.gd implements four goals (hold, approach, retreat, wander) and a handful of transition conditions, and knows nothing about dogs or cats. Placement is world data: an interactables record in data/world/overworld.json whose catalogue entry carries a `critter` key spawns one of these where it stands, and acting on it fires the named event. Numbers are here rather than in GDScript because the point of the exercise is that the next animal is a data file. The escort in #78 — \"follow, but stop if the player gets too far, and fail after N tiles apart\" — is three states and four transitions in this same shape and needs no new code; scripts/game/CritterSim.gd builds and runs exactly that as a proof.",
+  "_comment": "Animals that move. A critter is a named state machine over the tile grid, and everything about how it behaves — which states exist, what each one does, the distances it keeps and what moves it between them — is in this file. scripts/game/Critters.gd implements four goals (hold, approach, retreat, wander) and a handful of transition conditions, and knows nothing about dogs or cats. Placement is world data: an interactables record in data/world/overworld.json whose catalogue entry carries a `critter` key spawns one of these where it stands, and acting on it fires the named event. `pace` is seconds per cell, so 0.17 is exactly the player's own walk.step_time and anything larger is an amble; `critter.tick_seconds` is only how often an animal reconsiders, and is deliberately finer than any pace so a speed is never quantised to it. Numbers are here rather than in GDScript because the point of the exercise is that the next animal is a data file. The escort in #78 — \"follow, but stop if the player gets too far, and fail after N tiles apart\" — is three states and four transitions in this same shape and needs no new code; scripts/game/CritterSim.gd builds and runs exactly that as a proof.",
   "config": {
-    "critter.tick_seconds": 0.17,
+    "critter.tick_seconds": 0.06,
     "critter.fidget_seconds": 3.4,
     "critter.path_budget": 240
   },
@@ -11,17 +11,18 @@
       "name": "the dog",
       "sprite": "dog",
       "start": "waiting",
-      "_comment": "Follow, with lag. `trail: 2` aims him at the cell you stood on two moves ago rather than the one you are on, which is the whole difference between a companion and a mirror — a follower that occupies your previous cell exactly reads as a rendering bug. `keep: 1` means he stops when he is beside that cell, so his real distance from you sits around two or three. `recover: 10` is the escape hatch: ten move attempts that get no closer and he gives up on the path and reappears at the edge of his band, which is what stops a dog wedged behind a chair from being lost for the rest of the run.",
+      "_comment": "Follow, with lag. `trail: 2` aims him at the cell you stood on two moves ago rather than the one you are on, which is the whole difference between a companion and a mirror — a follower that occupies your previous cell exactly reads as a rendering bug. `keep: 1` means he stops when he is beside that cell, so his real distance from you sits around two or three. His pace is the player's own 0.17s a cell, so he keeps up rather than gaining or losing ground. `recover: 10` is the escape hatch: ten move attempts that get no closer and he gives up on the path and reappears at the edge of his band, which is what stops a dog wedged behind a chair from being lost for the rest of the run.",
       "states": {
         "waiting": {
-          "goal": "hold"
+          "goal": "hold",
+          "say": "He sits down where he is. He will be here."
         },
         "following": {
           "goal": "approach",
           "target": "player",
           "keep": 1,
           "trail": 2,
-          "pace": 1.0,
+          "pace": 0.17,
           "recover": 10,
           "say": "He gets up. He is coming with you."
         }
@@ -50,14 +51,14 @@
           "goal": "wander",
           "target": "home",
           "keep": 2,
-          "pace": 3.2,
+          "pace": 0.9,
           "restless": 0.25
         },
         "bolting": {
           "goal": "retreat",
           "target": "player",
           "keep": 6,
-          "pace": 0.7,
+          "pace": 0.12,
           "say": "It is already three tiles away."
         },
         "skulking": {
@@ -67,7 +68,7 @@
           "goal": "approach",
           "target": "player",
           "keep": 4,
-          "pace": 2.2
+          "pace": 0.34
         },
         "watching": {
           "goal": "hold",

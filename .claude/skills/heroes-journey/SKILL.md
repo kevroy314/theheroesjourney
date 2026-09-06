@@ -105,6 +105,14 @@ Godot scans that directory **non-recursively and skips subdirectories**, so a
 
 ## Traps this project has already hit
 
+**`make_tiles.py` silently drops every authored prop.** The generated atlas is
+rebuilt from scratch, and props added through `tools/add_prop.py` live *past*
+the generated ones — so regenerating tiles leaves `tiles.json` one short and the
+Tiled map referencing a prop no catalogue can read. The export refuses, with a
+message about the object rather than about the missing step. **Always run
+`python3 tools/add_prop.py reapply` after `make_tiles.py`**, before
+`make_world.py`.
+
 **A new `class_name` is invisible until you reimport.** `.godot/` is gitignored
 and `global_script_class_cache.cfg` is only rebuilt by an import pass, so a
 freshly added `class_name` parses as "Identifier not declared in the current
