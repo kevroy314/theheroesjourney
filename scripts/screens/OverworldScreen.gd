@@ -10,6 +10,7 @@ var _world: HJTileWorld
 var _steps_chip: PanelContainer
 var _budget: Label
 var _where: Label
+var _place: Label
 var _act: Button
 var _pad: HJMoveControls
 
@@ -47,7 +48,8 @@ func build() -> void:
 		if at.x < 0:
 			at = HJWorld.shared().nearest_walkable(HJWorld.shared().spawn)
 		where = HJWorld.shared().place_name(at)
-	titles.add_child(HJUI.label(where, HJUI.FS_HEAD, "text"))
+	_place = HJUI.label(where, HJUI.FS_HEAD, "text")
+	titles.add_child(_place)
 	_where = HJUI.label(Steps.describe(), HJUI.FS_TINY, "muted")
 	titles.add_child(_where)
 	# On Android the counter is useless until ACTIVITY_RECOGNITION is granted,
@@ -194,6 +196,22 @@ func _on_moved(cell: Vector2i) -> void:
 	run.world_pos = cell
 	Game.tutorial.note_moved(cell)
 	_offer_nearby(cell)
+	_sync_place(cell)
+
+
+## The header named the place once, when the screen was built, and then never
+## again — so you could walk off the street into the tavern and still be told
+## you were in "The Town". Now that thirteen buildings can be walked into, the
+## header is the only thing that says you are inside one.
+func _sync_place(cell: Vector2i) -> void:
+	if _place == null or not is_instance_valid(_place):
+		return
+	var run: HJRun = Game.run
+	if run == null:
+		return
+	# Inside an anomaly the area's own name wins, exactly as it does at build.
+	var named := String(run.area.get("name", ""))
+	_place.text = named if named != "" else HJWorld.shared().place_name(cell)
 
 
 ## The thing you are standing next to, as the primary action.

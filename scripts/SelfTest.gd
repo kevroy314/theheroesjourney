@@ -854,6 +854,32 @@ static func _layout_checks(host: Node, failures: Array) -> void:
 	Meta.ui_toast_pos = was_pos
 	host.call("_place_toasts")
 
+	# Walking into a building must change what the header says it is.
+	#
+	# The header named the place once, at build, and then never again — so you
+	# could walk off the street into the tavern and still be told you were in
+	# "The Town". With thirteen buildings enterable the header is the only thing
+	# that says you are inside one.
+	var world := HJWorld.shared()
+	var inside := Vector2i(-1, -1)
+	var want := ""
+	for i in world.indoors.size():
+		var name_of := world.place_name(world.indoors[i].get_center())
+		if name_of != "Home" and name_of != "Outside":
+			inside = world.nearest_walkable(world.indoors[i].get_center())
+			want = name_of
+			break
+	if want != "":
+		Game.goto("overworld")
+		await host.get_tree().process_frame
+		var walk: Node = host.get("current")
+		walk.call("_on_moved", inside)
+		await host.get_tree().process_frame
+		var label: Label = walk.get("_place")
+		_check(failures, "the header renames itself when you walk indoors",
+			label != null and label.text == want,
+			"reads '%s', expected '%s'" % [label.text if label != null else "", want])
+
 	# A word must not be broken down the screen.
 	#
 	# Squeezed into a shrink-wrapped container, "Tobin" set one letter per line
