@@ -98,6 +98,13 @@ func backdrop_id() -> String:
 	return screen_id if screen_id != "" else Game.screen
 
 
+## How much room at the bottom of the frame this screen's own controls need, in
+## frame units. The toast column sits above it. Zero is the honest answer for a
+## screen that puts nothing in the thumb zone; the walk screen overrides it.
+func toast_clearance() -> float:
+	return 0.0
+
+
 ## The place the run is standing in right now. Anything that happens *inside* an
 ## area — the boon, the event, opening the bag — happens in that area, not in
 ## some generic room, so they all key off this rather than off their own name.

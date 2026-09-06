@@ -60,11 +60,13 @@ func build() -> void:
 			HJUI.FS_TINY, "muted"))
 	# The name sat straight on the backdrop, and a speaker whose accent is
 	# "muted" — Tobin's is — disappeared entirely wherever the art behind it
-	# was pale. It reads over a window now because it has a ground of its own,
-	# which is the same answer the line of dialogue below it already used.
+	# was pale. It needs a ground; what it must not have is the one I gave it
+	# first, a shrink-wrapped panel in an HBox, which squeezed the label to its
+	# minimum width and set "Tobin" one letter per line. The plate takes the
+	# rest of the row instead, so the name has the width it always had.
 	var plate := HJUI.panel("panel")
 	plate.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	plate.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	plate.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	plate.add_child(naming)
 	who.add_child(plate)
 	v.add_child(who)

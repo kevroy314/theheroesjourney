@@ -31,9 +31,11 @@ const SCREENS := {
 const FRAME_WIDTH := 720.0
 
 ## How tall a band the toast column is allowed to fill before it starts trimming.
-## What the movement pad and the action button occupy at the bottom of the play
-## screen: the pad is about 260px and `_act` another 84, plus its margin. A
-## toast anchored below this covers the control the player is reaching for.
+## The floor under the bottom band when the screen has nothing to say about its
+## own controls. A screen that does have controls is asked — see
+## `HJScreen.toast_clearance()` — because this number was wrong: 360 clears the
+## movement pad and lands squarely on the action button above it, which is the
+## one control the toast is most often talking about.
 const CONTROLS_BAND := 360.0
 const TOAST_BAND := 240.0
 ## How much of the width the offset column takes. Wide enough for a sentence at
@@ -136,8 +138,11 @@ func _place_toasts() -> void:
 			# notification can sit and still be out of the way of a thumb.
 			toasts.anchor_top = 1.0
 			toasts.anchor_bottom = 1.0
-			toasts.offset_top = -(TOAST_BAND + CONTROLS_BAND)
-			toasts.offset_bottom = -CONTROLS_BAND
+			var clear := CONTROLS_BAND
+			if current != null and current.has_method("toast_clearance"):
+				clear = maxf(clear, float(current.call("toast_clearance")))
+			toasts.offset_top = -(TOAST_BAND + clear)
+			toasts.offset_bottom = -clear
 			# The newest line sits lowest, closest to where the eye already is,
 			# and older ones ride up out of the way.
 			toasts.grow_vertical = Control.GROW_DIRECTION_BEGIN
@@ -225,12 +230,21 @@ func _on_screen_changed(screen_name: String) -> void:
 	# which room it is standing in.
 	current.screen_id = screen_name
 	host.add_child(current)
+	# The toast column's band depends on which screen is under it, and a toast
+	# outlives a screen change: `Game.say` then `Game.goto` is an ordinary
+	# pairing, and it fired while the *old* screen was still current. That is
+	# how a notification ended up wearing the world map's clearance — which is
+	# none — over the walk screen's action button.
+	_place_toasts()
 	_swapping = false
 
 
 func _toast(text: String, kind: String) -> void:
 	if text.strip_edges() == "":
 		return
+	# The action button appears and disappears as the player walks past things,
+	# so the clearance is measured now rather than when the screen was built.
+	_place_toasts()
 	var role := "text"
 	match kind:
 		"good": role = "good"
@@ -257,6 +271,7 @@ func _toast(text: String, kind: String) -> void:
 func _unlock_toast(text: String, screen: String) -> void:
 	if text.strip_edges() == "":
 		return
+	_place_toasts()
 	var card := HJUI.TapCard.new()
 	card.add_theme_stylebox_override("panel", HJUI.stylebox(
 		Palette.c("panel_alt"), HJUI.RADIUS, Palette.c("accent"), 2))

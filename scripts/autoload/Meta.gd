@@ -76,10 +76,15 @@ var hold_confirm: bool = false
 ## that opts back into mouse events, so down there it does not merely obscure
 ## the primary action, it *eats the tap meant for it*.
 ##
-## So: "top_left", which is narrow and offset. It clips the left of the header
-## for two seconds and touches no control at all. Covering information you can
-## re-read costs less than covering a control you are reaching for.
-var ui_toast_pos: String = "top_left"
+## So: "bottom", which sits above the whole bottom control stack — the action
+## button as well as the movement pad, measured from the screen's own layout
+## rather than assumed. It covers nothing at all.
+##
+## This used to default to "top_left" while the load fallback and the reset both
+## said "bottom", so a fresh install and a reset disagreed and a new player got
+## a toast across the run header — over the very numbers it was talking about.
+## One default now, and it is the one the other two already named.
+var ui_toast_pos: String = "bottom"
 ## How walking is driven. One of: "dpad" | "pad4" | "pad8" | "tap_path".
 var ui_move_control: String = "dpad"
 var pause_started: int = 0

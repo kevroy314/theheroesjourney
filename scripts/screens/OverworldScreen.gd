@@ -134,6 +134,30 @@ func _exit_tree() -> void:
 
 
 ## The keyboard, which is every control's fifth option. Routed through the
+## The action button and the movement pad, asked rather than assumed.
+##
+## The constant in Main cleared the pad and stopped there, so a toast landed on
+## the action button — the one control it is most often talking about, and the
+## one the player's thumb is already moving towards.
+##
+## Their *minimum* sizes rather than their laid-out rects, because both are
+## SHRINK_END and therefore sit at exactly their minimum, and because a minimum
+## is already correct before the first layout pass. Reading `position` instead
+## was the first attempt and it silently returned nothing at all, which looks
+## from the outside exactly like the bug it was meant to fix.
+func toast_clearance() -> float:
+	if _act == null or not is_instance_valid(_act):
+		return 0.0
+	if _pad == null or not is_instance_valid(_pad):
+		return 0.0
+	var gap := 0.0
+	var box := _act.get_parent()
+	if box is BoxContainer:
+		gap = float((box as BoxContainer).get_theme_constant("separation"))
+	return _act.get_combined_minimum_size().y \
+		+ _pad.get_combined_minimum_size().y + gap * 2.0 + 8.0
+
+
 ## movement controls rather than straight at the world, so that a key press
 ## cancels a tap-to-walk route the same way a thumb on the pad does.
 func _unhandled_input(event: InputEvent) -> void:

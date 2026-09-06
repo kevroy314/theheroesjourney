@@ -811,9 +811,96 @@ static func _screen_checks(host: Node, failures: Array) -> void:
 		Game.goto(String(screen_name))
 		await host.get_tree().process_frame
 	_check(failures, "every screen builds mid-run", Game.run != null, "")
+	await _layout_checks(host, failures)
+
 	Game.abandon_run()
 	Game.goto("title")
 	await host.get_tree().process_frame
+
+
+## Layout, asserted rather than eyeballed.
+##
+## Three separate papercuts shipped in one pass — a toast on top of the action
+## button, a speaker's name set one letter per line, and a default that put the
+## toast across the run header — and all three were "verified" by looking at a
+## screenshot of a path that happened to look fine. A screenshot proves one
+## frame. These prove the property, on every run, in eight seconds.
+static func _layout_checks(host: Node, failures: Array) -> void:
+	# The toast column must clear the bottom controls.
+	Game.goto("overworld")
+	# Two frames: one to build, one for the container to lay its children out.
+	await host.get_tree().process_frame
+	await host.get_tree().process_frame
+	var was_pos := Meta.ui_toast_pos
+	Meta.ui_toast_pos = "bottom"
+	host.call("_place_toasts")
+	var screen: Node = host.get("current")
+	var act: Control = screen.get("_act") if screen != null else null
+	if act != null and is_instance_valid(act) and act.size.y > 0.0:
+		var toasts: Control = host.get("toasts")
+		# Both measured from the bottom edge of the frame, which is what the
+		# toast column is anchored to.
+		var band_bottom := -float(toasts.offset_bottom)
+		# The toast column is anchored to the frame, which fills the viewport, so
+		# the viewport's height is the right zero to measure both from.
+		var frame_h := act.get_viewport_rect().size.y
+		var act_top := frame_h - act.global_position.y
+		_check(failures, "a bottom toast clears the action button",
+			band_bottom >= act_top,
+			"band %.0f from the bottom, button top %.0f" % [band_bottom, act_top])
+	else:
+		_check(failures, "the walk screen has a laid-out action button", false,
+			"no _act to measure")
+	Meta.ui_toast_pos = was_pos
+	host.call("_place_toasts")
+
+	# A word must not be broken down the screen.
+	#
+	# Squeezed into a shrink-wrapped container, "Tobin" set one letter per line
+	# and still passed every check there was, because none of them looked at a
+	# Label. The general form of that bug is a label given less width than one
+	# word needs, so the rule is general: a run of text with no spaces in it may
+	# not occupy more lines than it has words.
+	# The doorstep conversation is `once: true`, and by this point in the harness
+	# it has already been seen — which is precisely why the first version of this
+	# check passed while the bug was in the tree. It found no dialogue at all and
+	# reported success. Forget it first, so the check always has something to
+	# measure, and assert that it really opened.
+	Dialogue.seen.erase("spite_doorstep")
+	var opened := Dialogue.start("spite_doorstep")
+	_check(failures, "the doorstep conversation opens for the layout check",
+		opened and Dialogue.active(), "start=%s" % opened)
+	if opened:
+		Game.goto("dialogue")
+		await host.get_tree().process_frame
+		await host.get_tree().process_frame
+		var squeezed := ""
+		var lines := 0
+		for node in _labels(host.get("current")):
+			var label: Label = node
+			var text := label.text.strip_edges()
+			if text == "":
+				continue
+			var words: int = text.split(" ", false).size()
+			if label.get_line_count() > maxi(1, words):
+				squeezed = text
+				lines = label.get_line_count()
+				break
+		_check(failures, "no label breaks a word down the screen",
+			squeezed == "", "'%s' takes %d lines" % [squeezed, lines])
+		Dialogue.stop()
+
+
+## Every Label under a node, depth first.
+static func _labels(root: Node) -> Array:
+	var out: Array = []
+	if root == null:
+		return out
+	if root is Label:
+		out.append(root)
+	for child in root.get_children():
+		out.append_array(_labels(child))
+	return out
 
 
 ## Anomalies: the roguelite loop. Walking to one is the player's problem; this
