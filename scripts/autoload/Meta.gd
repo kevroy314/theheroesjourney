@@ -30,6 +30,16 @@ var palace_size: int = 0               ## 0 = not initialised yet
 ## rewritten. This stays only long enough to be migrated out of an old save.
 var history: Array = []
 
+## What the player said about themselves when the first memory asked, keyed by
+## the `remember` field of the choice node that asked — "strength" -> "self_weak",
+## "name" -> whatever they typed, "" if they would not say. Run tags carry the
+## same answers for the length of a run; this is the half that outlives the loop,
+## because anomaly selection is supposed to read it on the *next* run. It is a
+## real exception to "nothing survives the reset", and it earns the exception the
+## same way the Mind Palace does: what you admitted about yourself is inside you,
+## so it comes along.
+var self_description: Dictionary = {}  ## question key -> tag, or typed text
+
 var codex: Array = []                  ## echo ids ever found
 var axis_tasks: Dictionary = {}        ## axis -> lifetime count
 ## The deepest ring ever reached. Progression is how far out you have been, not
@@ -526,7 +536,7 @@ func save_game() -> void:
 		"revealed": revealed,
 		"streak": streak, "best_streak": best_streak,
 		"last_active_day": last_active_day, "rest_used_day": rest_used_day,
-		"codex": codex, "axis_tasks": axis_tasks,
+		"codex": codex, "axis_tasks": axis_tasks, "self_description": self_description,
 		"deepest_ring": deepest_ring, "anomalies_closed": anomalies_closed,
 		"resume_x": resume_at.x, "resume_y": resume_at.y,
 		"loops": loops, "runs_today": runs_today,
@@ -582,6 +592,7 @@ func load_game() -> void:
 			best_streak = int(parsed.get("best_streak", 0))
 			last_active_day = String(parsed.get("last_active_day", ""))
 			rest_used_day = String(parsed.get("rest_used_day", ""))
+			self_description = parsed.get("self_description", {})
 			codex = parsed.get("codex", [])
 			axis_tasks = parsed.get("axis_tasks", {})
 			deepest_ring = int(parsed.get("deepest_ring", 0))
@@ -619,6 +630,7 @@ func wipe() -> void:
 	rest_used_day = ""
 	codex = []
 	axis_tasks = {}
+	self_description = {}
 	deepest_ring = 0
 	anomalies_closed = 0
 	resume_at = Vector2i(-1, -1)

@@ -253,6 +253,14 @@ func tap_node(id: String) -> void:
 			run.pending_node = id
 			changed()
 			goto("task")
+		"choice":
+			# A question, not a task. It takes the same slot on the run — there
+			# is one thing in front of the player at a time — and the same
+			# screen, which builds a bare page for it instead of the movement
+			# picker and the plausibility gate. HJSurvey does the rest.
+			run.pending_node = id
+			changed()
+			goto("task")
 		"free":
 			finish_node(id)
 			_show_text(String(node.get("label", "")), String(node.get("text", "")))
@@ -390,7 +398,22 @@ func complete_task(movement_id: String, scaled: bool) -> void:
 		goto("area")
 
 
+## Back out of a task without doing it.
+##
+## Refuses on a `choice`, and the reason is a trap worth naming. Skipping clears
+## `pending_node` *without* completing the node, so the thing stays available and
+## is offered again — which is right for a task you decided not to do, and a
+## silent infinite loop for a question, because the question is the only way
+## forward and declining it changes nothing. The self-test drove exactly that
+## loop 200 times before giving up.
+##
+## The choice screen has no skip button, so no player can reach this. It is
+## guarded anyway: a screen growing one later should get a no-op it can see,
+## rather than a run that quietly cannot end.
 func skip_task() -> void:
+	if String(run.node(run.pending_node).get("type", "")) == "choice":
+		say("It is still asking.", "warn")
+		return
 	run.pending_node = ""
 	changed()
 	goto("area")

@@ -103,7 +103,8 @@
       "mirror",
       "trinket",
       "spite",
-      "warden"
+      "warden",
+      "choice"
     ],
     "loot_types": [
       "grit",
@@ -128,6 +129,16 @@
     ],
     "unit_tokens": [
       "$set"
+    ],
+    "_comment_choice_inputs": "How an option on a choice node is answered. Absent means a button carrying the option's own words. \"text\" means the player types the answer, so the option renders a field as well as a button, and what they typed is what gets remembered rather than the tag.",
+    "choice_inputs": [
+      "text"
+    ],
+    "_comment_truths": "An anomaly is a memory of a life adjacent to yours, and this is the claim it makes about itself. AreaScreen reads it into the line above the intro, so it is the frame the player is given before they act; nothing yet checks the claim, which is the point.",
+    "truths": [
+      "true",
+      "false",
+      "unclear"
     ],
     "_dynamic_key_fields": "Data fields whose *value* is a Rules key resolved at runtime rather than written as a literal in the source. Game.gd rolls loot with Rules.value(String(entry['scaled_by'])), so a key that only ever appears in a scaled_by field is genuinely read even though no literal call names it. validate_data.py cross-checks this list against the non-literal Rules.value() call sites it finds, so adding a second dynamic reader without listing it here is itself an error.",
     "dynamic_key_fields": [
@@ -222,8 +233,12 @@
       "optional": [
         "intro",
         "outro",
-        "slots"
-      ]
+        "slots",
+        "truth"
+      ],
+      "enum": {
+        "truth": "truths"
+      }
     },
     "anomalies": {
       "_comment": "Anomalies are areas in every structural respect \u2014 same nodes, same slots \u2014 so the graph pass treats them together with areas and their ids share the area id space.",
@@ -247,10 +262,15 @@
       "optional": [
         "intro",
         "outro",
-        "slots"
-      ]
+        "slots",
+        "truth"
+      ],
+      "enum": {
+        "truth": "truths"
+      }
     },
     "nodes": {
+      "_comment": "One card in an area. `when` is the same condition dictionary a modifier carries, evaluated by Rules.passes against the run -- a node whose `when` fails is closed off, and HJAreaGen counts it as satisfied for everything downstream, so `select_next` is the flag that says so: the player picks a branch of an `exclusive_next` fork, the memory picks a branch of a `select_next` one, trying `next` in order and opening the first whose `when` passes. Every `select_next` fork needs a last branch with no `when` at all, or a run that matches none of them is offered nothing. `prompt`, `options` and `remember` belong to `choice` nodes: the prompt is the sentence the memory starts, the options finish it, and `remember` names the key the answer is filed under in Meta.self_description, which is the half of the answer that outlives the loop.",
       "files": {
         "dir": "areas",
         "paths": [
@@ -283,13 +303,51 @@
         "next",
         "grants",
         "exclusive_next",
-        "side_of"
+        "select_next",
+        "side_of",
+        "prompt",
+        "options",
+        "remember",
+        "when"
       ],
       "enum": {
         "type": "node_types"
       },
       "refs": {
         "loot": "loot"
+      }
+    },
+    "choice_options": {
+      "_comment": "One answer to a choice node. `grants` is the existing node mechanism -- it writes to HJRun.tags, which Rules.passes already reads as has_tag/lacks_tag -- so an answer is a condition the rest of the content can consult with no new machinery. Grit belongs on the node rather than here: paying differently for different answers would price honesty, and the survey is the one place in the game that must not.",
+      "files": {
+        "dir": "areas",
+        "paths": [
+          "nodes[].options[]"
+        ],
+        "also": [
+          {
+            "dir": "content",
+            "paths": [
+              "anomalies[].nodes[].options[]"
+            ]
+          }
+        ]
+      },
+      "runtime": [
+        "areas{}.nodes[].options[]",
+        "anomalies[].nodes[].options[]"
+      ],
+      "unique_ids": false,
+      "required": [
+        "text"
+      ],
+      "optional": [
+        "grants",
+        "grit",
+        "input"
+      ],
+      "enum": {
+        "input": "choice_inputs"
       }
     },
     "tasks": {

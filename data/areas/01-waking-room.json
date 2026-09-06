@@ -1,47 +1,89 @@
 {
   "id": "waking_room",
-  "name": "The Waking Room",
-  "intro": "The ceiling. Familiar in a way you can't place. The door is across the room.",
-  "outro": "The handle is cold. Behind you the bed is already making its case.",
+  "name": "The Asking",
+  "truth": "unclear",
+  "_comment": "Beat 3 of docs/FIRST-THIRTY.md, and the first anomaly a save ever opens. It is a survey rather than a task chain because the player has not been told what an anomaly is yet, and being asked something is a better first lesson than being asked for ten push-ups. Every answer grants a tag, which is a run condition Rules.passes can read, and is filed under `remember` in Meta.self_description, which is what anomaly selection will weight against later. The last node is an action selected by the answers, and it is always a do-this: a player who says they are overnourished is given someone to message, never told to eat less. The three actions are tried in `next` order and the first whose `when` passes takes it, so act_message must stay last and stay unconditional -- it is the default, and without it a run that matches nothing walks out of a memory that asked five questions and wanted nothing.",
+  "intro": "Nothing in here is furniture. The hole has your outline in it, roughly, the way a chair remembers someone. It is waiting for the rest.",
+  "outro": "It has what it came for. You are on the record now, in a place that does not keep records.",
   "nodes": [
-    { "id": "wake", "type": "free", "label": "Open your eyes",
-      "text": "You are awake, and horizontal, and those are two different problems.",
-      "next": ["rep"] },
+    { "id": "name", "type": "choice", "label": "Your name",
+      "prompt": "Do you remember your name?",
+      "text": "It is a fair question, and you are having to think about it.",
+      "remember": "name",
+      "grit": 4,
+      "options": [
+        { "input": "text", "text": "That one", "grants": ["named"] },
+        { "text": "I do not remember", "grants": ["nameless"] }
+      ],
+      "next": ["muscle"] },
 
-    { "id": "rep", "type": "task", "label": "The First Rep",
-      "text": "One repetition. Not a workout. Not a plan. One.",
-      "task": { "movement": "$choose:move", "units": 1 },
-      "grit": 5, "next": ["set1"] },
+    { "id": "muscle", "type": "choice", "label": "Your strength",
+      "prompt": "I am",
+      "text": "Answer for the body you have today, not the one you had, and not the one you meant to have.",
+      "remember": "strength",
+      "grit": 4,
+      "options": [
+        { "text": "weak of muscle", "grants": ["self_weak"] },
+        { "text": "strong of muscle", "grants": ["self_strong"] },
+        { "text": "unsure of my strength", "grants": ["self_unsure"] }
+      ],
+      "next": ["nourish"] },
 
-    { "id": "set1", "type": "task", "label": "A Set",
-      "text": "Well. You're on the floor anyway.",
-      "task": { "movement": "$same", "units": "$set" },
-      "grit": 12, "loot": "common", "next": ["set2"] },
+    { "id": "nourish", "type": "choice", "label": "What you eat",
+      "prompt": "I am",
+      "text": "It does not want a number. It would not know what to do with one.",
+      "remember": "nourishment",
+      "grit": 4,
+      "options": [
+        { "text": "overnourished", "grants": ["self_overfed"] },
+        { "text": "undernourished", "grants": ["self_underfed"] },
+        { "text": "a sweet tooth", "grants": ["self_sweet"] }
+      ],
+      "next": ["rested"] },
 
-    { "id": "set2", "type": "task", "label": "Again",
-      "text": "The second set is the one nobody sees you do.",
-      "task": { "movement": "$same", "units": "$set" },
-      "grit": 18, "loot": "common", "next": ["breadth", "depth"], "exclusive_next": true },
+    { "id": "rested", "type": "choice", "label": "Your sleep",
+      "prompt": "I am",
+      "text": "Whatever you say here, it is not going to argue with you.",
+      "remember": "rest",
+      "grit": 4,
+      "options": [
+        { "text": "rested", "grants": ["self_rested"] },
+        { "text": "running on empty", "grants": ["self_spent"] },
+        { "text": "awake at the wrong hours", "grants": ["self_nocturnal"] }
+      ],
+      "next": ["reach"] },
 
-    { "id": "breadth", "type": "task", "label": "Something New",
-      "text": "A different shape. Just once, to see.",
-      "task": { "movement": "$other:move", "units": 1 },
-      "grit": 10, "grants": ["varied"], "loot": "common", "next": ["door"] },
+    { "id": "reach", "type": "choice", "label": "Other people",
+      "prompt": "I",
+      "text": "Last one. Then it will want something done, and it will have picked what.",
+      "remember": "bonds",
+      "grit": 4,
+      "options": [
+        { "text": "reach out", "grants": ["self_reaches"] },
+        { "text": "wait to be asked", "grants": ["self_waits"] },
+        { "text": "have let it go quiet", "grants": ["self_quiet"] }
+      ],
+      "select_next": true,
+      "next": ["act_eat", "act_bed", "act_message"] },
 
-    { "id": "depth", "type": "task", "label": "One More",
-      "text": "You know exactly what this costs now. That is the whole point.",
-      "task": { "movement": "$same", "units": "$set" },
-      "grit": 30, "loot": "uncommon", "next": ["door"] },
+    { "id": "act_eat", "type": "task", "label": "Eat Something",
+      "text": "You said undernourished, so this is what it asks for. One thing that grew, or one thing with protein in it. Not a plan.",
+      "when": { "has_tag": "self_underfed" },
+      "task": { "movement": "$choose:fuel", "units": 1 },
+      "grit": 14, "next": ["out"] },
 
-    { "id": "door", "type": "threshold", "label": "The Door",
-      "text": "Out. The hallway is cold and enormously ordinary." }
-  ],
-  "slots": [
-    { "attach": "set1", "chance": 0.55,
-      "table": [ { "type": "echo", "w": 3 }, { "type": "cache", "grit": 8, "w": 3 }, { "type": "mirror", "w": 1 } ] },
-    { "attach": "rep", "chance": 0.4,
-      "table": [ { "type": "task", "label": "The Glass by the Bed", "movement": "water", "units": 1, "grit": 6, "w": 1 } ] },
-    { "attach": "set2", "chance": 0.3,
-      "table": [ { "type": "trinket", "w": 2 }, { "type": "cache", "grit": 12, "w": 3 } ] }
+    { "id": "act_bed", "type": "task", "label": "Be In Bed On Time",
+      "text": "You said running on empty. It is not asking you to sleep, which you cannot promise. It is asking you to be horizontal at the hour you already decided on.",
+      "when": { "has_tag": "self_spent" },
+      "task": { "movement": "bedtime", "units": 1 },
+      "grit": 14, "next": ["out"] },
+
+    { "id": "act_message", "type": "task", "label": "Message Someone",
+      "text": "One person. You already know which one, and you knew before you finished reading this. It does not have to be about anything.",
+      "task": { "movement": "message", "units": 1 },
+      "grit": 14, "next": ["out"] },
+
+    { "id": "out", "type": "threshold", "label": "The Way Back",
+      "text": "The pressure lets go all at once. You are standing in your own house holding something you did not have five minutes ago." }
   ]
 }

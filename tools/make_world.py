@@ -466,25 +466,70 @@ def stamp_town(world, rng, centre):
         if math.hypot(sx - cx, sy - cy) <= half:
             world.put(sx, sy, T["path_dirt"])
 
-    # Lots between the streets. A building is placed only if its whole footprint
-    # is free and one of its edges touches a street, so every door opens onto
-    # somewhere you can actually walk.
-    for ly in (-19, -4, 12):
-        for lx in (-19, -4, 12):
-            if rng.random() < 0.2:
-                continue
+    # Buildings, placed *along* the streets rather than in lots that hope to
+    # touch one.
+    #
+    # The previous version put lots at ly in (-19, -4, 12) with heights 4..6 and
+    # tested whether `oy + bh` landed on a street row. Streets are at cy +/- 9,
+    # and those lots make oy+bh land in {cy-15..cy-12, cy..cy+3, cy+16..cy+19} —
+    # never 9 either way. So `touches` was false every time, no building was
+    # ever placed, and the town was a paved crossroads. It also only ever tested
+    # the *south* edge, so even had the arithmetic worked, half the town could
+    # not have faced a street.
+    #
+    # Walking the streets and setting buildings against them makes "the door
+    # opens onto somewhere you can walk" true by construction rather than by a
+    # test that can silently never pass.
+    taken = set()
+
+    def free(ox, oy, bw, bh):
+        for y in range(oy - 1, oy + bh + 1):
+            for x in range(ox - 1, ox + bw + 1):
+                if (x, y) in taken:
+                    return False
+                if math.hypot(x - cx, y - cy) > half - 1:
+                    return False
+                if world.at(x, y) == T["path_dirt"]:
+                    return False
+        return True
+
+    def place(ox, oy, bw, bh, door):
+        for y in range(oy, oy + bh):
+            for x in range(ox, ox + bw):
+                world.put(x, y, T["roof"])
+                taken.add((x, y))
+        world.put(door[0], door[1], T["door"])
+
+    # Along the two horizontal streets, on both sides.
+    for sy in (cy - 9, cy + 9):
+        x = cx - half + 3
+        while x < cx + half - 8:
             bw, bh = rng.randint(5, 7), rng.randint(4, 6)
-            ox, oy = cx + lx + rng.randint(0, 1), cy + ly + rng.randint(0, 1)
-            if math.hypot(ox - cx, oy - cy) > half - 6:
-                continue
-            touches = any(
-                world.at(ox + i, oy + bh) == T["path_dirt"] for i in range(bw))
-            if not touches:
-                continue
-            for y in range(oy, oy + bh):
-                for x in range(ox, ox + bw):
-                    world.put(x, y, T["roof"])
-            world.put(ox + bw // 2, oy + bh - 1, T["door"])
+            for side in (-1, 1):
+                if rng.random() < 0.25:
+                    continue
+                oy = sy - bh - 1 if side < 0 else sy + 2
+                if free(x, oy, bw, bh):
+                    # The door sits on the face looking at the street, one row
+                    # inside the roof, so it reads as a doorway and not a gap.
+                    dy = oy + bh - 1 if side < 0 else oy
+                    place(x, oy, bw, bh, (x + bw // 2, dy))
+            x += bw + rng.randint(2, 4)
+
+    # And the two vertical ones, which is what makes the crossroads a place
+    # rather than one long row of frontages.
+    for sx in (cx - 9, cx + 9):
+        y = cy - half + 4
+        while y < cy + half - 8:
+            bw, bh = rng.randint(5, 7), rng.randint(4, 6)
+            for side in (-1, 1):
+                if rng.random() < 0.3:
+                    continue
+                ox = sx - bw - 1 if side < 0 else sx + 2
+                if free(ox, y, bw, bh):
+                    dx = ox + bw - 1 if side < 0 else ox
+                    place(ox, y, bw, bh, (dx, y + bh // 2))
+            y += bh + rng.randint(3, 5)
 
 
 def coast_stop(world, bearing):
@@ -608,7 +653,7 @@ def house_plan(cells):
             ("counter", 13, 1), ("cup", 14, 1), ("shelf_open", 16, 1),
             ("table", 12, 4), ("chair", 11, 4), ("chair_pulled", 13, 4),
             ("bottle", 14, 4), ("plant_pot", 16, 6), ("barrel", 8, 1),
-            ("crate", 8, 6), ("book_open", 10, 4), ("shelf_open", 16, 3),
+            ("crate", 8, 6), ("book_open", 10, 4), ("shelf_open", 16, 5),
             ("chest", 9, 6),
             # hall -- and the boots by the front door
             ("bookshelf", 1, 8), ("chest", 15, 8), ("crate", 13, 9),

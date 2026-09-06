@@ -38,7 +38,7 @@
     "spite": "&",
     "locked": "?",
     "done": "+",
-    "warden": "!"
+    "warden": "!", "choice": "¿"
   },
   "mountain_line": "The mountain keeps its one light. From here it looks like it is waiting."
 }

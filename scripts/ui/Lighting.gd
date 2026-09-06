@@ -74,6 +74,25 @@ static var player_light: float = 0.45
 const PLAYER_RADIUS := 3.2
 const PLAYER_COLOUR := Color(0.78, 0.76, 0.72)
 
+## Inside is not outside.
+##
+## The user's first note on lighting was "a simple light in a room projecting
+## out can really make a scene pop", and the run opens in a house — so the one
+## place this has to be right on day one is an interior at nine in the morning,
+## where the sun is up and the room is still dim. A global hour cannot say that.
+##
+## The world already draws a rectangle round each room for the Boon of the White
+## Room, so the renderer sets this while the character stands in one and the
+## ambient takes a floor: never brighter than a dim room, and neutral rather
+## than the blue of a night sky, because a ceiling is not weather.
+##
+## This is the coarse version — the whole frame darkens, not just the cells
+## under the roof. Doing it properly means handing the room rectangles to the
+## shader, which is worth it once there is more than one building.
+static var indoors: bool = false
+const INTERIOR_MIX := 0.40
+const INTERIOR_COLOUR := Color(0.085, 0.080, 0.115)
+
 
 ## --- the ambient ramp ----------------------------------------------------------
 ##
@@ -118,23 +137,25 @@ const GLOW := 0.34
 ## because nothing here knows about roofs yet. When the house has an inside,
 ## this is where a "sheltered" term belongs.
 static func lamp_gain() -> float:
-	return smoothstep(0.0, 0.34, ambient_mix())
+	_resample()
+	return _cache_gain
 
 
-## How much of the ambient replaces the art right now, 0..1.
-static func ambient_mix(t: float = -1.0) -> float:
-	var s := _sample(t)
-	return float(s[0])
+## The sampled ramp, recomputed only when the hour actually moves. Three calls a
+## frame walk this list otherwise, and each one allocated a result to return.
+static var _cache_at: float = -1.0
+static var _cache_indoors := false
+static var _cache_mix: float = 0.0
+static var _cache_colour: Color = Color.BLACK
+static var _cache_gain: float = 0.0
 
 
-## What the unlit world is tinted toward right now.
-static func ambient_colour(t: float = -1.0) -> Color:
-	var s := _sample(t)
-	return s[1]
-
-
-static func _sample(t: float) -> Array:
-	var u := fposmod(time_of_day if t < 0.0 else t, 1.0)
+static func _resample() -> void:
+	if is_equal_approx(_cache_at, time_of_day) and _cache_indoors == indoors:
+		return
+	_cache_at = time_of_day
+	_cache_indoors = indoors
+	var u := fposmod(time_of_day, 1.0)
 	var previous: Array = AMBIENT[0]
 	for stop in AMBIENT:
 		var entry: Array = stop
@@ -143,10 +164,32 @@ static func _sample(t: float) -> Array:
 			var was: float = float(previous[0])
 			var span: float = maxf(at - was, 0.0001)
 			var k: float = clampf((u - was) / span, 0.0, 1.0)
-			return [lerpf(float(previous[1]), float(entry[1]), k),
-				Color(previous[2]).lerp(Color(entry[2]), k)]
+			_settle(lerpf(float(previous[1]), float(entry[1]), k),
+				Color(previous[2]).lerp(Color(entry[2]), k))
+			return
 		previous = entry
-	return [float(previous[1]), Color(previous[2])]
+	_settle(float(previous[1]), Color(previous[2]))
+
+
+static func _settle(mix: float, colour: Color) -> void:
+	_cache_mix = mix
+	_cache_colour = colour
+	if indoors:
+		_cache_mix = maxf(mix, INTERIOR_MIX)
+		_cache_colour = colour.lerp(INTERIOR_COLOUR, 0.75)
+	_cache_gain = smoothstep(0.0, 0.34, _cache_mix)
+
+
+## How much of the ambient replaces the art right now, 0..1.
+static func ambient_mix() -> float:
+	_resample()
+	return _cache_mix
+
+
+## What the unlit world is tinted toward right now.
+static func ambient_colour() -> Color:
+	_resample()
+	return _cache_colour
 
 
 ## --- the manifest --------------------------------------------------------------

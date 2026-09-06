@@ -3,6 +3,7 @@
 
   "anomalies": [
     { "id": "a_stall", "tier": 0, "weight": 3, "name": "A Stall in the Air",
+      "truth": "true",
       "intro": "The air here is thicker than air. Something already happened in this spot and has not finished happening.",
       "outro": "It thins. Whatever it was, it is behind you.",
       "nodes": [
@@ -12,6 +13,7 @@
       ] },
 
     { "id": "a_stutter", "tier": 0, "weight": 2, "name": "A Stutter",
+      "truth": "unclear",
       "intro": "You take the same step twice. Only you notice.",
       "outro": "It settles.",
       "nodes": [
@@ -22,6 +24,7 @@
       ] },
 
     { "id": "a_eddy", "tier": 1, "weight": 3, "name": "An Eddy",
+      "truth": "true",
       "intro": "Time pools here the way water does behind a stone.",
       "outro": "The current takes it.",
       "nodes": [
@@ -34,6 +37,7 @@
       "slots": [{ "chance": 0.4, "table": [{ "type": "echo", "w": 1 }, { "type": "cache", "w": 1 }] }] },
 
     { "id": "a_seam", "tier": 2, "weight": 3, "name": "A Seam",
+      "truth": "false",
       "intro": "Two versions of this place are trying to occupy it at once.",
       "outro": "One of them wins. You do not find out which.",
       "nodes": [
@@ -46,6 +50,7 @@
       "slots": [{ "chance": 0.5, "table": [{ "type": "echo", "w": 1 }, { "type": "cache", "w": 1 }, { "type": "trinket", "w": 1 }] }] },
 
     { "id": "a_hollow", "tier": 3, "weight": 3, "name": "A Hollow",
+      "truth": "unclear",
       "intro": "Something was taken out of this place and the shape of it is still here.",
       "outro": "You leave it emptier than you found it, which is the point.",
       "nodes": [
@@ -59,6 +64,7 @@
       "slots": [{ "chance": 0.6, "table": [{ "type": "echo", "w": 1 }, { "type": "trinket", "w": 1 }] }] },
 
     { "id": "a_wound", "tier": 4, "weight": 3, "name": "A Wound",
+      "truth": "false",
       "intro": "This is not a pocket of strange time. This is where it was cut.",
       "outro": "It is not closed. It is only closed for now.",
       "nodes": [

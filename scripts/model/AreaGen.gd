@@ -46,6 +46,10 @@ static func build(area_def: Dictionary, rng: RandomNumberGenerator, ctx: Diction
 		"name": area_def.get("name", "Area"),
 		"intro": area_def.get("intro", ""),
 		"outro": area_def.get("outro", ""),
+		# What the memory claims about itself. Carried through the build because
+		# the screen frames the whole area with it, and an area instance that
+		# does not know what it is claiming cannot be framed.
+		"truth": area_def.get("truth", ""),
 		"entry": entry,
 		"nodes": nodes,
 		"order": order,
@@ -101,11 +105,63 @@ static func predecessors(area: Dictionary, id: String) -> Array:
 	return out
 
 
+## Which branch of a `select_next` fork the run has earned.
+##
+## `exclusive_next` is the *player* choosing: they tap one branch and the
+## siblings close. `select_next` is the *memory* choosing: the branches are
+## tried in the order they are written and the first whose `when` passes is the
+## one that opens. That is the whole mechanism behind the survey ending in an
+## action the answers picked rather than in a sixth question — the answers are
+## run tags, `when` is the condition language that already reads tags, and
+## nothing new had to be invented to join them up.
+##
+## Returns "" when the fork is not a select_next one, or when nothing matched.
+## Nothing matching means every branch closes, so a fork like this must end in a
+## branch carrying no `when` at all.
+static func chosen_branch(run: HJRun, fork_id: String) -> String:
+	var fork := run.node(fork_id)
+	if not bool(fork.get("select_next", false)):
+		return ""
+	for nxt in fork.get("next", []):
+		var id := String(nxt)
+		if Rules.passes(run.node(id).get("when", {}), run.ctx()):
+			return id
+	return ""
+
+
+## A road the run has shut: this node's own `when` fails, or a fork above it
+## picked a different branch.
+##
+## Only ever true once something upstream is actually finished. Before that a
+## node is not shut, it is simply not reached yet, and the difference matters on
+## screen: a card that says "not what you said" before you have said anything
+## has told the player how the fork ends before they answer it.
+static func is_closed(run: HJRun, id: String) -> bool:
+	if run.is_done(id) or run.locked.has(id):
+		return false
+	var node := run.node(id)
+	if node.is_empty():
+		return false
+	var decided := false
+	for pred in predecessors(run.area, id):
+		if not run.is_done(pred):
+			continue
+		decided = true
+		if bool(run.node(pred).get("select_next", false)) \
+				and chosen_branch(run, pred) != id:
+			return true
+	if not decided:
+		return false
+	return not Rules.passes(node.get("when", {}), run.ctx())
+
+
 static func is_available(run: HJRun, id: String) -> bool:
 	if run.is_done(id) or run.locked.has(id):
 		return false
 	var node := run.node(id)
 	if node.is_empty():
+		return false
+	if is_closed(run, id):
 		return false
 	var side_of := String(node.get("side_of", ""))
 	if side_of != "":
@@ -113,7 +169,9 @@ static func is_available(run: HJRun, id: String) -> bool:
 	for pred in predecessors(run.area, id):
 		# A locked predecessor is a road not taken, not a road still to walk —
 		# without this an exclusive fork strands everything downstream of it.
-		if not run.is_done(pred) and not run.locked.has(pred):
+		# A closed one is the same thing decided by the run rather than by the
+		# player, and strands its downstream in exactly the same way.
+		if not run.is_done(pred) and not run.locked.has(pred) and not is_closed(run, pred):
 			return false
 	return true
 

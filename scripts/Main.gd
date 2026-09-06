@@ -75,6 +75,7 @@ func _ready() -> void:
 	Events.screen_changed.connect(_on_screen_changed)
 	Events.theme_changed.connect(_restyle)
 	Events.logged.connect(_toast)
+	Events.unlocked.connect(_unlock_toast)
 
 	# Above every screen, and it owns its own visibility.
 	add_child(HJDebugOverlay.new())
@@ -168,7 +169,43 @@ func _toast(text: String, kind: String) -> void:
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	p.add_child(HJUI.label(text, HJUI.FS_SMALL, role, HORIZONTAL_ALIGNMENT_CENTER))
 	toasts.add_child(p)
+	_trim_and_fade(p)
 
+
+## An unlock: the same strip, but it takes you there.
+##
+## The toast column is MOUSE_FILTER_IGNORE so a status line never eats a tap
+## meant for the screen underneath. This one opts back in, for itself only, and
+## it lingers — three seconds is enough to read a status line and not enough to
+## notice a thing is tappable, decide to tap it, and reach it.
+func _unlock_toast(text: String, screen: String) -> void:
+	if text.strip_edges() == "":
+		return
+	var card := HJUI.TapCard.new()
+	card.add_theme_stylebox_override("panel", HJUI.stylebox(
+		Palette.c("panel_alt"), HJUI.RADIUS, Palette.c("accent"), 2))
+	card.modulate.a = 0.0
+
+	var row := HJUI.hbox(10)
+	if HJUI.has_icon("resolve"):
+		row.add_child(HJUI.icon("resolve", 32, "accent"))
+	var body := HJUI.vbox(2)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(HJUI.label(text, HJUI.FS_SMALL, "accent"))
+	if screen != "":
+		body.add_child(HJUI.label("Tap to go there", HJUI.FS_TINY, "muted"))
+	row.add_child(body)
+	card.add_child(row)
+
+	if screen != "":
+		card.tapped.connect(func() -> void:
+			card.queue_free()
+			Game.goto(screen))
+	toasts.add_child(card)
+	_trim_and_fade(card, 5.0)
+
+
+func _trim_and_fade(p: Control, linger: float = 2.1) -> void:
 	while toasts.get_child_count() > 3:
 		var oldest := toasts.get_child(0)
 		toasts.remove_child(oldest)
@@ -177,7 +214,7 @@ func _toast(text: String, kind: String) -> void:
 	# Bound to the panel, so trimming an old toast kills its tween with it.
 	var tween := p.create_tween()
 	tween.tween_property(p, "modulate:a", 1.0, 0.12)
-	tween.tween_interval(2.1)
+	tween.tween_interval(linger)
 	tween.tween_property(p, "modulate:a", 0.0, 0.35)
 	tween.tween_callback(p.queue_free)
 

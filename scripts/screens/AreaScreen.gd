@@ -2,6 +2,19 @@ extends HJScreen
 ## One area, one sitting. The tree of what is left to do, the clock, and the
 ## items you can spend to change either.
 
+## What an anomaly claims about itself, as one line above everything else in it.
+##
+## An anomaly is a memory of a life adjacent to yours, and you are here to play
+## the version of you who acted. Some of these did not happen. The area's
+## `truth` field is that claim; nothing in the game checks it yet, and the
+## flatness is the point — it states it the way a caption states a date, and a
+## caption can be wrong.
+const TRUTH_LINES := {
+	"true": "It happened like this.",
+	"false": "It did not happen like this.",
+	"unclear": "It may have happened like this.",
+}
+
 var _header: HJRunHeader
 var _graph: HJAreaGraph
 
@@ -42,6 +55,13 @@ func build() -> void:
 	var body := HJUI.vbox(14)
 	scroll.add_child(body)
 	v.add_child(scroll)
+
+	# Above the intro and never withdrawn: the frame has to hold for the whole
+	# memory, not only for the first card of it.
+	var truth := String(run.area.get("truth", ""))
+	if TRUTH_LINES.has(truth):
+		body.add_child(HJUI.label(String(TRUTH_LINES[truth]), HJUI.FS_TINY, "accent_2",
+			HORIZONTAL_ALIGNMENT_CENTER))
 
 	if String(run.area.get("intro", "")) != "" and run.completed.is_empty():
 		var intro := HJUI.panel("panel")

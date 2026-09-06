@@ -48,8 +48,10 @@ func note_moved(cell: Vector2i) -> void:
 
 	# 2. The Hearth. It has been visible in the Palace since the first launch —
 	#    the player has seen the shape of it — and this is the moment it becomes
-	#    a thing they are told to go and buy.
-	g.say("The Hearth is open to you. Build it in the Mind Palace.", "good")
+	#    a thing they are told to go and buy. Tappable, because a player told a
+	#    room is open and then left to find it has been told nothing useful, and
+	#    this is also where they learn the Mind Palace exists at all.
+	Events.unlocked.emit("The Hearth is open to you.", "palace")
 
 	# 3. Spite, on the doorstep, first run only. `once: true` on the
 	#    conversation plus its own persisted seen-set means this cannot repeat

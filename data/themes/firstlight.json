@@ -38,7 +38,7 @@
     "spite": "&",
     "locked": "?",
     "done": "+",
-    "warden": "!"
+    "warden": "!", "choice": "¿"
   },
   "mountain_line": "Far off, past the window, a single light on the mountain. It has not gone out.",
   "backdrops": {

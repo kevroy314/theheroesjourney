@@ -26,8 +26,8 @@
     "steps.cost_mult": 1.0,
     "walk.step_time": 0.17,
     "interact.door_cost": 25,
-    "interact.coffee_cost": 10,
-    "interact.breakfast_cost": 15,
+    "interact.coffee_cost": 30,
+    "interact.breakfast_cost": 35,
     "finder.range": 48,
     "finder.noise": 0.22
   }

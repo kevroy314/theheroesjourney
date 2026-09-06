@@ -121,6 +121,11 @@ func _make_card(id: String, budget: float = CARD_MAX) -> Control:
 	var type_id := String(node.get("type", "free"))
 	var done := run.is_done(id)
 	var locked := run.locked.has(id)
+	# Shut by what the run has said rather than by what the player tapped. Reads
+	# the same as locked on purpose — both are roads that are no longer roads —
+	# but it gets its own line, because "the other way" is a thing you chose and
+	# this is not.
+	var closed := HJAreaGen.is_closed(run, id)
 	var available := HJAreaGen.is_available(run, id)
 	var visible_now := HJAreaGen.is_visible(run, id)
 
@@ -148,6 +153,9 @@ func _make_card(id: String, budget: float = CARD_MAX) -> Control:
 	elif locked:
 		fill = Palette.ca("panel", 0.5)
 		sub = "the other way"
+	elif closed:
+		fill = Palette.ca("panel", 0.5)
+		sub = "not what you said"
 	elif available:
 		fill = Palette.c("panel_alt")
 		border = Palette.c("accent")
@@ -252,6 +260,7 @@ func _descriptor(node: Dictionary) -> String:
 		"trinket": return Palette.word("trinket").to_lower()
 		"spite": return "someone is here"
 		"warden": return "the end of the loop"
+		"choice": return "it wants an answer"
 	return ""
 
 

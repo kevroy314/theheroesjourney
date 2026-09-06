@@ -9,8 +9,20 @@ extends HJScreen
 ## The one screen that is deliberately nowhere. Everything else in the game is
 ## a place you are standing; this is the moment you set the phone down and do
 ## the thing, so the room falls away and only the commitment is left.
+##
+## A question is the exception. It is not a moment away from the world, it is
+## the memory speaking to you, so the room it is asking from stays behind it.
 func backdrop_id() -> String:
+	if _pending_is_choice():
+		return run_area_id()
 	return ""
+
+
+static func _pending_is_choice() -> bool:
+	var run: HJRun = Game.run
+	if run == null or run.pending_node == "":
+		return false
+	return String(run.node(run.pending_node).get("type", "")) == "choice"
 
 
 var _movement: Dictionary = {}
@@ -23,6 +35,8 @@ var _timer_bar: ProgressBar
 var _confirm: Button
 var _hold_bar: ProgressBar
 var _scale_row: VBoxContainer
+var _field: LineEdit                ## the name question, when there is one
+var _field_button: Button           ## the option that field belongs to
 
 
 func build() -> void:
@@ -32,6 +46,15 @@ func build() -> void:
 		return
 
 	var node := run.node(run.pending_node)
+
+	# A choice is not a task and must not be gated like one. It shares this
+	# screen because it shares `pending_node` — the run has one thing in front
+	# of it at a time — but it shares nothing else: no movement, no plausibility
+	# timer, no hold. See _build_choice.
+	if String(node.get("type", "")) == "choice":
+		_build_choice(node)
+		return
+
 	var options := Game.movement_options(node)
 
 	# Nothing picked yet and more than one way to do it — ask first.
@@ -51,6 +74,99 @@ func build() -> void:
 
 	_movement = Content.movement(run.pending_movement)
 	_build_active(node)
+
+
+## A rebuild throws away what the player is in the middle of — the text in the
+## field, the scaling they picked — and this screen is a fixed moment rather
+## than a view of changing state. Anything that would move it is not news here.
+func sync() -> void:
+	if _field != null and is_instance_valid(_field):
+		return
+	refresh()
+
+
+# --- the question --------------------------------------------------------------
+# The portal asking who you are. Beat 3 of docs/FIRST-THIRTY.md.
+#
+# Deliberately bare next to the task layout above: no card around the question,
+# no headline panel, no gate, no bar. A task is equipment on a workbench; a
+# question is words in a room, and the difference has to be visible before the
+# player has read either of them.
+
+func _build_choice(node: Dictionary) -> void:
+	var run: HJRun = Game.run
+	var v := page(16)
+
+	var scroll := HJUI.scroll()
+	var body := HJUI.vbox(16)
+	scroll.add_child(body)
+	v.add_child(scroll)
+
+	body.add_child(HJUI.label(String(run.area.get("name", "")).to_upper(),
+		HJUI.FS_TINY, "muted"))
+	body.add_child(HJUI.label(String(node.get("prompt", node.get("label", ""))),
+		HJUI.FS_HEAD, "text"))
+	if String(node.get("text", "")) != "":
+		body.add_child(HJUI.label(String(node["text"]), HJUI.FS_SMALL, "muted"))
+
+	var options: Array = node.get("options", [])
+
+	# The field goes above the answers and near the top of the page on purpose.
+	# Android raises the soft keyboard over the bottom of a portrait screen and
+	# resizes the viewport under it; whatever is at the top survives that, and
+	# the scroller covers the rest.
+	for i in range(options.size()):
+		if String((options[i] as Dictionary).get("input", "")) == "text":
+			body.add_child(_text_field(scroll))
+			break
+
+	body.add_child(HJUI.rule())
+
+	for i in range(options.size()):
+		var option: Dictionary = options[i]
+		var index := i
+		var typed := String(option.get("input", "")) == "text"
+		var b := HJUI.button(String(option.get("text", "?")), "ghost", not typed)
+		b.custom_minimum_size.y = 88
+		b.pressed.connect(func() -> void:
+			HJSurvey.answer(run.pending_node, index,
+				_field.text if _field != null and is_instance_valid(_field) else ""))
+		body.add_child(b)
+		if typed:
+			# Nothing typed is not this answer. It is the answer below it, which
+			# is a button of its own — an empty field must never be a way of
+			# getting past the question without having answered it.
+			_field_button = b
+
+	body.add_child(HJUI.spacer(24))
+
+
+func _text_field(scroll: ScrollContainer) -> Control:
+	_field = LineEdit.new()
+	_field.placeholder_text = "..."
+	_field.max_length = 24
+	_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_field.custom_minimum_size.y = 96
+	_field.add_theme_font_size_override("font_size", HJUI.fs(HJUI.FS_HEAD))
+	HJUI.face(_field)
+	_field.add_theme_stylebox_override("normal",
+		HJUI.stylebox(Palette.ca("panel", 0.55), HJUI.RADIUS, Palette.ca("line", 0.8), 2))
+	_field.add_theme_stylebox_override("focus",
+		HJUI.stylebox(Palette.ca("panel_alt", 0.8), HJUI.RADIUS, Palette.c("accent"), 2))
+	_field.add_theme_color_override("font_color", Palette.c("text"))
+	_field.add_theme_color_override("font_placeholder_color", Palette.ca("muted", 0.6))
+	_field.add_theme_color_override("caret_color", Palette.c("accent"))
+	_field.text_changed.connect(func(text: String) -> void:
+		if _field_button != null and is_instance_valid(_field_button):
+			_field_button.disabled = text.strip_edges() == "")
+	_field.text_submitted.connect(func(_text: String) -> void:
+		if _field_button != null and is_instance_valid(_field_button) and not _field_button.disabled:
+			_field_button.emit_signal("pressed"))
+	# The keyboard covers the bottom half of the screen the moment this takes
+	# focus, so put the field where the player can still see it.
+	_field.focus_entered.connect(func() -> void:
+		scroll.ensure_control_visible.call_deferred(_field))
+	return _field
 
 
 # --- movement picker -----------------------------------------------------------
