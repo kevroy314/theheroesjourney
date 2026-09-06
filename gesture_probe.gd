@@ -76,6 +76,7 @@ func _initialize() -> void:
 	await _drive("tap_rapid", "pushup")
 	await _drive_slow_taps()
 	await _drive_timers_off()
+	await _drive_tutorial_hint()
 
 	for line in _log:
 		print(line)
@@ -257,3 +258,63 @@ func _nearest_anomaly(run: Object) -> Vector2i:
 func _world() -> Object:
 	var script: GDScript = load("res://scripts/ui/World.gd")
 	return script.shared()
+
+
+## The tutorial beat, the toast it raises, and what Settings does when tapped.
+func _drive_tutorial_hint() -> void:
+	var E: Node = root.get_node("/root/Events")
+	var seen: Array = []
+	var probe := func(text: String, screen: String) -> void:
+		seen.append([text, screen])
+	E.unlocked.connect(probe)
+
+	M.revealed.erase("beat:timers_optional")
+	Prefs.set_flag("timers_on", true)
+
+	Prefs.hint_timers(4)
+	if seen.is_empty():
+		_ok("hint: a four-second wait raises nothing")
+	else:
+		_fail("hint: fired on a trivial wait")
+
+	Prefs.hint_timers(300)
+	if seen.size() == 1 and String(seen[0][1]) == "menu":
+		_ok("hint: \"%s\" -> %s" % [seen[0][0], seen[0][1]])
+	else:
+		_fail("hint: expected one toast to the menu, got %s" % str(seen))
+
+	Prefs.hint_timers(300)
+	if seen.size() == 1:
+		_ok("hint: never fires twice")
+	else:
+		_fail("hint: fired again")
+	E.unlocked.disconnect(probe)
+
+	if Prefs.focus() == "timers":
+		_ok("hint: the timers row is armed for highlighting")
+	else:
+		_fail("hint: nothing armed")
+
+	# Settings, opened the way the toast opens it: from the task screen.
+	G.goto("task")
+	G.goto("menu")
+	var settings: Node = load("res://scripts/screens/SettingsScreen.gd").new()
+	settings.screen_id = "menu"
+	root.add_child(settings)
+	await process_frame
+	await process_frame
+	if String(settings.get("_whence")) == "task":
+		_ok("settings: Back returns to the task")
+	else:
+		_fail("settings: Back would go to '%s'" % settings.get("_whence"))
+	if Prefs.focus() == "timers":
+		_ok("settings: the highlight survives a rebuild")
+	else:
+		_fail("settings: the highlight was consumed by the first build")
+	settings.queue_free()
+	await process_frame
+	await process_frame
+	if Prefs.focus() == "":
+		_ok("settings: leaving the screen spends the highlight")
+	else:
+		_fail("settings: highlight still armed after leaving")

@@ -301,9 +301,36 @@ func spawn_all() -> void:
 		_live.append(_make(String(placement.get("key", "")),
 			String(placement.get("critter", "")), def, home, home,
 			String(def.get("start", ""))))
+	release_home_cells()
 	_spawned = true
 	_dirty = true
 	changed.emit()
+
+
+## The cell an animal was placed on is floor, and the world currently says it is
+## a wall.
+##
+## The dog and the cat were static props before they could walk, and a prop is
+## declared `solid` in tools/make_tiles.py, which bakes a 1 into the world's
+## `blocked` plane. Left alone that is an invisible wall exactly where the dog
+## used to be lying, for the rest of the run — and one he can walk off but never
+## walk back onto.
+##
+## This clears those cells in the loaded world, and it is deliberately a stopgap
+## rather than the fix. The fix is in the generator: an animal that has a
+## behaviour should not also be a solid prop, so `_p("dog", ..., solid=True)`
+## and its static art both want removing from tools/make_tiles.py, which this
+## system does not own. Until then this is two cells of floor inside one house,
+## and the alternative is a feature that is visibly broken.
+func release_home_cells() -> void:
+	var w := world()
+	if w == null or w.blocked.is_empty():
+		return
+	for entry in _live:
+		var home: Vector2i = (entry as Dictionary)["home"]
+		var i := home.y * w.w + home.x
+		if i >= 0 and i < w.blocked.size():
+			w.blocked[i] = 0
 
 
 func _make(key: String, id: String, def: Dictionary, home: Vector2i,
@@ -947,6 +974,7 @@ func load_state() -> bool:
 		c["held"] = float(row.get("held", 0.0))
 		c["stray"] = int(row.get("stray", 0))
 		_live.append(c)
+	release_home_cells()
 	_spawned = true
 	changed.emit()
 	return not _live.is_empty()

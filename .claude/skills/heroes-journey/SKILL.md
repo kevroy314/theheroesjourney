@@ -125,6 +125,28 @@ press handler must dedupe — let only the family that started a press finish it
 (`HJUI.TapCard`, `HJDebugOverlay.Bubble`). Symptoms: taps firing twice, a
 toggle that opens and instantly closes, drags at double speed.
 
+**But "first family wins" is wrong for anything multi-touch.** The emulated
+mouse press arrives *before* the touch it was synthesised from, so on a
+`TapCard`-style handler the mouse claims the gesture and every later finger is
+ignored: one-finger drag works and pinch is silently dead, with no error
+anywhere. A handler that cares how many fingers there are must let **touch win
+and take the press off the mouse** — the two arrive back to back with no motion
+between them, so the handover costs nothing and the mouse path survives as a
+fallback for a build with emulation off. `WorldMapScreen.MapView._gesture` is
+the worked example; `HJUI.TapCard._press` is the single-touch rule it departs
+from.
+
+**`HJUI.label` defaults to word-wrap and expand-fill.** `autowrap_mode =
+AUTOWRAP_WORD_SMART` and `size_flags_horizontal = SIZE_EXPAND_FILL` are right
+for prose and catastrophic in a shrink-to-fit row: inside an `HBoxContainer`
+that wants its children's minimum width, "Boon of the White Room" wrapped to one
+letter per line and drew a column down the whole screen. There are no
+parameters for this — `label()` takes only text, size, role and align — so a
+one-line label has to set `autowrap_mode = TextServer.AUTOWRAP_OFF` and
+`size_flags_horizontal = Control.SIZE_SHRINK_CENTER` on the returned node.
+`HJUI.BuffStrip._pill_text` exists for exactly that. There are ~160 call sites,
+so assume the default is wrong before assuming it is right.
+
 **Screens must not redirect during `build()`.** A synchronous `Game.goto()` from
 inside a screen's own build re-enters the swap and tears the tree apart. Call
 `Game.resync_screen("my-own-screen-name")` deferred instead; it recomputes the
@@ -142,7 +164,14 @@ every layout pass (we once reached a 6694px-tall viewport). Use anchors.
 
 **Deferred work outlives its screen.** `queue_free()` is deferred, so a
 swapped-out screen still receives signals until it is actually freed. `HJScreen`
-connects in `_enter_tree` and disconnects in `_exit_tree` for exactly this.
+connects in `_enter_tree` and disconnects in `_exit_tree` for exactly this. When
+it is a *lambda* that outlives what it captured, the engine says `Lambda capture
+at index N was freed` — a **runtime** error, so it does not fail a build and for
+a long time it did not fail `./test.sh` either. `test.sh` grepped for the three
+parse and compile shapes only; its `ENGINE_ERRORS` pattern now also carries
+`Lambda capture`, `Condition "`, `USER ERROR`, `Attempt to call`, `Invalid
+access` and `nonexistent`. If you widen it further, widen it there — it is one
+variable used by both the guard and the printer.
 
 **Exclusive forks strand their downstream.** When a choice locks its siblings,
 availability must treat a *locked* predecessor as satisfied — otherwise the node

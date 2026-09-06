@@ -10,13 +10,22 @@ data/rulesets/*.json    run-wide modifiers and hooks
 data/movements/*.json   the movement library, grouped into purchasable packs
 data/areas/*.json       the eight authored node graphs
 data/echoes/*.json      the story, in fragments
+data/dialogue/*.json    speakers, and the conversations they have
+data/objectives/*.json  what you are trying to do, and how it is measured
 data/content/           config, anomalies, items, trinkets, loot, spite,
                         achievements (the Wheel), rooms (the Mind Palace),
-                        upgrades (traits)
-data/world/*.json       the overworld, as packed tile planes
+                        upgrades (traits), buffs, interactables, critters
+data/world/*.json       the overworld, as packed tile planes — plus where the
+                        interactables stand and where the house is
 data/schema.json        the shape of all of the above — see Validation, below.
                         Not content: Content globs the subdirectories, not data/
 ```
+
+Two of those directories are new enough to be worth saying out loud: a *kind* of
+content gets its own directory when it has its own vocabulary and its own file
+naming (`dialogue`, `objectives`), and lives in `content/` when it is a flat
+catalogue the rest of the game references by id (`buffs`, `interactables`,
+`critters`). Both are globbed the same way; the split is for people, not code.
 
 ## Modifiers — the schema everything shares
 
@@ -27,7 +36,15 @@ data/schema.json        the shape of all of the above — see Validation, below.
 **ops**, applied in this order: `set`, `add`, `mul`, `min` (floor), `max` (ceiling).
 
 **conditions** (all listed must pass): `tier_gte`, `tier_lte`, `zone_gte`,
-`phase`, `region`, `kind`, `axis`, `has_relic`, `hp_below`.
+`phase`, `region`, `kind`, `axis`, `has_relic`, `hp_below`, `has_tag`,
+`lacks_tag`.
+
+**There is one condition language in this repo and this is it.** The same `when`
+dictionary gates a modifier, an area node and a dialogue reply, evaluated by the
+same `Rules.passes`, so `zone_gte` means the same thing on a trinket and in a
+sentence somebody says to you. The single exception is a critter transition,
+which asks about distances the run knows nothing about and so has a vocabulary
+of its own — see Critters, below.
 
 `"per_level": true` on a trait modifier multiplies by the purchased level.
 
@@ -42,8 +59,30 @@ Rulesets and trinkets can fire effects on events:
 ```
 
 **hooks**: `on_run_start`, `on_area_enter`, `on_area_clear`, `on_task_complete`.
-**effects**: `grit`, `item`, `deadline`, `log` — each takes `amount`, plus
-optional `silent`.
+
+**effects**, all applied by `Game.apply_effects` and nothing else:
+
+| type | carries | does |
+|---|---|---|
+| `grit` | `amount` | pays Grit into the run |
+| `item` | — | a random item into the bag |
+| `deadline` | `amount` in hours | moves the deadline |
+| `log` | `text`, `kind` | says something in the toast strip |
+| `buff` | `buff` (a buffs id) | applies a buff |
+| `tag` | `tag`, optional `text`/`kind` | writes a run tag |
+
+Any of them may carry `silent` to suppress the toast.
+
+**One payer.** `Game.apply_effects` is the only implementation, so a ruleset
+hook, a trinket, an interactable and a critter transition all make things happen
+the same way, and adding a seventh verb is one `match` arm rather than four.
+Dialogue and objectives speak a slightly wider vocabulary — see Story effects,
+below — and hand the overlapping verbs straight back here rather than paying
+them a second way.
+
+`tag` is the case that shows why this is worth the discipline: the front door
+being open is a run tag, so the gate needs no new field anywhere. `has_tag`
+already reads them, and so can any screen.
 
 ## Movements
 
@@ -90,7 +129,12 @@ asserts this.
 ```
 
 **node types**: `task`, `free`, `threshold` (the way out), `echo`, `cache`,
-`mirror`, `trinket`, `spite`, `warden`.
+`mirror`, `trinket`, `spite`, `warden`, `choice`.
+
+`truth` on the area or anomaly is `true`, `false` or `unclear`. An anomaly is a
+memory of a life adjacent to the player's, and this is the claim it makes about
+itself — `AreaScreen` renders it above the intro, so it is the frame the player
+is handed before they act. **Nothing checks the claim, and that is the point.**
 
 **movement tokens**: `$choose:<axis>` asks the player to pick, `$same` reuses
 their pick, `$other:<axis>` asks for a different one (falling back to the same
@@ -103,8 +147,61 @@ uncompletable), or a literal movement id.
 siblings — and downstream availability treats a *locked* predecessor as
 satisfied, or everything after the fork would wait forever.
 
+`grants` writes run tags when the node completes, which `has_tag` / `lacks_tag`
+then read.
+
+### Two kinds of fork
+
+A node may carry `when`, the same condition dictionary a modifier carries. A
+node whose `when` fails is closed off and counted as satisfied for everything
+downstream — which is exactly the `exclusive_next` rule, arrived at from the
+other direction. `select_next` is the flag that says who is doing the choosing:
+
+| | who picks | how |
+|---|---|---|
+| `exclusive_next` | the player | they tap a branch; the siblings lock |
+| `select_next` | the memory | `next` is tried **in order** and the first branch whose `when` passes opens |
+
+**Every `select_next` fork needs a last branch with no `when` at all**, or a run
+that matches none of them is offered nothing and the area dead-ends.
+
 `slots` roll side nodes at generation time; `area.slot_bonus` adds guaranteed
 extra rolls.
+
+### Choice nodes — the survey
+
+A `choice` node is the one card in the game that asks instead of demanding. It
+takes the same run slot and the same screen as a task, and then throws away
+everything a task screen exists to do: no movement, no timer, no plausibility
+gate, no "I couldn't do this one". Those three exist to make a claimed push-up
+believable, and there is nothing to make believable about a sentence you
+finished about yourself. So a choice never goes through `Game.complete_task`.
+
+```jsonc
+{ "id": "muscle", "type": "choice", "label": "Your strength",
+  "prompt": "I'm", "remember": "strength", "grit": 4, "next": ["nourish"],
+  "options": [
+    { "text": "weak of muscle",       "grants": ["self_weak"] },
+    { "text": "strong of muscle",     "grants": ["self_strong"] },
+    { "text": "unsure of my strength","grants": ["self_unsure"] }
+  ] }
+```
+
+`prompt` is the sentence the memory starts and each option finishes it. An
+answer lands in two deliberately different places:
+
+| | where | lives for |
+|---|---|---|
+| `grants` on the option | run tags | this run — `has_tag` reads them immediately, which is how the survey ends in an action its own answers picked |
+| `remember` on the node | `Meta.self_description[key]` | the save — tags die with the loop, and the point of asking is to still know next time |
+
+An option may set `"input": "text"`, which renders a field as well as a button;
+what the player typed is what gets remembered, instead of the tag.
+
+**`grit` belongs on the node, not the option.** Paying differently for different
+answers would price honesty, and the survey is the one place in this game that
+must not do that. An option may override it, but only for a reason that is not
+"this is the better answer".
 
 ## Themes
 

@@ -1579,11 +1579,48 @@ static func _tutorial_checks(failures: Array) -> void:
 	var outside := _outdoor_cell(world)
 	_check(failures, "there is somewhere outside to walk to", outside.x >= 0, str(outside))
 	if outside.x >= 0:
+		# _story_checks already walked spite_doorstep, and `once: true` means he
+		# will not come out twice. That is correct for a save and wrong for this
+		# check, which is about the beat rather than about the leftovers of an
+		# earlier section. Forget him first, so what follows tests the tutorial.
+		Dialogue.wipe()
 		Game.tutorial.note_moved(outside)
 		_check(failures, "stepping outside breaks the Boon of the White Room",
 			not Buffs.has("white_room"), str(Buffs.active().size()))
 		_check(failures, "and the beat is marked as having happened",
 			Meta.revealed.has("beat:left_house"), str(Meta.revealed.size()))
+
+		# Beats 5 and 6 are the busiest moment in the game and until now nothing
+		# checked the two things that make them a tutorial rather than a step:
+		# somebody is waiting outside, and they give you a reason to walk.
+		_check(failures, "Spite is on the doorstep the first time you go out",
+			Dialogue.current().get("dialogue", "") == "spite_doorstep",
+			"in %s, screen %s" % [Dialogue.current().get("dialogue", "-"), Game.screen])
+		_check(failures, "and the game is showing him rather than the world",
+			Game.screen == Dialogue.SCREEN, Game.screen)
+
+		# Walk the conversation to its end, taking the first reply each time,
+		# and the objective he hands over must be live at the other side.
+		var turns := 0
+		while turns < 40 and not Dialogue.current().is_empty() \
+				and not bool(Dialogue.current().get("done", false)):
+			var view: Dictionary = Dialogue.current()
+			if bool(view.get("can_continue", false)):
+				Dialogue.advance()
+			elif not (view.get("replies", []) as Array).is_empty():
+				Dialogue.choose(int((view["replies"][0] as Dictionary)["index"]))
+			else:
+				break
+			turns += 1
+		_check(failures, "the doorstep conversation reaches an end",
+			turns < 40, "%d turns and still talking" % turns)
+		_check(failures, "and it leaves you with somewhere to be",
+			Objectives.is_active("close_town_anomalies") \
+				or Objectives.is_complete("close_town_anomalies"),
+			Objectives.state("close_town_anomalies"))
+		_check(failures, "which the Hearth can show you",
+			not Objectives.active().is_empty() or not Objectives.completed().is_empty(),
+			"%d active" % Objectives.active().size())
 
 		# Once. A beat that fires on every step outside would re-break a boon the
 		# player had been given again, and re-introduce Spite for ever.
