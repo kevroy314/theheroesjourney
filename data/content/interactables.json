@@ -86,6 +86,19 @@
         "type": "dialogue",
         "dialogue": "spite_doorstep"
       }
+    },
+    {
+      "id": "leaf_gate",
+      "name": "The barricade",
+      "verb": "Ask them to let you through",
+      "desc": "Leaves, pine needles and boxes, and children behind it who are entirely serious.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "blocks_until_tag": "town_quiet",
+      "effect": {
+        "type": "dialogue",
+        "dialogue": "fort_children"
+      }
     }
   ]
 }

@@ -1,0 +1,287 @@
+{
+  "_comment": "THE PROGRESSION GATE, AS TWO CHILDREN. PROPOSALS/BUILDINGS.md #15: the town is bounded by a river on two sides and the farm fences on the third, and the only gap is a fort of leaf-mould, pine needles and flattened boxes with a set of children of unknown origin in it. You do not fight them. You are not allowed past until the town is finished, and the only thing that changes their mind is that the town is finished.\n\nTHE CONDITION IS REAL AND IT IS THE OBJECTIVE. `close_town_anomalies` in data/objectives/town.json is the same errand Spite hands over on the doorstep, and Bird's jar is that objective's progress bar held in a child's hands -- one pebble per hole she has watched somebody close. Nothing here counts anything of its own.\n\nHOW THE GATE IS WIRED, AND THE ONE THING STILL MISSING. The branch at `gate` is two replies with the same words and opposite `when` clauses, so the player never sees the mechanism -- only one of them is ever on screen. They currently read the run tag `town_quiet`, because `has_tag` and `lacks_tag` are the only conditions Rules.passes implements that a conversation can actually evaluate. That is the RIGHT SHAPE and the WRONG SOURCE: a run tag dies with the loop, and the whole point of this objective is that it does not. The durable version is four lines in scripts/autoload/Rules.gd --\n\n    \"objective_done\":\n        if not Objectives.is_complete(String(want)):\n            return false\n\n-- plus \"objective_done\" in schema.json vocabulary.when_keys, and then the two `when` dictionaries below become { \"objective_done\": \"close_town_anomalies\" } and { \"not_objective_done\": ... } or a single reply each way. data/objectives/town.json already grants `town_quiet` in the objective's `reward`, and data/content/interactables.json places `leaf_gate` with `blocks_until_tag: \"town_quiet\"` pointing at this conversation -- so the gate works today, and works the run you finish the town in. What it does not survive is the loop reset: a run tag dies with the run and the objective does not, so on the next loop the children refuse again although the town is provably finished. That is the bug `objective_done` fixes and the only reason it is worth doing. Both halves are one-line changes in files this file does not own; see docs/CHARACTER-TOWNSFOLK.md.\n\nWRITTEN AS CHILDREN, NOT AS GUARDS. Their authority is invented, absolute and -- this is the joke and also the horror -- correct. They have ranks. They have a rule and the rule binds them too, which is why the change of heart is not a favour: Pell takes the stick out of the gap because the jar is full, and says so, and would have kept it there forever otherwise. Nobody in town knows whose children they are. Neither do they. That is one line, said flat, and never explained.",
+
+  "speakers": [
+    {
+      "id": "fort",
+      "name": "The children of the defence",
+      "portrait": "fort",
+      "accent": "good",
+      "desc": "Two of them in the mouth of a fort made of leaves. Pell has the stick and does the talking. Bird has the jar and does the counting. Nobody in town can say where they came from.",
+      "moods": [
+        { "id": "posted", "name": "on the gate",
+          "desc": "The stick is across the gap. This is a rule, and rules are the only thing either of them has." },
+        { "id": "stood_down", "name": "off the gate",
+          "desc": "The stick is against the wall. They are eight and eleven again, and it shows immediately." }
+      ]
+    }
+  ],
+
+  "dialogues": [
+    {
+      "id": "fort_children",
+      "speaker": "fort",
+      "start": "hail",
+      "_comment": "Deliberately NOT `once`. Game.apply_effects answers a spent conversation with 'There is nothing more to say', and a town where the gate says that is a town with a locked door in it. Everything that should only happen once is gated on a tag instead.",
+      "nodes": [
+        {
+          "id": "hail",
+          "mood": "posted",
+          "lines": [
+            "The hedge runs the whole length of the lane and there is one gap in it, and the gap has a fort in it: leaf-mould packed into flattened boxes, a roof of pine needles, a wall of stacked crates with a slot cut in it at knee height.",
+            "Two children are in the mouth of it. The taller one puts a stick across the gap at the height of your knee. It would not stop a cat."
+          ],
+          "replies": [
+            { "text": "Stop.", "when": { "lacks_tag": "met_fort" }, "goto": "rules" },
+            { "text": "Step over it.", "when": { "lacks_tag": "met_fort" }, "goto": "over" },
+            { "text": "\"Pell. It's me. We did this already.\"", "when": { "has_tag": "met_fort" }, "goto": "again" }
+          ]
+        },
+        {
+          "id": "over",
+          "mood": "posted",
+          "lines": [
+            "You lift your foot over the stick and the smaller one makes a noise like a kettle.",
+            "\"NO,\" she says. \"No, no, no, you can't, it doesn't count if you just go over it, put your foot BACK.\"",
+            "You put your foot back. She stops making the noise. The taller one has not moved at all."
+          ],
+          "next": "rules"
+        },
+        {
+          "id": "rules",
+          "mood": "posted",
+          "lines": [
+            "\"Right,\" says the taller one. \"I'm Pell. I'm the captain. That's Bird, she's the count. This is the defence and you can't get out through it without permission, that's the rule, I made it.\"",
+            "Bird does not look up. She is sitting on an upturned crate with a jam jar in her lap, moving pebbles from one hand into it, one at a time, with enormous care.",
+            "\"Also you have to say what you're going out for,\" Pell adds. \"That's a rule as well. I made that one this morning.\""
+          ],
+          "replies": [
+            { "text": "\"Whose are you? Where do you live?\"", "goto": "whose" },
+            { "text": "\"Defence against what?\"", "goto": "holes" },
+            { "text": "\"I'm going out. That's what I'm going out for.\"", "goto": "gate" }
+          ]
+        },
+        {
+          "id": "whose",
+          "mood": "posted",
+          "lines": [
+            "\"Here,\" says Pell, and gestures at the fort, and that is the whole of the answer she thinks she has given.",
+            "\"No — whose. Oh.\" She thinks about it the way you think about a question in a test you have not revised for. \"I don't know. Nobody's asked me that.\"",
+            "Bird says, without looking up: \"Six.\" Pell says, \"She's counting, don't.\""
+          ],
+          "next": "holes"
+        },
+        {
+          "id": "holes",
+          "mood": "posted",
+          "lines": [
+            "\"The holes,\" says Pell. \"In the town. You must have seen one, they're everywhere, they go all quiet round the edges and then you can hear a kitchen through them.\"",
+            "\"They open and then somebody goes in and then they shut. Bird counts the shut ones.\" She says this as though explaining tides.",
+            "\"The rule is: nobody goes out of the town while there's an open one in it. Because if it's not safe in here it's definitely not safe out there, and out there we can't see you.\""
+          ],
+          "replies": [
+            { "text": "\"Who made that rule?\"", "goto": "rule_source" },
+            { "text": "\"Then check. I'll wait.\"", "goto": "gate" }
+          ]
+        },
+        {
+          "id": "rule_source",
+          "mood": "posted",
+          "lines": [
+            "\"I did,\" says Pell. Then, after a moment, less certainly: \"I think I did.\"",
+            "Bird says: \"You did. You were crying.\"",
+            "\"I was not,\" says Pell, and puts the stick back straight across the gap, which it had never stopped being."
+          ],
+          "next": "gate"
+        },
+        {
+          "id": "gate",
+          "mood": "posted",
+          "lines": [
+            "Bird tips the jar out onto the crate lid and counts the pebbles with one finger.",
+            "She does it twice. She is not fast, and neither of them hurries her, and after a while you find you are not hurrying her either."
+          ],
+          "replies": [
+            { "text": "Wait.", "when": { "lacks_tag": "town_quiet" }, "goto": "refused" },
+            { "text": "Wait.", "when": { "has_tag": "town_quiet" }, "goto": "opened" }
+          ]
+        },
+
+        {
+          "id": "refused",
+          "mood": "posted",
+          "lines": [
+            "Bird shakes her head once and puts the pebbles back in the jar.",
+            "\"Not full,\" says Pell. \"There's still open ones in there. You can hear them from here, if you stop talking.\"",
+            "You stop talking. After a moment you can."
+          ],
+          "replies": [
+            { "text": "\"I can look after myself.\"", "goto": "arg_self" },
+            { "text": "\"You are children. Move.\"", "goto": "arg_move" },
+            { "text": "\"What if I go anyway?\"", "goto": "arg_anyway" },
+            { "text": "\"All right. I'll shut them.\"", "goto": "accept" }
+          ]
+        },
+        {
+          "id": "arg_self",
+          "mood": "posted",
+          "lines": [
+            "\"Everyone says that,\" says Pell. \"That's not a thing you get to say about yourself, it's a thing other people say about you afterwards.\"",
+            "Bird, still not looking up: \"That's what Mrs Ollard says.\"",
+            "\"It's still true when she says it,\" says Pell."
+          ],
+          "next": "refused_end"
+        },
+        {
+          "id": "arg_move",
+          "mood": "posted",
+          "lines": [
+            "Pell does not move. It costs her something; you can see exactly how much, because she is eleven and has not learned to hide it yet.",
+            "\"Yes,\" she says. \"We are.\"",
+            "Bird says: \"That's why we're the ones doing it.\""
+          ],
+          "next": "refused_end"
+        },
+        {
+          "id": "arg_anyway",
+          "mood": "posted",
+          "lines": [
+            "\"Then you go,\" says Pell. \"It's a stick. I'm not going to hit you with it, that would be insane.\"",
+            "\"But we let one out before. Before the counting. She said the same as you and she was nice about it and we moved and she went up the lane.\"",
+            "Bird stops counting. Pell says, quite quietly: \"So now there's a rule.\""
+          ],
+          "next": "refused_end"
+        },
+        {
+          "id": "accept",
+          "mood": "posted",
+          "lines": [
+            "Pell looks at you for slightly too long, the way people do when they have won an argument they had prepared much more for.",
+            "\"Right,\" she says. \"Good. Yes. That's — yes.\"",
+            "Bird holds up the jar and rattles it once, helpfully, so you know what full is going to sound like."
+          ],
+          "next": "refused_end"
+        },
+        {
+          "id": "refused_end",
+          "mood": "posted",
+          "lines": [
+            "Pell steps back into the gap with the stick across it, at the height of your knee, where it does not stop anything at all.",
+            "\"Come back when it's quiet,\" she says. \"We're here. We're always here.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "met_fort" }
+          ],
+          "end": true
+        },
+
+        {
+          "id": "opened",
+          "mood": "stood_down",
+          "lines": [
+            "Bird looks at the pebbles. Then at the hedge. Then at Pell.",
+            "\"Full,\" she says.",
+            "Pell holds the stick across the gap for a moment longer than she needs to. Then she takes it out and stands it against the crate wall, carefully, the way you put down something you have been carrying a long way.",
+            "\"Then you're clear to go,\" she says. \"That's the rule. We don't get to make it up when it's inconvenient, that's the whole point of it being a rule.\""
+          ],
+          "replies": [
+            { "text": "\"Thank you.\"", "goto": "toll" },
+            { "text": "\"You could have just let me through.\"", "goto": "could_have" }
+          ]
+        },
+        {
+          "id": "could_have",
+          "mood": "stood_down",
+          "lines": [
+            "\"Yes,\" says Pell, in the tone of someone who has thought about this more than you have.",
+            "\"And then it wouldn't have meant anything when I did.\""
+          ],
+          "next": "toll"
+        },
+        {
+          "id": "toll",
+          "mood": "stood_down",
+          "lines": [
+            "Bird gets up off the crate for the first time since you arrived, fishes one pebble out of the jar and puts it in your hand. It is a very ordinary pebble. It is slightly warm from the jar.",
+            "\"That's the toll,\" says Pell, who has clearly just invented the toll. \"You have to bring it back.\"",
+            "\"You have to bring it back,\" agrees Bird, and looks at you until you say that you will."
+          ],
+          "effects": [
+            { "type": "tag", "tag": "fort_open" },
+            { "type": "tag", "tag": "met_fort" },
+            { "type": "log", "text": "The children take the stick out of the gap. The lane out of town is open.", "kind": "good" }
+          ],
+          "replies": [
+            { "text": "\"I'll bring it back.\"", "goto": "farewell" }
+          ]
+        },
+        {
+          "id": "farewell",
+          "mood": "stood_down",
+          "lines": [
+            "Pell walks you the four steps through the gap and stops exactly at the line where the leaf wall ends, as though there is something there.",
+            "\"Right,\" she says. \"Off you go then.\"",
+            "She is still standing in that spot when the lane turns."
+          ],
+          "end": true
+        },
+
+        {
+          "id": "again",
+          "mood": "posted",
+          "lines": [
+            "\"I know,\" says Pell. \"We have to do it every time. It's a defence. It's not a defence if it lets you off.\""
+          ],
+          "replies": [
+            { "text": "Go through.", "when": { "has_tag": "fort_open" }, "goto": "wave" },
+            { "text": "\"Has it changed?\"", "when": { "lacks_tag": "fort_open" }, "goto": "gate" },
+            { "text": "\"What do you two actually do all day?\"", "goto": "smalltalk" }
+          ]
+        },
+        {
+          "id": "wave",
+          "mood": "stood_down",
+          "lines": [
+            "Pell lifts two fingers off the crate wall, which is apparently a salute, and Bird rattles the jar.",
+            "\"Toll's paid,\" says Pell. \"Go on.\""
+          ],
+          "end": true
+        },
+        {
+          "id": "smalltalk",
+          "mood": "posted",
+          "lines": [
+            "\"Defend,\" says Pell.",
+            "\"We had a dog for a bit,\" says Bird. \"It went home. It has a home.\" She says this without any weight on it whatsoever, which is much worse.",
+            "\"We're getting a flag,\" says Pell. \"Bird's doing it. It's going to be green.\""
+          ],
+          "replies": [
+            { "text": "\"What's on the flag?\"", "goto": "flag" },
+            { "text": "Leave them to it.", "goto": "leave_small" }
+          ]
+        },
+        {
+          "id": "flag",
+          "mood": "posted",
+          "lines": [
+            "Bird holds up a square of sacking with a shape on it in what is almost certainly beetroot.",
+            "\"It's a hole,\" she says. \"With a line through it.\"",
+            "It is, in fact, extremely clear."
+          ],
+          "next": "leave_small"
+        },
+        {
+          "id": "leave_small",
+          "mood": "posted",
+          "lines": [
+            "Pell puts the stick back across the gap without appearing to decide to."
+          ],
+          "effects": [
+            { "type": "tag", "tag": "met_fort" }
+          ],
+          "end": true
+        }
+      ]
+    }
+  ]
+}

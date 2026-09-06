@@ -739,6 +739,8 @@
       "req_type_vocab": "wheel_reqs"
     },
     "spite_alters": {
+      "_comment": "Spite's two halves, and also his two portrait moods. `id_space` puts them in the same namespace as every other speaker's moods -- see speaker_moods -- so a `mood` on a dialogue node has exactly one set of ids to name, whoever is talking.",
+      "id_space": "moods",
       "files": {
         "dir": "content",
         "paths": [
@@ -773,7 +775,7 @@
       ],
       "optional": [],
       "refs": {
-        "alter": "spite_alters"
+        "alter": "moods"
       },
       "effect_vocab": "spite_effects"
     },
@@ -886,6 +888,27 @@
       ],
       "optional": [
         "accent",
+        "desc",
+        "moods"
+      ]
+    },
+    "speaker_moods": {
+      "_comment": "A speaker's portrait moods, which is the same thing Spite's alters are and shares their id space. The contract this makes checkable: `mood` on a dialogue node names one of these, and Dialogue.portrait_path() turns it into assets/portraits/<portrait>_<mood>.png. Nothing checks that the FILE exists -- see docs/CHARACTER-TOWNSFOLK.md -- but at least a mistyped mood is now an error rather than a silent fall back to a lettered plate. `desc` is the one-line stage direction the writing gives the face; DialogueScreen prints `mood.capitalize()` under the name for everyone except Spite, so keep mood ids readable as words.",
+      "id_space": "moods",
+      "files": {
+        "dir": "dialogue",
+        "paths": [
+          "speakers[].moods[]"
+        ]
+      },
+      "runtime": [
+        "speakers{}.moods[]"
+      ],
+      "required": [
+        "id",
+        "name"
+      ],
+      "optional": [
         "desc"
       ]
     },
@@ -936,7 +959,7 @@
         "end"
       ],
       "refs": {
-        "mood": "spite_alters",
+        "mood": "moods",
         "speaker": "speakers"
       },
       "unique_ids": false

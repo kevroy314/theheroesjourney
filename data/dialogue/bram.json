@@ -1,0 +1,194 @@
+{
+  "_comment": "Bram Hollis, from PROPOSALS/NPC-CONCEPTS.md #2. Six brothers, six twins, an empty house that is plainly theirs, and a tragedy that the notes are explicit about: the twins vanished when the loop started and the brothers walk the country picking things up because a thing somebody dropped is the only kind of clue there is.\n\nTHE BRIEF SAID: DO NOT TIP THE TRAGEDY ON THE FIRST MEETING. So the first meeting is entirely warm. He is funny, he is delighted to see you, he gives you back something you dropped and undercharges for it, and the ONLY tell is that he counts in sixes and does it twice. The house gets one deflection, cheerful and a beat too smooth. The second meeting this loop goes one layer down and stops. The whole of it is behind `zone_gte: 2` -- you have to have been out past the foothills, seen the country change round you and come back, before he will say the word 'wife' -- and even then he tells you the shape and not the thing.\n\nHE IS A SHOP THAT RUNS BACKWARDS, and the pricing rule from the notes is live. 'He'll pay you more the further from the home town the item is from' is `zone_gte`, which is the condition Rules.passes already implements and which Spite's doorstep already uses -- so the reply that pays well is simply not on screen until you have been out far enough to have anything worth it. What is NOT built is the shop: there is no inventory screen, no buy, no sell, and no items beyond the ones data/content/items.json already carries. The trade here pays grit, which is real, and the branch is written so a shop screen can be dropped in where `barter` is.",
+
+  "speakers": [
+    {
+      "id": "bram",
+      "name": "Bram Hollis",
+      "portrait": "bram",
+      "accent": "accent",
+      "desc": "Wearing four coats and carrying the rest. Unhoused entirely on purpose, richer than the mayor, and the happiest man in the county on any given morning."
+    }
+  ],
+
+  "dialogues": [
+    {
+      "id": "bram_finds",
+      "speaker": "bram",
+      "start": "hello",
+      "nodes": [
+        {
+          "id": "hello",
+          "lines": [
+            "A very large man in several coats is going along the verge with a stick, turning things over.",
+            "He straightens up when he sees you and his whole face goes off like a lamp.",
+            "\"There you are,\" he says, as though you are late, as though you were expected, as though this is a nice thing rather than an alarming one."
+          ],
+          "replies": [
+            { "text": "\"Do I know you?\"", "when": { "lacks_tag": "met_bram" }, "goto": "intro" },
+            { "text": "\"What have you got?\"", "when": { "lacks_tag": "met_bram" }, "goto": "intro" },
+            { "text": "\"Bram.\"", "when": { "has_tag": "met_bram" }, "goto": "again" }
+          ]
+        },
+        {
+          "id": "intro",
+          "lines": [
+            "\"Bram Hollis. I pick things up.\" He says this like a job title, because it is one.",
+            "\"People drop things. Things fall out of packs, out of pockets, out of holes in the world if you're standing in the right place at the wrong time. I go along after and I pick them up, and then when somebody wants one I have got one.\"",
+            "He is already going through a sack. \"You've dropped something, by the way. Ages back. I've been carrying it about.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "met_bram" }
+          ],
+          "replies": [
+            { "text": "\"What is it?\"", "goto": "gift" },
+            { "text": "\"How much?\"", "goto": "how_much" },
+            { "text": "\"Where do you live?\"", "goto": "house" }
+          ]
+        },
+        {
+          "id": "how_much",
+          "lines": [
+            "\"For yours? Nothing. It's yours. That'd be a swindle and I'd have to do it to your face.\"",
+            "He considers. \"For somebody else's, a fair price. I do a fair price. People think I mean a low price and then they get here and it IS a low price, and then they want to know what's wrong with it, and there's nothing wrong with it, it's just that I got it for free off a verge.\""
+          ],
+          "next": "gift"
+        },
+        {
+          "id": "gift",
+          "lines": [
+            "It is a length of good cord, wound in six loops, and a folded square of oilcloth. It is exactly the sort of thing you do not notice going and then need at dusk in the rain.",
+            "\"There,\" he says. \"Now you've got it again.\"",
+            "He winds the last loop and then, without appearing to notice he is doing it, counts them. Six. Then counts them again."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 8 },
+            { "type": "log", "text": "Good cord and a square of oilcloth. Small things, and they help.", "kind": "good" }
+          ],
+          "replies": [
+            { "text": "\"Six?\"", "goto": "sixes" },
+            { "text": "\"Thank you.\"", "goto": "goodbye" }
+          ]
+        },
+        {
+          "id": "sixes",
+          "lines": [
+            "\"Habit,\" he says, cheerfully, and shoulders the sack. \"There's six of us. You get in the way of it.\"",
+            "\"Coll, Dunn, Ferris, Gove, Otho, me. All out on the roads and all of us picking things up, so if you've lost something and I haven't got it, one of them will have.\""
+          ],
+          "replies": [
+            { "text": "\"Where do the six of you live?\"", "goto": "house" },
+            { "text": "\"That's a lot of brothers.\"", "goto": "goodbye" }
+          ]
+        },
+        {
+          "id": "house",
+          "lines": [
+            "\"Out,\" he says, and grins, and spreads both arms at the whole county, and it is such a good answer that you nearly take it.",
+            "\"Better than a room. A room's got the same four walls in it every morning and I've had a look at them.\""
+          ],
+          "replies": [
+            { "text": "\"The big empty house on the square is yours.\"", "goto": "deflect" },
+            { "text": "Let it go.", "goto": "goodbye" }
+          ]
+        },
+        {
+          "id": "deflect",
+          "lines": [
+            "\"It is,\" he agrees immediately, no pause at all, which is itself a kind of pause. \"Roof's good. Well built. Somebody should be in it.\"",
+            "\"Anyway.\" He hitches the sack. \"You'll want to get on, and I want that ditch before the light goes.\""
+          ],
+          "next": "goodbye"
+        },
+
+        {
+          "id": "again",
+          "lines": [
+            "\"There you are,\" he says, exactly as before, and means it exactly as much."
+          ],
+          "replies": [
+            { "text": "\"I've got something from a long way out.\"", "when": { "zone_gte": 2 }, "goto": "barter_far" },
+            { "text": "\"I've got something to sell you.\"", "when": { "lacks_tag": "sold_bram" }, "goto": "barter" },
+            { "text": "\"Six brothers and an empty house. Tell me.\"", "when": { "zone_gte": 2 }, "goto": "twins" },
+            { "text": "\"Why won't you live in that house?\"", "goto": "deflect" },
+            { "text": "\"Nothing. Just saying hello.\"", "goto": "hello_back" }
+          ]
+        },
+        {
+          "id": "hello_back",
+          "lines": [
+            "\"Well, that's the best thing anybody's said to me today,\" he says, and it is entirely obvious that he is not being polite.",
+            "He gives you half an apple. You did not see where it came from."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 5 }
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "barter",
+          "lines": [
+            "He turns it over twice, holds it up, sniffs it, and names a price that is more than you were going to ask for.",
+            "\"That's what it's worth,\" he says, to your face, as though this is normal.",
+            "\"Town stuff, though. There's a lot of town stuff. Bring me something from a long way out and we'll have a proper conversation about it.\""
+          ],
+          "effects": [
+            { "type": "grit", "amount": 9 },
+            { "type": "tag", "tag": "sold_bram" }
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "barter_far",
+          "lines": [
+            "He goes very still with it in both hands.",
+            "\"That's not from here,\" he says. \"That's not from anywhere near here. Where'd you —\" and then he stops himself, and looks at it for a while longer than a man valuing a thing needs to.",
+            "Then the lamp comes back on. \"Right. Yes. That's worth a great deal more to me than it is to you, and I'm telling you that before I pay you, which you'll notice.\""
+          ],
+          "effects": [
+            { "type": "grit", "amount": 22 },
+            { "type": "tag", "tag": "sold_bram" },
+            { "type": "log", "text": "He pays over the odds for anything from far out, and says so first.", "kind": "good" }
+          ],
+          "replies": [
+            { "text": "\"What are you actually looking for?\"", "goto": "twins" },
+            { "text": "Take the money.", "goto": "goodbye" }
+          ]
+        },
+        {
+          "id": "twins",
+          "lines": [
+            "He sits down on the verge. It takes a while; there is a lot of him and a lot of coats.",
+            "\"Six of us married six of them,\" he says. \"Sisters. All in the one summer, which the whole town thought was a great joke and it was.\"",
+            "\"And then there was a morning. And the six of us got up, and there wasn't a single thing missing out of that house. Not a coat. Not a shoe. Nothing dropped.\"",
+            "\"So I go along the verges. Because a person who went somewhere drops something, and nobody dropped anything, and I have not yet worked out what that leaves.\""
+          ],
+          "replies": [
+            { "text": "\"That's why you won't go in.\"", "goto": "wont_go_in" },
+            { "text": "Say nothing.", "goto": "wont_go_in" }
+          ]
+        },
+        {
+          "id": "wont_go_in",
+          "lines": [
+            "\"It's a house,\" he says, getting up. \"It's not a home, it's a house. There's a difference and it's not the roof.\"",
+            "And then he laughs, genuinely, and hauls the sack up, and the whole thing folds away as neatly as the oilcloth.",
+            "\"Right. Ditch. Go on with you.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "bram_told_you" }
+          ],
+          "end": true
+        },
+
+        {
+          "id": "goodbye",
+          "lines": [
+            "He is back at the verge before you have finished turning round, poking at something with the stick and looking extremely pleased about it."
+          ],
+          "end": true
+        }
+      ]
+    }
+  ]
+}

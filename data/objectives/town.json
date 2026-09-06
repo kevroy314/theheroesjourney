@@ -6,10 +6,26 @@
       "title": "Close every anomaly in town",
       "desc": "Spite says the town is full of holes. Walk into each one and come back out of it having finished what it asked.",
       "giver": "spite",
-      "goal": { "type": "anomalies_in_ring", "ring": 0 },
+      "goal": {
+        "type": "anomalies_in_ring",
+        "ring": 0
+      },
       "reward": [
-        { "type": "resolve", "amount": 12 },
-        { "type": "log", "text": "The town is quiet. Spite is not going to say anything nice about it.", "kind": "good" }
+        {
+          "type": "tag",
+          "tag": "town_quiet",
+          "text": "The children lower the barricade.",
+          "kind": "good"
+        },
+        {
+          "type": "resolve",
+          "amount": 12
+        },
+        {
+          "type": "log",
+          "text": "The town is quiet. Spite is not going to say anything nice about it.",
+          "kind": "good"
+        }
       ]
     }
   ]

@@ -1,0 +1,164 @@
+{
+  "_comment": "The bartender. PROPOSALS/NPC-CONCEPTS.md #4 is the four characters 'The bartender - he h' and then the file stops, so everything here is invented and it is invented against a brief with two words in it: the tavern is seedy, and he has to be someone the player would come back to.\n\nTHE INVENTION: he is the cleanest man in the dirtiest room. A seedy tavern with a seedy landlord is one note played twice; a seedy tavern with a fastidious one is a room that has somebody holding it together, and you can see exactly how much effort it is costing him. He knows everything about everyone because people tell a bartender, and he will not tell you a word of it, which is what makes him the only person in town who is safe. That is the reason to come back and it is stated in one line by him refusing to gossip about somebody you asked about.\n\nAND THE HOOK, WHICH COSTS ONE SENTENCE: he remembers your drink. Not you -- your drink. He cannot say why he already knows it and he does not enjoy being asked. Spite is the only person who half-remembers the loop; Tobin is the first evidence that it leaks into people who do not.\n\nMECHANICALLY HE IS THE FIRST WORKING TRADE IN THE GAME. A drink is +grit and -deadline, which is a real cost and a real benefit in the vocabulary Objectives.apply_effects already implements, and a bar that restores your run resource for an hour of your day is the most natural shop in any game. `drank` gates the second one down to a worse rate, because a bar you can stand at forever is not a bar.\n\nHe also closes Mrs Ollard's errand: `met_tobin` is what data/dialogue/busybody.json reads. Two files, one tag, no code.",
+
+  "speakers": [
+    {
+      "id": "tobin",
+      "name": "Tobin",
+      "portrait": "tobin",
+      "accent": "muted",
+      "desc": "Keeps the bar. Bald, bearded, enormous, and wearing the only clean thing in the building. Polishing a glass that was already clean when you came in."
+    }
+  ],
+
+  "dialogues": [
+    {
+      "id": "tobin_bar",
+      "speaker": "tobin",
+      "start": "bar",
+      "nodes": [
+        {
+          "id": "bar",
+          "lines": [
+            "The room smells of spilled beer, wet coats and a fire that has been out since yesterday. Something is going on in the corner and it is better not to look at it directly.",
+            "Behind the bar, a very large bald man in a white apron is polishing a glass. The apron is spotless. The bar top is spotless. He is an island.",
+            "He looks up, and does not smile, and somehow you feel welcome anyway."
+          ],
+          "replies": [
+            { "text": "\"Evening.\"", "when": { "lacks_tag": "met_tobin" }, "goto": "intro" },
+            { "text": "\"Tobin.\"", "when": { "has_tag": "met_tobin" }, "goto": "again" }
+          ]
+        },
+        {
+          "id": "intro",
+          "lines": [
+            "\"Evening.\" He sets the glass down, squares it to the edge of the bar, and moves it a quarter inch.",
+            "\"Tobin. It's my name and it's not the pub's name, so don't ask for a Tobin, you'll get a look.\"",
+            "He is already reaching for a bottle you did not point at."
+          ],
+          "effects": [
+            { "type": "tag", "tag": "met_tobin" }
+          ],
+          "replies": [
+            { "text": "\"How did you know what I drink?\"", "goto": "the_drink" },
+            { "text": "\"Just the one, then.\"", "goto": "drink" },
+            { "text": "\"What's going on in that corner?\"", "goto": "corner" }
+          ]
+        },
+        {
+          "id": "the_drink",
+          "lines": [
+            "The bottle stops, about four inches off the bar.",
+            "\"...I don't,\" he says.",
+            "He looks at the bottle in his own hand for a second longer than a man looks at a bottle. Then he pours it, and it is right, and he does not mention it again and neither, you find, do you."
+          ],
+          "replies": [
+            { "text": "\"That's happened before.\"", "goto": "before" },
+            { "text": "Drink it.", "goto": "drink" }
+          ]
+        },
+        {
+          "id": "before",
+          "lines": [
+            "\"It happens,\" he says, in the flat voice of a man closing a subject.",
+            "\"I've been doing this a long time. You get so you know a face.\"",
+            "He picks up the cloth again. \"You've not got a face I know.\""
+          ],
+          "next": "drink"
+        },
+        {
+          "id": "corner",
+          "lines": [
+            "He does not look at the corner. \"That's Wenn and that's Wenn's business.\"",
+            "\"People come in here and they say things because it's warm and because I'm stood here. And then they go home, and the things stay in the room, and they do not come out of it.\"",
+            "\"Which is also why you can say what you like in front of me, and I'd take that as the offer it is.\""
+          ],
+          "replies": [
+            { "text": "\"Nothing to say.\"", "goto": "drink" },
+            { "text": "\"Noted.\"", "goto": "drink" }
+          ]
+        },
+        {
+          "id": "drink",
+          "lines": [
+            "It is better than the room deserves. He watches you notice that, and there is a very small movement at one corner of the beard.",
+            "You are in there rather longer than you meant to be."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 16 },
+            { "type": "deadline", "amount": -1 },
+            { "type": "tag", "tag": "drank" }
+          ],
+          "next": "leaving"
+        },
+        {
+          "id": "second",
+          "lines": [
+            "\"You've had one.\" He pours it anyway. \"I'm not your mother, I'm just saying it out loud so one of us has.\"",
+            "This one does less and takes just as long."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 6 },
+            { "type": "deadline", "amount": -1 }
+          ],
+          "next": "leaving"
+        },
+
+        {
+          "id": "again",
+          "lines": [
+            "\"Back.\" He puts a glass on the bar without being asked and squares it to the edge."
+          ],
+          "replies": [
+            { "text": "\"Go on then.\"", "when": { "lacks_tag": "drank" }, "goto": "drink" },
+            { "text": "\"One more.\"", "when": { "has_tag": "drank" }, "goto": "second" },
+            { "text": "\"What have you heard?\"", "goto": "rumour" },
+            { "text": "\"Mrs Ollard sent me to check you weren't on the ceiling.\"", "when": { "has_tag": "ollard_errand" }, "goto": "ollard" },
+            { "text": "\"Nothing tonight.\"", "goto": "leaving" }
+          ]
+        },
+        {
+          "id": "rumour",
+          "lines": [
+            "\"Nothing about anybody,\" he says, which is not the same as nothing.",
+            "\"There's two children living in a heap of leaves at the end of Mill Lane and nobody in this town can tell me whose they are. I have asked. I have asked in a way that gets answers.\"",
+            "\"And there's a house on the square with six chairs at the table and the table's laid.\" He picks the cloth back up. \"That's not gossip, that's a window.\""
+          ],
+          "replies": [
+            { "text": "\"Who laid the table?\"", "goto": "table" },
+            { "text": "\"Thanks.\"", "goto": "leaving" }
+          ]
+        },
+        {
+          "id": "table",
+          "lines": [
+            "\"Nobody's laid it,\" says Tobin. \"That's the thing about it. It's been laid.\"",
+            "He wipes the bar, which is clean, and then wipes it again."
+          ],
+          "next": "leaving"
+        },
+        {
+          "id": "ollard",
+          "lines": [
+            "There is a pause of exactly the right length.",
+            "\"Tell her I've done the ceiling,\" he says, \"and it needed doing.\"",
+            "Then, more quietly, and to the glass: \"Tell her I'll come up on Sunday.\""
+          ],
+          "effects": [
+            { "type": "grit", "amount": 6 },
+            { "type": "log", "text": "He will come up on Sunday. He says this to a glass.", "kind": "good" }
+          ],
+          "next": "leaving"
+        },
+        {
+          "id": "leaving",
+          "lines": [
+            "He is polishing the glass again by the time you are at the door. It was clean when you came in and it is clean now.",
+            "\"Mind the step,\" he says, without looking up. There is no step. There is, however, a hole in the floor, and it is exactly where the step would have been."
+          ],
+          "end": true
+        }
+      ]
+    }
+  ]
+}

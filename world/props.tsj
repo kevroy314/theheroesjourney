@@ -1,12 +1,12 @@
 {
   "columns": 8,
   "image": "../assets/tiles/props.png",
-  "imageheight": 2880,
+  "imageheight": 2976,
   "imagewidth": 512,
   "margin": 0,
   "name": "props",
   "spacing": 0,
-  "tilecount": 240,
+  "tilecount": 248,
   "tiledversion": "1.12.2",
   "tileheight": 96,
   "tiles": [
@@ -6972,6 +6972,246 @@
     },
     {
       "id": 232,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "fence_rail"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 233,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "field_gate"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 234,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "leaf_wall"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 235,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "campfire"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 236,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "trash_can"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 237,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "haystack"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 238,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "washing_line"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 239,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "sign_shop"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": true
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 240,
       "properties": [
         {
           "name": "name",

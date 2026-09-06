@@ -859,7 +859,8 @@ def main():
             save(ws, "_player_walk.png")
 
     write_animals(save, grounds)
-    write_spite(save, grounds, cels)
+    spite_cels = write_spite(save, grounds, cels)
+    write_town(save, grounds, cels, spite_cels)
 
     # Prove the contract rather than assert it.
     print()
@@ -2303,6 +2304,1726 @@ def write_spite(save, grounds, player_cels):
     print("  kind vs wary: %.1f%% of pixels differ -- one man, two faces" % (diff * 100))
     if not ok:
         raise SystemExit("SPITE CONTRACT FAILED")
+    return cels
+
+# --- the townsfolk: one body, five deltas ---------------------------------------
+#
+# Spite is a bespoke geometry table: eleven hand-written rows of skull, sixteen
+# of coat, and a drawing function per garment. That is the right amount of work
+# for the second character in the game and the wrong amount for the fifteenth.
+# #77 wants a town. So everything below is the same figure Spite is -- same
+# Frame, same north-west light, same alpha-derived rim, same baked contact
+# shadow, same fixed sole -- with the geometry DERIVED FROM SCALARS instead of
+# typed out, so a townsperson is a dictionary and not a file.
+#
+# What a townsperson is:
+#
+#   a body      crown row, skull size, neck, a width profile from shoulder to
+#               hem, leg width and stance. Nine numbers.
+#   a palette   four ramps mixed from data/themes/firstlight.json the same way
+#               COOL / WARM / LEATHER / SKIN are: cloth, trim, skin, hair.
+#   a crown     one of five: cap, mop, bun, bald, horseshoe -- or a hood.
+#   a garment   one of six: coat, cloak, dress, apron, vest, layers.
+#   props       zero or more small functions, called per facing.
+#
+# and everything else -- four facings, three columns, the walk contract, the
+# mirror, the recentre, the check sheets -- is shared and cannot be got wrong
+# per character because no character gets to write it.
+#
+# THE VALUE DISCIPLINE IS THE PART THAT DOES NOT SURVIVE BEING GUESSED. The
+# ground runs 34 (grass_tall) to 72 (snow) and COOL is built with a deliberate
+# hole between 43 and 90 for exactly that reason. `cloth5()` below reproduces
+# that hole for any hue: three steps above 95, two below 42, nothing in between,
+# and the dark steps are solved for a target luma rather than mixed by a
+# fraction, because a fraction that brackets a pale linen apron puts a dark
+# green cloak straight into the sand. Small parts -- hair, brows, a jar -- use
+# `hue5()`, which is an even ramp, because a feature that is 5% of the figure
+# can afford to sit in the hole and the rim is what holds the silhouette anyway.
+
+# The luma the deep folds aim at, either side of the ground band.
+FOLD_L, DEEP_L = 40.0, 27.0
+
+
+def _toward_bg(base, target):
+    """The mix of `base` toward the background whose luma is `target`.
+
+    Solved rather than guessed. mix() is linear, so luma is linear in t, and
+    one formula lands every hue on the same value. Mixing by a fixed fraction
+    instead is what puts a dark cloak in the middle of the sand while a pale
+    apron clears it.
+    """
+    la, lb = luma(base), luma(C["bg"])
+    if la <= lb:
+        return base
+    t = (target - la) / (lb - la)
+    return mix(base, C["bg"], max(0.0, min(1.0, t)))
+
+
+def cloth5(base, up=0.34):
+    """A garment ramp, bracketed either side of the ground.
+
+    0 lit / 1 base / 2 mid all sit above 95 luma; 3 fold / 4 deep sit below 42.
+    Nothing lands in 43..90 where sand, ice, dune and snow live. Index 2 is the
+    turn: mixed toward `line` rather than toward the background, so a shaded
+    garment goes grey-blue like everything else in this world instead of just
+    going dark.
+    """
+    return [mix(base, C["text"], up), base, mix(base, C["line"], 0.30),
+            _toward_bg(base, FOLD_L), _toward_bg(base, DEEP_L)]
+
+
+def hue5(base, up=0.40):
+    """An even ramp for the small parts -- hair, beards, props, glass. Five
+    steps with no hole in them, because a feature this size is read against the
+    figure it sits on, not against the ground."""
+    return [mix(base, C["text"], up), base,
+            mix(base, C["line"], 0.38), mix(base, C["bg"], 0.55),
+            mix(base, C["bg"], 0.78)]
+
+
+def skin5(base):
+    """A face ramp: lit, base, shaded, in-the-collar, and the near-black that
+    draws an eye and a mouth line.
+
+    The base must sit BELOW the character's hair, always. make_sprites' first
+    cut of Spite put skin at 160 against hair at 146 and the profile read as a
+    beak on a grey skull; `town_report()` measures this for every townsperson
+    rather than trusting that the ramps were chosen carefully.
+    """
+    return [mix(base, C["text"], 0.24), base,
+            mix(base, C["bg"], 0.28), mix(base, C["bg"], 0.56),
+            mix(C["bg"], BLACK, 0.30)]
+
+
+# --- geometry from scalars ------------------------------------------------------
+
+def _row(y, w):
+    """A span `w` wide, centred on CX = 15.5. Widths are forced even, because an
+    odd one is a figure half a pixel off its own tile and the mirror will not
+    match it."""
+    w = max(2, w + (w % 2))
+    x0 = 16 - w // 2
+    return (y, x0, x0 + w - 1)
+
+
+def oval(top, rows, w):
+    """A skull: full width through the middle, two rows of taper at each end."""
+    out = []
+    for i in range(rows):
+        d = min(i, rows - 1 - i)
+        out.append(_row(top + i, w - (4 if d == 0 else 2 if d == 1 else 0)))
+    return out
+
+
+def taper(y0, y1, keys):
+    """Widths named at fractions of a run of rows, interpolated between.
+
+    This is the whole of the body plan. `keys` is [(t, width)] and a character's
+    silhouette -- broad and tapering, round and barrelled, narrow over a wide
+    skirt -- is six numbers in that list rather than sixteen typed spans.
+    """
+    n = max(1, y1 - y0 + 1)
+    out = []
+    for i in range(n):
+        t = 0.0 if n == 1 else i / float(n - 1)
+        w = keys[-1][1]
+        for j in range(len(keys) - 1):
+            a, b = keys[j], keys[j + 1]
+            if a[0] <= t <= b[0]:
+                u = 0.0 if b[0] == a[0] else (t - a[0]) / (b[0] - a[0])
+                w = a[1] + (b[1] - a[1]) * u
+                break
+        out.append(_row(y0 + i, int(round(w))))
+    return out
+
+
+def profile_keys(P, depth=1.0):
+    """Shoulder, chest, elbow, waist, hem -- as a taper() key list.
+
+    One shape for every townsperson, and the six widths in it are what makes a
+    bartender a wedge and a shopkeeper a barrel. `depth` squeezes it for the
+    side view: a person is narrower seen edge-on, and drawing the profile at
+    the same width as the front is the single commonest way a turned sprite
+    stops being the same person.
+    """
+    def d(w):
+        return max(6, int(round(w * depth)))
+    return [(0.00, d(P["sh_w"]) - 8), (0.10, d(P["sh_w"])),
+            (0.34, d(P["chest_w"])), (0.40, d(P["elbow_w"])),
+            (0.60, d(P["elbow_w"])), (0.68, d(P["waist_w"])),
+            (1.00, d(P["hem_w"]))]
+
+
+def geometry(P, side=False):
+    """Every span table one townsperson needs, from the scalars in P."""
+    top = P["crown"]
+    hh, hw = P["head_h"], P["head_w"]
+    head = oval(top, hh, hw + (2 if side else 0))
+    if side:
+        # The skull carries its mass BEHIND the ear, and the face is a notch cut
+        # out of the front of it. Shifting the whole oval one pixel forward and
+        # letting the hair overhang the neck is what sells a bare head in
+        # profile -- Spite's file spends a paragraph on the same two pixels.
+        head = [(y, x0 - 1, x1) for (y, x0, x1) in head]
+    ny = top + hh
+    neck = [_row(ny + i, P["neck_w"] + 2 * i) for i in range(P["neck_rows"])]
+    sy = ny + P["neck_rows"]
+    hy = P["hem_y"]
+    body = taper(sy, hy, profile_keys(P, P["depth"] if side else 1.0))
+    if side:
+        # Lean the whole column forward or back. A stoop is not a shorter
+        # person, it is a person whose head is in front of their feet, and that
+        # only exists in the side view.
+        lean = P.get("lean", 0)
+        if lean:
+            n = len(body)
+            body = [(y, x0 + int(round(lean * (1.0 - i / float(max(1, n - 1))))),
+                     x1 + int(round(lean * (1.0 - i / float(max(1, n - 1))))))
+                    for i, (y, x0, x1) in enumerate(body)]
+            head = [(y, x0 + lean, x1 + lean) for (y, x0, x1) in head]
+            neck = [(y, x0 + lean, x1 + lean) for (y, x0, x1) in neck]
+    hem = [_row(hy + 1, P["hem_w"] + P.get("hem_flare", 0))]
+    return {"head": head, "neck": neck, "body": body, "hem": hem,
+            "sy": sy, "ny": ny, "hy": hy, "top": top}
+
+
+def body_keys(P, n):
+    """Which ramp step each torso row sits at.
+
+    Light at the top, dark at the bottom, and the step down happens at the
+    waist rather than gradually: the value break is what stops a figure being
+    one barrel of cloth from the collar to the hem. Spite's SP_BODY_F_K is this
+    table written out by hand; this is the rule it was written from.
+    """
+    out = []
+    for i in range(n):
+        t = i / float(max(1, n - 1))
+        out.append(0 if t < 0.16 else (1 if t < 0.66 else 2))
+    return out
+
+
+# --- painting -------------------------------------------------------------------
+
+def paint_spans(f, spans, ramp, keys, dy=0, hi=2, sh=3):
+    """sculpt(), for a figure that is not made of COOL.
+
+    Identical light -- the leftmost `hi` pixels a step lighter, the rightmost
+    `sh` a step darker, the last column two -- over an arbitrary ramp. This is
+    the one function that makes the whole town look like it is standing in the
+    same weather as the traveller, so nothing below is allowed to paint a
+    garment any other way.
+    """
+    if isinstance(keys, int):
+        keys = [keys] * len(spans)
+
+    def R(i):
+        return ramp[max(0, min(len(ramp) - 1, i))]
+
+    for (y, x0, x1), k in zip(spans, keys):
+        yy = y + dy
+        f.row(yy, x0, x1, R(k))
+        f.row(yy, x0, min(x1, x0 + hi - 1), R(k - 1))
+        f.row(yy, max(x0, x1 - sh + 1), x1, R(k + 1))
+        f.px(x1, yy, R(k + 2))
+
+
+# --- the crown ------------------------------------------------------------------
+#
+# The first thing the eye reads on a 32px figure, so it is the axis the cast is
+# separated on. Nobody in town shares one: the traveller has a hood, Spite a
+# parted cap, and the six below are a leaf hood, a mop, a bun, a bald dome, a
+# horseshoe and a shorn crop. If a seventh townsperson needs a crown that is
+# already taken, they need a different one.
+
+def hu_hair_front(f, P, dy, back):
+    G, hr = P["_g"], P["hair"]
+    head, hl, kind = G["head"], P["hairline"], P["crown_kind"]
+    rows = head if back else head[:hl]
+    if kind == "bald":
+        # A bald head still has a head from behind. The first cut drew nothing
+        # here and the bartender walked away with no skull at all -- an error
+        # no rule catches and one glance at the `up` row does.
+        for (y, x0, x1) in head:
+            f.row(y + dy, x0, x1, P["skin"][1])
+            f.row(y + dy, x1 - 2, x1, P["skin"][2])
+        f.row(head[0][0] + dy, head[0][1], head[0][2], P["skin"][0])
+        y, x0, x1 = head[-1]
+        f.row(y + dy, x0, x1, P["skin"][3])
+        rows = []
+    if kind == "horseshoe":
+        # Bare from the front and hair round the back and sides. Drawn as the
+        # temples only, because a horseshoe closed across the top is a wig.
+        for (y, x0, x1) in head[max(0, hl - 1):hl + 4]:
+            f.row(y + dy, x0, x0 + 2, hr[2])
+            f.px(x0, y + dy, hr[1])
+            f.row(y + dy, x1 - 2, x1, hr[3])
+        if back:
+            for (y, x0, x1) in head[max(0, hl - 1):]:
+                f.row(y + dy, x0, x1, hr[2])
+                f.row(y + dy, x0, x0 + 1, hr[1])
+                f.row(y + dy, x1 - 1, x1, hr[3])
+        return
+    for (y, x0, x1) in rows:
+        f.row(y + dy, x0, x1, hr[2])
+        f.row(y + dy, x0, x0 + 2, hr[1])
+        f.px(x0, y + dy, hr[0])
+        f.row(y + dy, x1 - 1, x1, hr[3])
+    if back:
+        # From behind there is no face and no fringe: a mass, a part and a nape.
+        f.px(head[1][1] + 1, head[1][0] + dy, hr[1])
+        y, x0, x1 = head[-2]
+        f.row(y + dy, x0, x1, hr[3])
+        y, x0, x1 = head[-1]
+        f.row(y + dy, x0, x1, hr[4])
+    else:
+        # The fringe, parted, with the forehead bare between the halves. Two
+        # dark bands across a 12px head read as goggles; one band with a gap in
+        # it reads as hair. (make_sprites records the same bug in Spite.)
+        y, x0, x1 = head[hl]
+        mid = (x0 + x1) // 2
+        f.row(y + dy, x0, mid - 1, hr[3])
+        f.row(y + dy, mid + 3, x1, hr[4])
+        if kind == "mop":
+            # A mop is the same cap with its edges refusing to line up. Drawn
+            # level all the way round it is a helmet.
+            for i, (yy, a, b) in enumerate(head[hl:hl + 3]):
+                f.row(yy + dy, a, a + (1 if i != 1 else 2), hr[3])
+                f.row(yy + dy, b - (1 if i != 1 else 2), b, hr[4])
+            f.px(mid + 1, head[hl][0] + dy, hr[3])
+    if kind == "bun":
+        # A knob, two rows proud of the crown and set BACK -- offset toward the
+        # right, which is behind her in the front view. Drawn centred and
+        # narrowing to a point, which is what the first cut did, it is a
+        # wizard's hat: three rows of taper on top of a head is a cone whatever
+        # you meant by it.
+        cy = head[0][0] - 1 + dy
+        f.row(cy, 15, 20, hr[2])
+        f.row(cy - 1, 16, 19, hr[1])
+        f.px(16, cy - 1, hr[0])
+        f.px(20, cy, hr[3])
+        f.px(14, cy + 1, hr[1])                                 # a strand come loose
+        f.px(13, cy + 2, hr[2])
+
+
+def hu_face_front(f, P, dy):
+    """Brow, eyes, nose, mouth, jaw. Seven rows on an adult, six on a child --
+    and the child's sit LOWER in the skull, which is the whole of why a short
+    adult is not a child."""
+    G, sk, hr = P["_g"], P["skin"], P["hair"]
+    head, top = G["head"], G["top"]
+    hl = P["hairline"] if P["crown_kind"] not in ("bald", "horseshoe") else 0
+    for (y, x0, x1) in head[hl:]:
+        f.row(y + dy, x0, x1, sk[1])
+        f.row(y + dy, x1 - 2, x1, sk[2])
+    if P["crown_kind"] in ("bald", "horseshoe"):
+        f.row(head[0][0] + dy, head[0][1], head[0][2], sk[0])   # the dome's shine
+        f.row(head[1][0] + dy, head[1][1] + 1, head[1][1] + 3, sk[0])
+        for (y, x0, x1) in head[1:P["hairline"] + 1]:           # and its far side,
+            f.row(y + dy, x1 - 1, x1, sk[3])                    # so it is a ball
+
+    ey = top + P["eye_y"]
+    sep = P["eye_sep"]
+    lx, rx = 16 - sep // 2 - 2, 16 + sep // 2
+    tilt = P.get("brow_tilt", (0, 0))
+    # Whichever of the two dark values is actually dark. A white-haired woman
+    # drawn with hair-coloured brows has no brows, and a face with no brows at
+    # 32px has no expression -- it is the one feature that reads at this size.
+    brow = hr[3] if luma(hr[3]) < luma(sk[3]) else sk[3]
+    for i, x in enumerate((lx, rx)):
+        f.row(ey - 1 + tilt[i] + dy, x, x + 1, brow)            # two pixels each.
+        f.row(ey + dy, x, x + 1, sk[4])                         # a bar is goggles
+    f.px(15, ey + 1 + dy, sk[0])                                # the nose: one lit
+    f.px(16, ey + 1 + dy, sk[2])                                # pixel and its shade
+    my = ey + P["mouth_dy"]
+    f.row(my + dy, 15, 16, sk[3])
+    f.px(17, my + dy, sk[3])                                    # a third at ONE
+    f.row(my + 1 + dy, 14, 17, sk[2])                           # corner; a wider
+                                                                # mouth is a moustache
+    if P.get("specs"):
+        # Spectacles as the BOTTOM of two lenses and a bridge, never a rim all
+        # the way round: a closed ring on a 12px head is goggles, which is the
+        # same failure the two-pixel brows above exist to avoid. Bright pixels
+        # outboard of each eye -- the first cut -- read as a startled stare.
+        f.row(ey + 1 + dy, lx, lx + 1, sk[3])
+        f.row(ey + 1 + dy, rx, rx + 1, sk[3])
+        f.px(lx + 2, ey + dy, sk[3])
+        f.px(rx - 1, ey + dy, sk[3])
+    if P.get("beard"):
+        # It has to come UP the jaw to the ears, not sit under the mouth. A
+        # beard drawn as three rows on the chin is a goatee, and on a bald head
+        # a goatee leaves the skull a featureless brown block -- which is what
+        # the bartender was until this ran to the temples.
+        jaw = head[-1][0]
+        for (y, x0, x1) in head:
+            if y < ey:
+                continue
+            if y <= my:
+                f.row(y + dy, x0, x0 + 1, hr[3])
+                f.row(y + dy, x1 - 1, x1, hr[4])
+                continue
+            f.row(y + dy, x0, x1, hr[2])
+            f.row(y + dy, x0, x0 + 1, hr[1])
+            f.row(y + dy, x1 - 2, x1, hr[3])
+        f.row(my + dy, 13, 18, hr[3])                           # the moustache line
+        f.row(my + dy, 15, 16, sk[4])                           # with the mouth in it
+        f.row(jaw + 1 + dy, 13, 18, hr[2])                      # and it hangs two
+        f.row(jaw + 2 + dy, 14, 17, hr[3])                      # rows past the jaw
+        f.px(18, jaw + 1 + dy, hr[4])
+
+
+# --- the garment ----------------------------------------------------------------
+
+def hu_garment_front(f, P, dy, back):
+    """Six garments over one body, because a town where everybody is wearing a
+    coat is a town of one person at six heights."""
+    G = P["_g"]
+    cl, tr = P["cloth"], P["trim"]
+    sy, hy = G["sy"], G["hy"]
+    body = G["body"]
+    n = len(body)
+    kind = P["garment"]
+
+    def band(t0, t1):
+        return [(i, r) for i, r in enumerate(body) if t0 <= i / float(n) < t1]
+
+    def sleeves(ramp, base=2):
+        """Arms, INSIDE the silhouette -- a panel a step off the garment down
+        each side, and a cuff. The traveller swings his arms outside his own
+        outline and that is his; everyone in town has their hands down."""
+        for _i, (y, x0, x1) in band(0.16, 0.62):
+            f.row(y + dy, x0, x0 + 2, ramp[base])
+            f.px(x0, y + dy, ramp[base - 1])
+            f.row(y + dy, x1 - 2, x1, ramp[base + 1])
+        if P.get("sleeveless"):
+            for _i, (y, x0, x1) in band(0.40, 0.62):
+                f.row(y + dy, x0, x0 + 2, P["skin"][1])
+                f.px(x0, y + dy, P["skin"][0])
+                f.row(y + dy, x1 - 2, x1, P["skin"][2])
+        # Hands, and they are SKIN. Drawn in the boot ramp -- which is what the
+        # first cut did, on the reasoning that a cuff is leather -- every
+        # townsperson ended a sleeve in a dark blob and the whole cast read as
+        # though it were wearing mittens.
+        hand = band(0.60, 0.74)
+        for _i, (y, x0, x1) in hand:
+            f.row(y + dy, x0, x0 + 2, P["skin"][1])
+            f.px(x0, y + dy, P["skin"][0])
+            f.row(y + dy, x1 - 2, x1, P["skin"][2])
+        if hand:
+            y = hand[-1][1][0]
+            f.row(y + dy, hand[-1][1][1], hand[-1][1][1] + 2, P["skin"][2])
+
+    if back:
+        f.col(15, sy + 2 + dy, hy + dy, cl[3])
+        f.col(16, sy + 2 + dy, hy + dy, cl[4])
+        f.row(sy + 2 + dy, body[2][1] + 1, body[2][2] - 1, cl[0])   # the yoke seam
+    elif kind in ("coat", "layers", "apron"):
+        for y in range(sy + 2, hy + 1):
+            f.row(y + dy, 15, 16, cl[4])                            # the opening
+        for i in range(4):                                          # lapels, which
+            f.px(14 - i, sy + 2 + i + dy, cl[0])                    # are their SEAMS
+            f.px(17 + i, sy + 2 + i + dy, cl[3])                    # and not shading
+    elif kind == "cloak":
+        f.row(sy + 2 + dy, body[2][1] + 1, body[2][2] - 1, cl[0])
+        f.px(15, sy + 3 + dy, tr[1])                                # the one clasp
+        f.px(16, sy + 3 + dy, tr[2])
+    elif kind == "dress":
+        f.row(sy + 2 + dy, body[2][1] + 2, body[2][2] - 2, cl[0])
+        f.col(15, sy + 3 + dy, sy + 6 + dy, cl[3])                  # a short placket
+        f.col(16, sy + 3 + dy, sy + 6 + dy, cl[4])
+
+    sleeves(tr if kind == "vest" else cl)
+
+    if kind == "dress":
+        # A gathered skirt at this size is three dark columns and the eye does
+        # the rest. Shading it instead gives a bell, not cloth.
+        for _i, (y, x0, x1) in band(0.60, 1.01):
+            for x in (x0 + 3, (x0 + x1) // 2, x1 - 3):
+                f.px(x, y + dy, cl[3])
+    elif kind == "apron":
+        # Chest to hem in the pale ramp, four narrower than the body, two
+        # straps. It is the brightest garment anybody in town owns and that is
+        # deliberate: it reads across a street, and he is the cleanest man in
+        # the dirtiest room.
+        for _i, (y, x0, x1) in band(0.34, 1.01):
+            f.row(y + dy, x0 + 6, x1 - 6, tr[1])
+            f.row(y + dy, x0 + 6, x0 + 7, tr[0])
+            f.row(y + dy, x1 - 7, x1 - 6, tr[2])
+        bib = band(0.34, 0.42)
+        if bib:
+            y, x0, x1 = bib[0][1]
+            for k in range(4):                                  # the neck straps,
+                f.px(x0 + 7, y - 1 - k + dy, tr[2])             # straight up. Drawn
+                f.px(x1 - 7, y - 1 - k + dy, tr[2])             # as a diagonal they
+                                                                # read as a scratch
+        f.row(hy + dy, body[-1][1] + 6, body[-1][2] - 6, tr[3])
+        # A seam down the middle and a tie across the waist. Without them the
+        # apron is 200 luma of nothing at all, which at 32px is a bib.
+        for _i, (y, x0, x1) in band(0.34, 1.01):
+            f.px(16, y + dy, tr[2])
+        tie = band(0.56, 0.64)
+        for _i, (y, x0, x1) in tie:
+            f.row(y + dy, x0 + 5, x1 - 5, tr[3])
+        if tie:
+            y, x0, x1 = tie[0][1]
+            f.row(y + 1 + dy, x0 + 5, x0 + 7, tr[2])
+    elif kind == "vest":
+        # A waistcoat is a PANEL on a shirt: inset three each side so the pale
+        # sleeve shows all the way down, open down the middle, buttoned, and
+        # cut away at the bottom over the belly. Drawn as the whole torso -- the
+        # first cut -- it is not a waistcoat, it is a yellow man.
+        for _i, (y, x0, x1) in band(0.06, 0.86):
+            f.row(y + dy, x0 + 3, x1 - 3, cl[1])
+            f.row(y + dy, x0 + 3, x0 + 4, cl[0])
+            f.row(y + dy, x1 - 4, x1 - 3, cl[2])
+        if not back:
+            for _i, (y, x0, x1) in band(0.06, 0.86):
+                f.row(y + dy, 15, 16, cl[4])                        # the opening
+            for i in range(4):                                      # lapels
+                f.px(14 - i, sy + 2 + i + dy, cl[0])
+                f.px(17 + i, sy + 2 + i + dy, cl[3])
+            for i in range(3):                                      # three buttons
+                f.px(14, sy + 6 + i * 3 + dy, tr[0])
+        y0 = sy + int(n * 0.86)
+        f.row(y0 + dy, body[min(int(n * 0.86), n - 1)][1] + 3,
+              body[min(int(n * 0.86), n - 1)][2] - 3, cl[3])        # its bottom edge
+    elif kind == "layers":
+        # Patches. He is wearing everything he owns and some of it is somebody
+        # else's, so he is the only figure in the game carrying more than two
+        # hues -- which is what "he picks things up" looks like from a field away.
+        # The inner coat: a narrower panel in a second ramp, so the outer one
+        # has an edge. One 26-wide slab of tan with a cross seam on it is a
+        # cardboard box, which is exactly what the first cut looked like.
+        # Lapped to one side, because a man wearing four coats does not do them
+        # up down the middle. The asymmetry is the only thing in the figure that
+        # is not mirrored, and it is what stops the outline reading as a crate.
+        for _i, (y, x0, x1) in band(0.10, 1.01):
+            f.row(y + dy, x0 + 6, x1 - 9, tr[1])
+            f.row(y + dy, x0 + 6, x0 + 7, tr[0])
+            f.px(x1 - 9, y + dy, tr[3])
+        pa = P["patch"]
+        f.box(body[3][1] + 2, sy + 5 + dy, body[3][1] + 5, sy + 8 + dy, pa[0][2])
+        f.row(sy + 5 + dy, body[3][1] + 2, body[3][1] + 5, pa[0][1])
+        f.px(body[3][1] + 5, sy + 8 + dy, pa[0][3])
+        f.box(body[-4][2] - 5, hy - 5 + dy, body[-4][2] - 2, hy - 2 + dy, pa[1][2])
+        f.row(hy - 5 + dy, body[-4][2] - 5, body[-4][2] - 2, pa[1][1])
+        f.px(body[-4][2] - 2, hy - 2 + dy, pa[1][3])
+        f.row(hy - 7 + dy, body[-6][1] + 2, body[-6][2] - 2, cl[3])
+        # A rope at the waist. He is wearing four coats and nothing holding them
+        # shut is a box with a cross on it, which is what the first cut was.
+        belt = band(0.54, 0.62)
+        for _i, (y, x0, x1) in belt:
+            f.row(y + dy, x0 + 1, x1 - 1, P["boots"][2])
+            f.row(y + dy, x0 + 1, x0 + 2, P["boots"][1])
+        if belt:
+            y, x0, x1 = belt[0][1]
+            f.px(15, y + dy, P["trim"][0])
+            f.px(16, y + dy, P["trim"][2])
+    if P.get("shawl"):
+        # A triangle over the shoulders to a point at the sternum. Widened a
+        # pixel a row it is a bib; this stays under a tenth of her.
+        sh = P["shawl"]
+        # A WRAP, not a triangle. The first cut ran a wide V down the chest and
+        # she was wearing a bib in one saturated colour -- the same failure
+        # Spite's scarf records. It sits ON the shoulders, follows the arms
+        # down, and comes to a small point at the sternum.
+        rows = P.get("shawl_rows", 5)
+        for i in range(rows + 3):
+            y = sy + 1 + i
+            b = body[min(i, n - 1)]
+            wing = max(2, 5 - i // 2)
+            f.row(y + dy, b[1], b[1] + wing, sh[1])
+            f.row(y + dy, b[1], b[1] + 1, sh[0])
+            f.row(y + dy, b[2] - wing, b[2], sh[2])
+            f.px(b[2], y + dy, sh[3])
+        for i in range(rows):                                   # the small point
+            y = sy + 1 + i
+            r = _row(y, max(2, 8 - i * 2))
+            f.row(y + dy, r[1], r[2], sh[1])
+            f.px(r[1], y + dy, sh[0])
+            f.px(r[2], y + dy, sh[2])
+
+
+def hu_legs(f, P, pose, dy):
+    """Legs and boots. Same contract as every other figure in the file: the
+    planted sole ends on SOLE in every frame, and the lifted foot is drawn
+    short rather than drawn somewhere else."""
+    cl, bt = P["trouser"], P["boots"]
+    w, gap = P["leg_w"], P["leg_gap"]
+    lx = 15 - gap // 2 - w + 1
+    rx = 16 + gap // 2
+    lift = P["stride"]
+
+    def leg(x0, up, out):
+        top = P["hem_y"] + 1 + dy
+        bot = SOLE - up
+        if bot - 3 < top:
+            top = max(top - 1, bot - 3)
+        for y in range(top, bot - 2):
+            f.row(y, x0, x0 + w - 1, cl[1])
+            f.px(x0, y, cl[0])
+            f.px(x0 + w - 1, y, cl[2])
+        for y in range(bot - 2, bot + 1):
+            f.row(y, x0 - out, x0 + w - 1, bt[1])
+            f.px(x0 - out, y, bt[0])
+        f.row(bot, x0 - out, x0 + w - 1, bt[2])
+
+    if pose == "neutral":
+        leg(lx, 0, 1)
+        leg(rx, 0, 0)
+    elif pose == "step_left":
+        leg(lx - 1, 0, 1)
+        leg(rx + 1, lift, 0)
+    else:
+        leg(lx - 1, lift, 1)
+        leg(rx + 1, 0, 0)
+
+
+# --- the side view --------------------------------------------------------------
+#
+# The traveller's profile is sold by a hood brim two pixels proud; Spite's by a
+# nose that breaks the outline and a mass of hair the neck does not follow.
+# Everyone here gets the same two devices, derived: the skull is drawn two wider
+# and one forward, the face is a NOTCH CUT OUT OF THE FRONT of it rather than a
+# lit wedge stuck on, and the near arm is a lit panel lying over the torso.
+# All three are failures make_sprites already recorded -- a lit wedge on a pale
+# dome is a bird's head, an arm drawn a step darker than the coat is a hole
+# rather than a limb, and an arm against the back seam is a satchel.
+
+def _front_edge(head, y):
+    for (yy, x0, _x1) in head:
+        if yy == y:
+            return x0
+    return head[len(head) // 2][1]
+
+
+def hu_profile(P, pose):
+    f = Frame()
+    dy = 0 if pose == "neutral" else 1
+    G = geometry(P, side=True)
+    P["_g"] = G
+    cl, tr, sk, hr, bt = P["cloth"], P["trim"], P["skin"], P["hair"], P["boots"]
+    head, body = G["head"], G["body"]
+    sy, hy, top = G["sy"], G["hy"], G["top"]
+    kind, crown = P["garment"], P["crown_kind"]
+
+    paint_spans(f, G["neck"], cl, 2, dy, hi=1, sh=1)
+    paint_spans(f, body, P["body_ramp"], body_keys(P, len(body)), dy)
+    paint_spans(f, G["hem"], P["body_ramp"], 3, dy)
+
+    # --- the skull
+    bare = crown in ("bald", "horseshoe")
+    for (y, x0, x1) in head:
+        if bare:
+            f.row(y + dy, x0, x1, sk[1])
+            f.row(y + dy, x1 - 2, x1, sk[2])
+        else:
+            f.row(y + dy, x0, x1, hr[2])
+            f.row(y + dy, x1 - 2, x1, hr[3])
+            f.px(x1, y + dy, hr[4])
+    if bare:
+        f.row(head[0][0] + dy, head[0][1] + 1, head[0][2] - 1, sk[0])
+        if crown == "horseshoe":
+            for (y, x0, x1) in head[P["hairline"]:]:
+                f.row(y + dy, x1 - 3, x1, hr[2])
+                f.px(x1, y + dy, hr[3])
+    else:
+        for (y, x0, x1) in head[:3]:
+            f.px(x0, y + dy, hr[0])
+            f.px(x0 + 1, y + dy, hr[1])
+        if crown == "bun":
+            y = head[len(head) // 3][0]
+            f.box(head[0][2] - 1, y + dy, head[0][2] + 2, y + 4 + dy, hr[2])
+            f.row(y + dy, head[0][2] - 1, head[0][2] + 2, hr[1])
+            f.px(head[0][2] + 2, y + 4 + dy, hr[4])
+
+    # --- the face, as a notch. Four pixels wide and no wider: the fix for the
+    # beak is to stop the skin before it becomes the silhouette.
+    ey = top + P["eye_y"]
+    jaw = head[-1][0]
+    for y in range(ey - 1, jaw + 1):
+        x0 = _front_edge(head, y)
+        f.row(y + dy, x0, x0 + 2, sk[1])
+        f.px(x0 + 2, y + dy, sk[2])
+    ex = _front_edge(head, ey)
+    f.px(ex, ey + dy, sk[4])                               # the eye
+    ny = ey + 1
+    nx = _front_edge(head, ny)
+    f.row(ny + dy, nx - 1, nx + 1, sk[1])                  # the nose, out one px
+    f.px(nx - 1, ny + dy, sk[0])
+    f.px(nx, ny + 1 + dy, sk[2])                           # its own shade under it
+    my = ey + P["mouth_dy"]
+    f.px(_front_edge(head, my), my + dy, sk[3])
+    f.px(_front_edge(head, my) + 1, my + dy, sk[2])
+    if not bare:
+        f.px(_front_edge(head, ey - 1) + 2, ey - 1 + dy, hr[4])     # fringe over brow
+    if P.get("specs"):
+        f.px(ex - 1, ey + dy, tr[0])
+        f.row(ey + dy, ex + 2, ex + 4, tr[2])              # the temple, to the ear
+    if P.get("beard"):
+        for y in range(my, jaw + 3):
+            x0 = _front_edge(head, min(y, jaw))
+            f.row(y + dy, x0 - 1, x0 + 3, hr[2])
+            f.px(x0 - 1, y + dy, hr[1])
+        f.px(_front_edge(head, my), my + dy, sk[4])
+
+    # --- the garment, edge on
+    f.col(body[len(body) // 2][2] - 1, sy + 2 + dy, hy + dy, cl[4])   # the back seam
+    if kind == "apron":
+        for i, (y, x0, x1) in enumerate(body):
+            if i / float(len(body)) < 0.34:
+                continue
+            f.row(y + dy, x0, x0 + 3, tr[1])
+            f.px(x0, y + dy, tr[0])
+        for i in range(4):
+            f.px(body[3][1] + 1 + i, sy + int(len(body) * 0.34) - 3 + i + dy, tr[2])
+    elif kind == "vest":
+        for i, (y, x0, x1) in enumerate(body):
+            if i / float(len(body)) < 0.10:
+                continue
+            f.row(y + dy, x0, x0 + 2, tr[1])
+            f.px(x0, y + dy, tr[0])
+    elif kind == "dress":
+        for i, (y, x0, x1) in enumerate(body):
+            if i / float(len(body)) < 0.60:
+                continue
+            f.px(x0 + 2, y + dy, cl[3])
+            f.px(x1 - 3, y + dy, cl[3])
+    elif kind == "layers":
+        pa = P["patch"]
+        f.box(body[3][1] + 1, sy + 5 + dy, body[3][1] + 4, sy + 9 + dy, pa[0][1])
+        f.row(sy + 5 + dy, body[3][1] + 1, body[3][1] + 4, pa[0][0])
+    elif kind == "cloak":
+        f.row(sy + 2 + dy, body[2][1], body[2][2] - 1, cl[0])
+    if P.get("shawl"):
+        sh = P["shawl"]
+        for i in range(P.get("shawl_rows", 7)):
+            y = sy + 1 + i
+            b = body[min(i, len(body) - 1)]
+            f.row(y + dy, b[1], b[2] - i, sh[1])
+            f.row(y + dy, b[1], b[1] + 1, sh[0])
+            f.px(b[2] - i, y + dy, sh[2])
+
+    # --- the near arm: a LIT panel over the torso, toward the front, with one
+    # dark seam behind it. A step darker than the coat and it is a hole.
+    ax = {"neutral": 0, "step_left": -1, "step_right": 1}[pose] + body[len(body) // 2][1] + 1
+    a0, a1 = sy + 3, sy + int(len(body) * 0.66)
+    arm = cl if kind != "apron" else tr
+    for i, y in enumerate(range(a0, a1)):
+        # Two wide at the shoulder, four at the forearm. A constant-width panel
+        # in the lit tone is a plank; the taper is the elbow, and the elbow is
+        # the only thing that makes it an arm at this size.
+        w = 2 if i < 2 else (3 if i < 4 else 4)
+        f.row(y + dy, ax, ax + w - 1, arm[1])
+        f.px(ax, y + dy, arm[0])
+        f.px(ax + w, y + dy, cl[4])
+    if P.get("sleeveless"):
+        for y in range(a0 + 4, a1):
+            f.row(y + dy, ax, ax + 3, sk[1])
+            f.px(ax, y + dy, sk[0])
+    f.row(a1 + dy, ax, ax + 3, sk[1])                      # the hand, in skin
+    f.px(ax, a1 + dy, sk[0])
+    f.row(a1 + 1 + dy, ax, ax + 2, sk[2])
+
+    # --- legs, near and far, with a pixel of daylight between them at rest
+    w, lift = P["leg_w"], P["stride"]
+    mid = (body[-1][1] + body[-1][2]) // 2
+    if pose == "neutral":
+        near, far, nl, fl = mid - w + 1, mid + 2, 0, 0
+    elif pose == "step_left":
+        near, far, nl, fl = mid - w - 1, mid + 4, 0, lift - 1
+    else:
+        near, far, nl, fl = mid + 4, mid - w - 1, lift - 1, 0
+
+    def leg(x0, up, shade, toe):
+        top_y = hy + 1 + dy
+        bot = SOLE - up
+        for y in range(max(top_y, bot - 3 + 1) if bot - 3 < top_y else top_y, bot - 2):
+            f.row(y, x0, x0 + w - 1, P["trouser"][1 + shade])
+            f.px(x0, y, P["trouser"][0 + shade])
+        for y in range(bot - 2, bot + 1):
+            f.row(y, x0 - toe, x0 + w - 1, bt[1 + shade])
+            f.px(x0 - toe, y, bt[0 + shade])
+        f.row(bot, x0 - toe, x0 + w - 1, bt[2])
+
+    leg(far, fl, 1, 0)
+    leg(near, nl, 0, 2)
+    return f
+
+
+# --- props ----------------------------------------------------------------------
+#
+# The cheapest way to tell two townspeople apart at ZOOM 3, and the only one
+# that works while they are walking away from you. A prop is a function of
+# (frame, character, facing, pose, dy) and it is drawn last, over the body,
+# before the rim -- so it is allowed to break the outline, which is the point.
+
+def prop_stick(f, P, facing, pose, dy):
+    """Held upright in the outer hand. The only vertical line in the cast, and
+    it survives being a third of a phone tile because it is two pixels wide and
+    twenty tall."""
+    hu = hue5(mix(C["accent"], C["bg"], 0.55))
+    G = P["_g"]
+    # In profile it goes THREE pixels clear of the body, because the head is
+    # drawn two proud of the shoulders and the nose one further: at the body's
+    # own edge -- where the first cut put it -- a child holding a stick is a
+    # child with a pole through his face.
+    x = {"down": G["body"][4][2], "up": G["body"][4][1] - 1,
+         "left": G["body"][4][1] - 4}[facing]
+    y0 = G["top"] - 3 + dy
+    y1 = SOLE - 1
+    f.col(x, y0, y1, hu[2])
+    f.col(x + 1, y0, y1, hu[4])
+    f.px(x, y0, hu[1])
+    f.px(x, y0 + 1, hu[0])
+
+
+def prop_jar(f, P, facing, pose, dy):
+    """A jar of pebbles, held at the belly in both hands. One pebble per hole
+    they have watched somebody close, which makes it the town objective's
+    progress bar, in the world, held by a child.
+
+    It only exists on the facings that can see it, so the jar going away when
+    she turns her back is the up/down tell."""
+    if facing == "up":
+        return
+    G = P["_g"]
+    gl = hue5(mix(C["accent_2"], C["text"], 0.20))
+    y = G["sy"] + int(len(G["body"]) * 0.45) + dy
+    x = 13 if facing == "down" else G["body"][len(G["body"]) // 2][1] + 1
+    f.box(x, y, x + 5, y + 4, gl[2])
+    f.row(y, x + 1, x + 4, gl[1])
+    f.row(y + 1, x, x + 1, gl[0])
+    f.row(y + 4, x + 1, x + 4, gl[3])
+    f.px(x + 2, y + 2, P["cloth"][3])                 # two pebbles in the bottom
+    f.px(x + 4, y + 3, P["cloth"][4])
+
+
+def prop_bundle(f, P, facing, pose, dy):
+    """Everything he owns, on his back. From behind it is most of him; from the
+    front it is two humps clearing his shoulders, which is exactly how a laden
+    person reads when they are walking towards you."""
+    G = P["_g"]
+    sk = hue5(mix(C["accent"], C["bg"], 0.30))
+    b = G["body"][1]
+    y = G["sy"] + dy
+    if facing == "up":
+        # TWO LOBES EITHER SIDE OF HIS HEAD, not one box over it. There is no
+        # depth here: a bundle drawn across the shoulders and up to the crown
+        # simply covers the head, and the first cut of this walked away with no
+        # skull at all. The head shows down the middle and the load is beside it.
+        top = G["head"][4][0] + dy
+        for x in (b[1] + 1, b[2] - 5):
+            f.box(x, top, x + 4, y + 6, sk[2])
+            f.row(top, x + 1, x + 3, sk[1])
+            f.row(top - 1, x + 1, x + 2, sk[0])
+            f.row(y + 6, x + 1, x + 3, sk[3])
+            f.row(top + 4, x, x + 4, sk[3])                  # a cord round each
+    elif facing == "down":
+        for x in (b[1] + 1, b[2] - 3):
+            f.box(x, y - 3, x + 2, y, sk[2])
+            f.row(y - 3, x, x + 2, sk[1])
+    else:
+        # Side on it rides the shoulders, one row proud of them and no higher:
+        # taken up to the crown it is a second head, which is what it looked
+        # like beside the ear the first time.
+        top = y - 1
+        f.box(b[2] - 2, top, b[2] + 2, y + 9, sk[2])
+        f.row(top, b[2] - 1, b[2] + 1, sk[1])
+        f.px(b[2] - 1, top, sk[0])
+        f.row(y + 9, b[2] - 1, b[2] + 1, sk[3])
+        f.row(y + 4, b[2] - 2, b[2] + 2, sk[3])
+
+
+def prop_towel(f, P, facing, pose, dy):
+    """The cloth over one shoulder. Two pixels wide, eight long, in the apron's
+    own ramp -- so the brightest thing on him is repeated once, small, and the
+    figure has a rhythm instead of one bright slab."""
+    G = P["_g"]
+    tr = P["trim"]
+    b = G["body"][2]
+    x = b[1] + 2 if facing != "left" else b[2] - 4
+    y = G["sy"] + 1 + dy
+    for i in range(9):
+        f.row(y + i, x, x + 1, tr[1])
+        f.px(x, y + i, tr[0])
+    f.row(y + 9, x, x + 1, tr[3])
+
+
+PROPS = {"stick": prop_stick, "jar": prop_jar,
+         "bundle": prop_bundle, "towel": prop_towel}
+
+
+# --- assembly -------------------------------------------------------------------
+
+def hu_frontal(P, pose, back):
+    f = Frame()
+    dy = 0 if pose == "neutral" else 1
+    G = geometry(P, side=False)
+    P["_g"] = G
+    paint_spans(f, G["neck"], P["cloth"], 2, dy, hi=1, sh=1)
+    paint_spans(f, G["body"], P["body_ramp"], body_keys(P, len(G["body"])), dy)
+    paint_spans(f, G["hem"], P["body_ramp"], 3, dy)
+    hu_hair_front(f, P, dy, back)
+    if not back:
+        hu_face_front(f, P, dy)
+    hu_garment_front(f, P, dy, back)
+    # The garment swings a column against the stride, as the traveller's cloak
+    # and Spite's coat both do. Without it the legs walk and the body does not.
+    b = G["body"][-1]
+    if pose == "step_left":
+        f.col(b[2], G["hy"] - 3 + dy, G["hy"] + dy, P["cloth"][4])
+    elif pose == "step_right":
+        f.col(b[1], G["hy"] - 3 + dy, G["hy"] + dy, P["cloth"][3])
+    hu_legs(f, P, pose, dy)
+    return f
+
+
+def hu_build(P, facing, pose):
+    if facing == "down":
+        f = hu_frontal(P, pose, False)
+    elif facing == "up":
+        f = hu_frontal(P, pose, True)
+    else:
+        f = hu_profile(P, pose)
+    dy = 0 if pose == "neutral" else 1
+    for name in P.get("props", []):
+        PROPS[name](f, P, facing if facing != "right" else "left", pose, dy)
+    return f.img
+
+
+def hu_build_all(P):
+    """The sheet contract, once, for everybody: four facings, three columns,
+    column 0 neutral, `right` a mirror of `left`, one recentre offset for all
+    three profile poses so the figure does not twitch when it turns or steps."""
+    cels = {}
+    for fa in ("down", "up"):
+        for po in FRAMES:
+            cels[(fa, po)] = hu_build(P, fa, po)
+    prof = recentre([hu_build(P, "left", po) for po in FRAMES])
+    for po, im in zip(FRAMES, prof):
+        cels[("left", po)] = im
+    for key in list(cels):
+        contact_shadow(rim(cels[key]), rx=P["shadow"], ry=P.get("shadow_y", 4.0))
+    lb = [cels[("left", po)].getbbox() for po in FRAMES]
+    lc = (min(b[0] for b in lb) + max(b[2] for b in lb) - 1) / 2.0
+    for po in FRAMES:
+        cels[("right", po)] = cels[("left", po)].transpose(Image.FLIP_LEFT_RIGHT)
+    rb = [cels[("right", po)].getbbox() for po in FRAMES]
+    rc = (min(b[0] for b in rb) + max(b[2] for b in rb) - 1) / 2.0
+    shift = int(round(lc - rc))
+    if shift:
+        for po in FRAMES:
+            n = Image.new("RGBA", (FW, FH), CLEAR)
+            n.paste(cels[("right", po)], (shift, 0))
+            cels[("right", po)] = n
+    return cels
+
+
+def prop_crown(f, P, facing, pose, dy):
+    """A crown of leaves, cut and stitched by somebody who is eight. Three
+    points, uneven, because an even one is a hat.
+
+    It is the only jagged silhouette in the cast and it is the whole reason
+    Pell reads as the captain from across the street rather than as the taller
+    of two children."""
+    G = P["_g"]
+    lf = P["cloth"]
+    head = G["head"]
+    y = head[0][0] + dy
+    x0, x1 = head[1][1], head[1][2]
+    f.row(y, x0, x1, lf[1])
+    f.row(y, x0, x0 + 1, lf[0])
+    f.px(x1, y, lf[2])
+    for i, (x, h) in enumerate(((x0 + 1, 2), ((x0 + x1) // 2, 3), (x1 - 2, 1))):
+        for k in range(h):
+            f.px(x, y - 1 - k, lf[1] if i != 2 else lf[2])
+            f.px(x + 1, y - 1 - k, lf[2] if i != 2 else lf[3])
+
+
+PROPS["crown"] = prop_crown
+
+
+# --- the cast -------------------------------------------------------------------
+#
+# Every townsperson is TOWNSPERSON plus a handful of overrides. That is the
+# whole claim of this section: Spite is 330 lines of bespoke geometry and these
+# six are twenty lines each, and they are the same figure standing in the same
+# light.
+#
+# The two axes they are separated on are the two that survive ZOOM 3: MASS
+# (crown row and shoulder width -- a child beside a bartender is legible before
+# anything else resolves) and CROWN (six shapes, none shared with the traveller's
+# hood or Spite's parted cap). Colour is third and it is deliberately third,
+# because on a phone at dusk it is the first thing to go.
+
+TOWNSPERSON = dict(
+    crown=3, head_w=12, head_h=11, hairline=4,
+    neck_w=6, neck_rows=3,
+    sh_w=18, chest_w=18, elbow_w=20, waist_w=17, hem_w=16, hem_y=32,
+    eye_y=6, eye_sep=4, mouth_dy=3, brow_tilt=(0, 0),
+    leg_w=4, leg_gap=2, stride=4,
+    depth=0.86, lean=0, hem_flare=0,
+    crown_kind="cap", garment="coat",
+    shadow=9.5, shadow_y=4.0, props=(),
+    boots=None, trim=None, trouser=None, body_ramp=None,
+)
+
+# Skins. Three of them, because a town of one complexion is a decision nobody
+# made on purpose. All three sit BELOW their wearer's hair in value -- the beak
+# on a grey skull is what happens when they do not, and town_report() measures
+# it rather than trusting this comment.
+SKIN_PALE = skin5(mix(mix(_SKIN, C["muted"], 0.30), C["bg"], 0.16))
+SKIN_ASH = skin5(mix(mix(_SKIN, C["muted"], 0.45), C["bg"], 0.34))
+SKIN_WARM = skin5(mix(mix(C["accent"], C["danger"], 0.40), C["bg"], 0.34))
+SKIN_DEEP = skin5(mix(mix(C["accent"], C["danger"], 0.30), C["bg"], 0.60))
+
+HAIR_STRAW = hue5(mix(C["warn"], C["muted"], 0.40))
+HAIR_DARK = hue5(mix(C["accent"], C["bg"], 0.55))
+HAIR_WHITE = hue5(mix(C["text"], C["muted"], 0.55))
+HAIR_IRON = hue5(mix(C["muted"], C["bg"], 0.28))
+
+LEAF = cloth5(mix(C["good"], C["line"], 0.22))       # the fort's own green
+MOSS = cloth5(mix(C["good"], C["bg"], 0.34))
+LILAC = cloth5(mix(mix(C["accent_2"], C["danger"], 0.35), C["line"], 0.30))
+SHAWL = cloth5(mix(C["accent_2"], C["line"], 0.20))
+SACK = cloth5(mix(C["accent"], C["bg"], 0.30))
+RUST = cloth5(mix(C["danger"], C["line"], 0.30))
+LINEN = cloth5(mix(C["text"], C["muted"], 0.34))
+BRASS = cloth5(mix(C["warn"], C["line"], 0.32))
+# The bartender is in the traveller's own cloth: COOL[3], the cloak's value, run
+# through the same five-step bracket. He is the one townsperson who looks like
+# he is from here, which is the joke -- he is the only one who is not.
+SLATE = cloth5(mix(C["line"], C["muted"], 0.80))
+SLATE_DK = cloth5(mix(mix(C["line"], C["muted"], 0.55), C["bg"], 0.15))
+DRESS = cloth5(mix(mix(C["accent_2"], C["line"], 0.50), C["bg"], 0.06))
+ROSE = cloth5(mix(mix(C["danger"], C["muted"], 0.25), C["line"], 0.18))
+STOCKING = cloth5(mix(C["line"], C["bg"], 0.28))
+
+
+def townsperson(**delta):
+    P = dict(TOWNSPERSON)
+    P.update(delta)
+    P.setdefault("skin", SKIN_PALE)
+    P.setdefault("hair", HAIR_DARK)
+    if P["boots"] is None:
+        P["boots"] = LEATHER
+    if P["trim"] is None:
+        P["trim"] = P["cloth"]
+    if P["body_ramp"] is None:
+        # A waistcoat is a panel ON a shirt, so the torso underneath it is the
+        # shirt's ramp and not the waistcoat's. Painting the body in the
+        # garment ramp and adding sleeves on top -- the first cut -- gave the
+        # shopkeeper a yellow chest with two thin pale strips, which reads as
+        # a yellow man rather than a man in a waistcoat.
+        P["body_ramp"] = P["trim"] if P["garment"] == "vest" else P["cloth"]
+    if P["trouser"] is None:
+        # Trousers are NOT the coat. The first cut let them default to the
+        # garment ramp and the shopkeeper came out a single yellow column from
+        # collar to boot -- at 32 px a figure needs a value break at the waist
+        # and a hue break at the hip or it is a bollard in a hat.
+        P["trouser"] = SLATE_DK
+    return P
+
+
+TOWN = {}
+
+# --- Pell. Eleven, in charge, and correct.
+# Short and top-heavy: a child is not a small adult, it is a big head on a
+# short body, so the skull stays 12 wide on 14-wide shoulders where an adult
+# runs 12 on 18. Crown at y10 against the traveller's y1 -- 34 rows of figure
+# against his 44, and that difference is readable before anything else is.
+TOWN["kid_pell"] = townsperson(
+    crown=11, head_h=10, head_w=12, hairline=4, eye_y=6, mouth_dy=2,
+    neck_w=5, neck_rows=2,
+    sh_w=14, chest_w=14, elbow_w=15, waist_w=14, hem_w=15, hem_y=36,
+    leg_w=4, leg_gap=2, stride=3,
+    crown_kind="cap", garment="cloak",
+    cloth=LEAF, trim=cloth5(mix(C["accent"], C["bg"], 0.30)),
+    trouser=SLATE_DK, hair=HAIR_DARK, skin=SKIN_WARM,
+    props=("crown", "stick"), shadow=7.5, shadow_y=3.4,
+)
+
+# --- Bird. Younger, on the wall, keeping the count. Shorter again, a mop
+# instead of a crown, dark hair against Pell's straw, and the jar -- which is
+# the only pale object either of them carries, held where your eye lands.
+TOWN["kid_bird"] = townsperson(
+    crown=13, head_h=10, head_w=12, hairline=4, eye_y=6, mouth_dy=2,
+    neck_w=5, neck_rows=2,
+    sh_w=13, chest_w=13, elbow_w=14, waist_w=13, hem_w=14, hem_y=37,
+    leg_w=4, leg_gap=2, stride=3,
+    crown_kind="mop", garment="cloak",
+    cloth=MOSS, trim=LEAF, trouser=SLATE_DK,
+    hair=HAIR_STRAW, skin=SKIN_DEEP,
+    props=("jar",), shadow=7.0, shadow_y=3.2,
+)
+
+# --- Mrs Ollard. The only triangle in the cast: a 24-wide hem under 16-wide
+# shoulders, so she is a skirt with a person on top of it. Stooped -- `lean`
+# puts her head in front of her feet in the side view, which is what a stoop
+# actually is; drawing her shorter would only have made her a child.
+# Her bun is the brightest crown in the game and it is meant to be: you are
+# supposed to be able to spot her at a window from the other end of the street.
+TOWN["busybody"] = townsperson(
+    crown=9, head_h=10, head_w=12, hairline=4, eye_y=6,
+    neck_w=6, neck_rows=3,
+    sh_w=16, chest_w=16, elbow_w=17, waist_w=17, hem_w=24, hem_y=38,
+    leg_w=4, leg_gap=2, stride=2, lean=2, depth=0.80,
+    crown_kind="bun", garment="dress",
+    cloth=DRESS, trim=ROSE, shawl=ROSE, shawl_rows=5,
+    trouser=STOCKING, hair=HAIR_WHITE, skin=SKIN_ASH,
+    shadow=12.0, shadow_y=4.2,
+)
+
+# --- Bram Hollis. The widest silhouette anyone has: 26 across the shoulders
+# and 24 at the hem, a barrel rather than a wedge, and a bundle that clears the
+# crown from behind. He is the only figure carrying four hues, which is the
+# whole of "he picks things up" said in the outline.
+TOWN["bram"] = townsperson(
+    crown=3, head_h=11, head_w=14, hairline=4, eye_y=6,
+    neck_w=7, neck_rows=2,
+    sh_w=26, chest_w=26, elbow_w=26, waist_w=25, hem_w=24, hem_y=33,
+    leg_w=5, leg_gap=2, stride=4, depth=0.80,
+    crown_kind="mop", garment="layers", beard=True,
+    cloth=SACK, trim=MOSS, patch=(RUST, SLATE), trouser=SLATE_DK,
+    hair=HAIR_DARK, skin=SKIN_WARM,
+    props=("bundle",), shadow=12.5, shadow_y=4.4,
+)
+
+# --- Tobin. A wedge: 26 across the shoulders down to 18 at the hem, where Bram
+# goes 26 to 24. Bald, so his crown is the one smooth dome in a cast of hoods,
+# caps, mops, buns and crowns -- and the apron is the brightest garment in the
+# game at 203 luma, against a world that tops out at 72.
+TOWN["tobin"] = townsperson(
+    crown=2, head_h=11, head_w=13, hairline=3, eye_y=6,
+    neck_w=8, neck_rows=2,
+    sh_w=26, chest_w=25, elbow_w=26, waist_w=21, hem_w=18, hem_y=32,
+    leg_w=5, leg_gap=2, stride=4, depth=0.90,
+    crown_kind="bald", garment="apron", beard=True, sleeveless=True,
+    cloth=SLATE, trim=LINEN, trouser=SLATE_DK, hair=HAIR_DARK, skin=SKIN_WARM,
+    props=("towel",), shadow=12.0, shadow_y=4.4,
+)
+
+# --- Ansel Cobb. The only figure whose waist is wider than his chest, which is
+# a belly and reads as one; the only horseshoe; and the only spectacles, drawn
+# as two pixels of glint and a bridge because a rim all the way round a 12px
+# head is goggles -- see hu_face_front.
+TOWN["cobb"] = townsperson(
+    crown=4, head_h=10, head_w=12, hairline=4, eye_y=6,
+    neck_w=7, neck_rows=3,
+    sh_w=19, chest_w=20, elbow_w=21, waist_w=23, hem_w=21, hem_y=31,
+    leg_w=4, leg_gap=2, stride=4, depth=0.94,
+    crown_kind="horseshoe", garment="vest", specs=True,
+    cloth=BRASS, trim=LINEN, trouser=SLATE_DK, hair=HAIR_IRON, skin=SKIN_PALE,
+    shadow=10.5, shadow_y=4.2,
+)
+
+
+# --- output and the check sheets ------------------------------------------------
+#
+# The sheets are the deliverable of the drawing step and the PNGs are just
+# output. Three of them, and each catches a different class of error:
+#
+#   _<id>_x4.png     the cell grid ruled over the sheet -- the layout contract,
+#                    visible. Catches a figure leaning out of its own box.
+#   _town_lineup.png every townsperson beside the traveller and Spite, at 1:1
+#                    AND at ZOOM 3, on the darkest, the middlest and the
+#                    brightest ground. The 1:1 half is the one that matters.
+#                    Catches two characters who turn out to be one character.
+#   _town_ground.png all six on all eighteen walkable materials. Catches the
+#                    one who dissolves into the sand.
+
+def town_sheet(cels):
+    sheet = Image.new("RGBA", (FW * len(FRAMES), FH * len(FACINGS)), CLEAR)
+    for r, fa in enumerate(FACINGS):
+        for c, po in enumerate(FRAMES):
+            sheet.paste(cels[(fa, po)], (c * FW, r * FH))
+    return sheet
+
+
+def town_lineup(cast, grounds, zoom=3):
+    """Everybody, side by side, on three grounds, small and then large.
+
+    Side by side is the only test that matters once the cast is bigger than
+    two: each of them has to be legible AND has to not be one of the others.
+    """
+    order = [k for k, _ in cast]
+    cw, ch = 34, 52
+    picks = [grounds[0], grounds[len(grounds) // 2], grounds[-1]] if grounds else []
+    pad_l, pad_t = 52, 16
+    n = len(order)
+    w = pad_l + n * cw * zoom + 8
+    h = pad_t + len(picks) * ch * zoom + (ch + 22) * 2 + 16
+    out = Image.new("RGBA", (w, h), mix(C["bg"], BLACK, 0.35) + (255,))
+    d = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    y = pad_t
+    for name, _i, gm, tile in picks:
+        strip = Image.new("RGB", (n * cw, ch))
+        for c, key in enumerate(order):
+            strip.paste(ground_patch(tile, cw, ch), (c * cw, 0))
+        strip = strip.convert("RGBA")
+        for c, key in enumerate(order):
+            strip.alpha_composite(dict(cast)[key][("down", "neutral")],
+                                  (c * cw + 1, ch - 48))
+        out.alpha_composite(strip.resize((n * cw * zoom, ch * zoom), Image.NEAREST),
+                            (pad_l, y))
+        d.text((3, y + 4), "%s\n%.0f" % (name[:11], gm), fill=C["muted"] + (255,),
+               font=font)
+        y += ch * zoom
+    for label, pick in (("1:1, as the game draws them", picks[len(picks) // 2] if picks else None),):
+        if pick is None:
+            break
+        y += 10
+        strip = Image.new("RGB", (n * cw, ch))
+        for c in range(n):
+            strip.paste(ground_patch(pick[3], cw, ch), (c * cw, 0))
+        strip = strip.convert("RGBA")
+        for c, key in enumerate(order):
+            strip.alpha_composite(dict(cast)[key][("down", "neutral")], (c * cw + 1, ch - 48))
+        out.alpha_composite(strip, (pad_l, y))
+        d.text((3, y + 4), label[:12], fill=C["muted"] + (255,), font=font)
+        y += ch + 6
+        # ...and their backs, because half of what you see of an NPC is the
+        # facing they are walking away in.
+        strip = Image.new("RGB", (n * cw, ch))
+        for c in range(n):
+            strip.paste(ground_patch(pick[3], cw, ch), (c * cw, 0))
+        strip = strip.convert("RGBA")
+        for c, key in enumerate(order):
+            strip.alpha_composite(dict(cast)[key][("up", "neutral")], (c * cw + 1, ch - 48))
+        out.alpha_composite(strip, (pad_l, y))
+        d.text((3, y + 4), "1:1 backs", fill=C["muted"] + (255,), font=font)
+    for c, key in enumerate(order):
+        d.text((pad_l + c * cw * zoom + 2, 3), key[:9], fill=C["muted"] + (255,), font=font)
+    return out
+
+
+def town_ground(cast, grounds, zoom=2):
+    order = [k for k, _ in cast]
+    cw, ch = 34, 52
+    pad_l, pad_t = 52, 14
+    n = len(order)
+    out = Image.new("RGBA", (pad_l + n * cw * zoom + 8, pad_t + len(grounds) * ch * zoom + 8),
+                    mix(C["bg"], BLACK, 0.35) + (255,))
+    d = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    for r, (name, _i, gm, tile) in enumerate(grounds):
+        strip = Image.new("RGB", (n * cw, ch))
+        for c in range(n):
+            strip.paste(ground_patch(tile, cw, ch), (c * cw, 0))
+        strip = strip.convert("RGBA")
+        for c, key in enumerate(order):
+            strip.alpha_composite(dict(cast)[key][("left", "neutral")], (c * cw + 1, ch - 48))
+        out.alpha_composite(strip.resize((n * cw * zoom, ch * zoom), Image.NEAREST),
+                            (pad_l, pad_t + r * ch * zoom))
+        d.text((3, pad_t + r * ch * zoom + 4), "%s\n%.0f" % (name[:11], gm),
+               fill=C["muted"] + (255,), font=font)
+    for c, key in enumerate(order):
+        d.text((pad_l + c * cw * zoom + 2, 3), key[:9], fill=C["muted"] + (255,), font=font)
+    return out
+
+
+def town_report(key, P, cels, grounds, player_cels):
+    """Measured, not asserted -- the same four numbers `write_spite` prints,
+    per townsperson, plus the one Spite's file learned the hard way: the face
+    must not outrank the hair."""
+    im = cels[("down", "neutral")]
+    cols = [x for x in range(FW) if any(im.getpixel((x, y))[3] == 255 for y in range(FH))]
+    rowsy = [y for y in range(FH) if any(im.getpixel((x, y))[3] == 255 for x in range(FW))]
+    st = sprite_stats(im)
+    worst = None
+    if grounds:
+        px = [luma(p) for p in im.getdata() if p[3] == 255]
+        nn = float(len(px))
+        for name, _i, gm, _t in grounds:
+            lit = sum(1 for v in px if v - gm >= 15) / nn
+            dark = sum(1 for v in px if gm - v >= 15) / nn
+            lost = sum(1 for v in px if abs(v - gm) < 10) / nn
+            if worst is None or lost > worst[3]:
+                worst = (name, lit, dark, lost)
+    ok = True
+    feet = set()
+    centres = []
+    for fa in FACINGS:
+        boxes = [cels[(fa, po)].getbbox() for po in FRAMES]
+        for po in FRAMES:
+            c = cels[(fa, po)]
+            ys = [y for y in range(FH) if any(c.getpixel((x, y))[3] == 255 for x in range(FW))]
+            feet.add(max(ys))
+        x0, x1 = min(b[0] for b in boxes), max(b[2] for b in boxes) - 1
+        centres.append((x0 + x1) / 2.0)
+        ok = ok and x0 >= 1 and x1 <= FW - 2 and abs((x0 + x1) / 2.0 - CX) <= 0.5
+    ok = ok and len(feet) == 1
+    # The beak check, generalised. Spite's first cut put skin at 160 against
+    # hair at 146 and the profile read as a bird's head; the rule that failure
+    # teaches is not "skin darker than hair" -- a dark-haired man has a lighter
+    # face and always will -- it is THE FACE MUST NOT BE THE BRIGHTEST THING ON
+    # THE FIGURE. Measured off the rendered cel rather than off the ramps, so a
+    # lit dome or a specular on a nose is caught too.
+    face, hairv = luma(P["skin"][1]), luma(P["hair"][2])
+    skins = {tuple(c) for c in P["skin"]}
+    hottest = max(luma(q) for q in im.getdata() if q[3] == 255)
+    skin_hi = max([luma(q) for q in im.getdata()
+                   if q[3] == 255 and q[:3] in skins] or [0.0])
+    ok = ok and skin_hi < hottest
+    print("  %-10s %3d w  %2d rows  %4d px  luma %5.1f  face %3.0f/hair %3.0f  "
+          "worst %-11s lit %2.0f%% dark %2.0f%% lost %2.0f%%  %s"
+          % (key, max(cols) - min(cols) + 1, max(rowsy) - min(rowsy) + 1, st["n"],
+             st["mean"], face, hairv,
+             worst[0] if worst else "-", (worst[1] if worst else 0) * 100,
+             (worst[2] if worst else 0) * 100, (worst[3] if worst else 0) * 100,
+             "ok" if ok else "FAIL sole=%s centres=%s skin_hi=%.0f/%.0f"
+             % (sorted(feet), centres, skin_hi, hottest)))
+    return ok
+
+
+def write_town(save, grounds, player_cels, spite_cels):
+    built = []
+    ok = True
+    for key in TOWN:
+        cels = hu_build_all(TOWN[key])
+        built.append((key, cels))
+        save(town_sheet(cels), "%s.png" % key)
+        save(spite_contact(town_sheet(cels)), "_%s_x4.png" % key)
+    print()
+    print("the townsfolk -- one base (TOWNSPERSON) + %d deltas" % len(TOWN))
+    for key, cels in built:
+        ok = town_report(key, TOWN[key], cels, grounds, player_cels) and ok
+    cast = [("you", player_cels), ("spite", spite_cels)] + built
+    if grounds:
+        save(town_lineup(cast, grounds), "_town_lineup.png")
+        save(town_ground(built, grounds), "_town_ground.png")
+    write_town_portraits()
+    if not ok:
+        raise SystemExit("TOWNSFOLK CONTRACT FAILED")
+
+
+# --- the townsfolk portraits ------------------------------------------------------
+#
+# Two of the six get a face: the children, because they are the gate and the
+# change of heart is the first person in the game the player talks round, and
+# Mrs Ollard, because she is the most fully written character in Kevin's notes
+# and half of what she is only exists in an expression. The other four get a
+# sprite and DialogueScreen's lettered plate, which is a deliberate choice and
+# not a shortfall -- four more faces at this quality is another pass, and a
+# mediocre face is worse than an initial in a box.
+#
+# Everything here is Spite's method one level up. `pp_face()` is ONE head and
+# the moods are a delta dictionary over it, so `posted` and `stood_down` cannot
+# be two different children, in exactly the way `kind` and `wary` cannot be two
+# different men. What is new is two techniques his two faces did not need:
+#
+#   THE GAZE. Moving a pupil one pixel inside an unchanged eye is the cheapest
+#   expression in the whole toolkit and the only one that draws "not here".
+#   Mrs Ollard's `adrift` is a gaze delta and almost nothing else -- the eyes
+#   are the same eyes, open the same amount, looking a pixel past you.
+#
+#   THE PROP AS THE MOOD. The children's `posted` has the stick across the
+#   bottom of the plate and `stood_down` does not. The gate is a literal object
+#   in the picture and taking it away is the whole beat, which means the mood
+#   reads at 1:1 before either face resolves. Where a mood is about a decision
+#   rather than a feeling, move the object.
+#
+# Both faces are 56 logical pixels doubled to 112, for the reason Spite's are:
+# a native 112 portrait is a finer grain than anything else on screen and reads
+# as a different game.
+
+PP_MOODS = {}                        # portrait stem -> [mood ids], for the report
+
+
+def pp_oval(cx, top, rows, w):
+    """A skull at portrait scale: three rows of taper at each end rather than
+    the sprite's two, because at twenty pixels across a two-row taper is a
+    tin."""
+    out = []
+    for i in range(rows):
+        d = min(i, rows - 1 - i)
+        ww = w - (6 if d == 0 else 3 if d == 1 else 1 if d == 2 else 0)
+        x0 = int(round(cx - ww / 2.0))
+        out.append((top + i, x0, x0 + ww - 1))
+    return out
+
+
+def pp_face(p, F, m):
+    """One head: skull, hair, nose, brows, eyes, mouth. Identical between the
+    moods of a character by construction -- every difference is in `m`."""
+    sk, hr = F["skin"], F["hair"]
+    dy = m.get("hdy", 0) + F.get("dy", 0)
+    head = pp_oval(F["cx"], F["top"], F["rows"], F["w"])
+    hl = F["hairline"]
+    cx = F["cx"]
+
+    for (y, x0, x1) in head[hl:]:                     # the flat of the face
+        p.row(y + dy, x0, x1, sk[1])
+        p.row(y + dy, x0, x0 + 1, sk[0])              # lit from the north-west
+        p.row(y + dy, x1 - 2, x1, sk[2])
+        p.px(x1, y + dy, sk[3])
+    for (y, x0, x1) in head[:hl]:                     # the cap of hair
+        p.row(y + dy, x0, x1, hr[2])
+        p.row(y + dy, x0, x0 + 2, hr[1])
+        p.row(y + dy, x0, x0 + 1, hr[0])
+        p.row(y + dy, x1 - 3, x1, hr[3])
+        p.px(x1, y + dy, hr[4])
+    for (y, x0, x1) in head[hl:hl + 5]:               # temples, past the eye
+        p.row(y + dy, x0, x0 + 1, hr[3])
+        p.row(y + dy, x1 - 1, x1, hr[4])
+    # The fringe: an uneven edge, cut by nobody. A straight one is a helmet.
+    for i, x in enumerate(range(head[hl][1] + 1, head[hl][2], 2)):
+        for k in range((i * 5 + F["top"]) % 3 + 1):
+            p.px(x, F["top"] + hl + k + dy, hr[3] if x < cx else hr[4])
+
+    ey = F["top"] + F["eye_y"]
+    sep = F["eye_sep"]
+    lx, rx = int(cx - sep / 2.0 - 3), int(cx + sep / 2.0)
+    gaze = m.get("gaze", 0)
+
+    # The nose: a lit ridge and a shaded flank. Two full columns is a bar down
+    # the middle of the face -- make_sprites records that one on Spite.
+    ny = ey + F["nose_y"]
+    p.col(int(cx) - 1, ny - 2 + dy, ny + dy, sk[0])
+    p.col(int(cx), ny - 1 + dy, ny + 1 + dy, sk[2])
+    p.row(ny + 1 + dy, int(cx) - 2, int(cx) + 1, sk[0])
+    p.px(int(cx) - 3, ny + 1 + dy, sk[3])
+    p.px(int(cx) + 2, ny + 1 + dy, sk[3])
+
+    # Cheekbone and jaw, along the edge and not as a patch in the middle.
+    for (y, x0, x1) in head[hl + 4:]:
+        p.row(y + dy, x1 - 2, x1, sk[2])
+        p.px(x0, y + dy, sk[1])
+    p.row(head[-1][0] + dy, head[-1][1], head[-1][2], sk[3])
+
+    # Brows: two rows, the lower inset so they taper. `tilt` is per-brow, and
+    # one of them a row off the other is an opinion where two level ones are
+    # nothing at all.
+    tilt = m.get("tilt", (0, 0))
+    brow = hr[3] if luma(hr[3]) < luma(sk[3]) else sk[3]
+    browd = hr[4] if luma(hr[4]) < luma(sk[3]) else sk[4]
+    for i, (bx0, bx1) in enumerate(((lx - 1, lx + 4), (rx - 1, rx + 4))):
+        by = ey - m.get("brow", 2) + tilt[i]
+        p.row(by + dy, bx0, bx1, brow)
+        if not F.get("brow_thin"):
+            # Two rows is a man's brow at this size. One row plus the taper is
+            # everyone else's, and the difference between them is most of why
+            # a face reads as one sex rather than the other.
+            p.row(by + 1 + dy, bx0 + 2, bx1 - 2, browd)
+        else:
+            p.px(bx0 + 1, by + 1 + dy, browd)
+            p.px(bx1 - 1, by + 1 + dy, browd)
+        p.px(bx0, by + dy, hr[2])
+
+    # Eyes. Four wide, two of pupil, and the lid over the top row is the whole
+    # of the difference between a person looking at you and a person who has
+    # already decided how it goes.
+    lid = m.get("lid", 0)
+    for x0 in (lx, rx):
+        p.row(ey - 1 + dy, x0 - 1, x0 + 4, sk[2])        # the socket
+        p.box(x0, ey + dy, x0 + 3, ey + 1 + dy, sk[0])   # the whites
+        p.box(x0 + 1 + gaze, ey + dy, x0 + 2 + gaze, ey + 1 + dy, sk[4])
+        p.row(ey + 2 + dy, x0 - 1, x0 + 4, sk[1])        # lower lid, catching
+        if lid:
+            p.row(ey + dy, x0, x0 + 3, sk[3])
+            p.box(x0 + 1 + gaze, ey + dy, x0 + 2 + gaze, ey + dy, sk[4])
+        else:
+            p.px(x0 + 1 + gaze, ey + dy, C["text"])      # one pixel of catchlight
+
+    # The mouth. One row of dark, never two: anything lit under a dark mouth
+    # line is teeth, and a raised half-mouth at 1:1 is a moustache. The whole
+    # expression is two pixels of corner.
+    my = ey + F["mouth_y"]
+    curl = m.get("curl", 0)
+    mw = F.get("mouth_w", 4)
+    p.row(my + dy, int(cx) - mw, int(cx) + mw - 1, sk[3])
+    p.row(my + dy, int(cx) - mw + 2, int(cx) + mw - 3, sk[4])
+    if curl > 0:
+        p.px(int(cx) - mw - 1, my - 1 + dy, sk[3])
+        p.px(int(cx) + mw, my - 1 + dy, sk[3])
+    elif curl < 0:
+        p.px(int(cx) - mw - 1, my + 1 + dy, sk[3])
+        p.px(int(cx) + mw, my + 1 + dy, sk[3])
+    if m.get("open"):
+        p.row(my + 1 + dy, int(cx) - mw + 2, int(cx) + mw - 3, sk[4])
+    p.row(my + 2 + dy, int(cx) - mw + 1, int(cx) + mw - 2, sk[2])
+
+
+def pp_shoulders(p, dy, y0, ramp, cx=28, clip=None):
+    """A bust that runs off all three lower edges of the plate. One floating
+    clear of its own frame is a cut-out; one that leaves the picture is a
+    person sitting in front of you.
+
+    SIX ROWS OF YOKE AND THEN FULL WIDTH, which is the shape Spite's p_coat
+    uses. The first cut here widened four pixels a row all the way down and
+    filled the bottom third of the plate with a pyramid -- shoulders are a
+    slope for about a sixth of a bust and horizontal after that.
+    """
+    right = p.w - 1 if clip is None else clip
+    for i in range(6):
+        y = y0 + i + dy
+        x0, x1 = max(0, int(cx) - 9 - 3 * i), min(right, int(cx) + 8 + 3 * i)
+        p.row(y, x0, x1, ramp[1])
+        p.row(y, x0, x0 + 4, ramp[0])
+        p.row(y, x1 - 5, x1, ramp[2])
+    for y in range(y0 + 6 + dy, p.h):
+        p.row(y, 0, right, ramp[1])
+        p.row(y, 0, 8, ramp[0])
+        p.row(y, max(0, right - 10), right, ramp[2])
+    p.row(y0 + 5 + dy, max(0, int(cx) - 24), min(right, int(cx) + 23), ramp[0])
+
+
+# --- Mrs Ollard's plate -----------------------------------------------------------
+#
+# She is at somebody's window and the window is the backdrop: a lit rectangle
+# behind her shoulder with a gap in the curtains, so the composition says what
+# she is before she says anything. She fills her plate, unlike Spite, and that
+# is also a quotation -- Spite wants there to be less of him and she has her
+# whole face in the gap.
+
+OLLARD_FACE = dict(cx=25, top=8, rows=22, w=21, hairline=5, brow_thin=True,
+                   eye_y=11, eye_sep=6, nose_y=3, mouth_y=8, mouth_w=3)
+
+# The delta. Note what is NOT here: the light. Both of her are the same woman in
+# the same lane at the same hour, and dimming the second one buys an unwell
+# person rather than a distracted one -- the exact error Spite's `wary` made and
+# had taken back out.
+OLLARD_MOOD = {
+    #                                                    gaze: the pupil, one px
+    "nosy":   dict(hdy=0, sdy=0, lid=0, brow=3, tilt=(0, 0), curl=1, gaze=0),
+    "adrift": dict(hdy=1, sdy=1, lid=0, brow=4, tilt=(-1, -1), curl=0, gaze=-1,
+                   open=True),
+}
+PP_MOODS["busybody"] = list(OLLARD_MOOD)
+
+
+def pp_ollard_ground(p):
+    """A wall, and the window she has just been at: a warm rectangle with the
+    curtains not quite met. It sits behind her right shoulder rather than
+    behind her head, so it is somewhere she was and not a halo."""
+    for y in range(p.h):
+        base = mix(C["bg"], C["panel"], 0.30 + 0.26 * (1.0 - abs(y - 24) / 48.0))
+        for x in range(p.w):
+            u = (x - 26.0) / 34.0
+            p.px(x, y, mix(base, C["bg"], min(1.0, u * u * 1.5)))
+    for y in range(6, 34):                                   # the sash
+        p.row(y, 34, 53, mix(C["bg"], C["accent"], 0.16))
+    p.box(36, 8, 51, 31, mix(C["bg"], C["line"], 0.55))      # curtains, drawn
+    p.col(43, 8, 31, mix(C["bg"], C["accent"], 0.40))        # the gap in them,
+    p.col(44, 8, 31, mix(C["bg"], C["accent"], 0.26))        # which is the only
+                                                             # warm thing in it
+    for x in (34, 53):
+        p.col(x, 5, 34, mix(C["bg"], BLACK, 0.20))
+    p.row(5, 34, 53, mix(C["bg"], C["line"], 0.22))
+    p.row(34, 34, 53, mix(C["bg"], BLACK, 0.22))
+    p.row(19, 36, 51, mix(C["bg"], BLACK, 0.16))             # the glazing bar
+
+
+def portrait_ollard(mood):
+    m = OLLARD_MOOD[mood]
+    p = Plate(PW, PW, C["bg"])
+    pp_ollard_ground(p)
+    # Four rows of neck and no more. The first cut left nine and she read as a
+    # totem pole -- the same number Spite's portrait had to come down to.
+    p.box(21, 28 + m["sdy"], 29, 33 + m["sdy"], SKIN_ASH[3])
+    p.box(21, 28 + m["sdy"], 23, 33 + m["sdy"], SKIN_ASH[2])
+    p.row(28 + m["sdy"], 21, 29, SKIN_ASH[4])
+    pp_shoulders(p, m["sdy"], 32, DRESS, cx=25)
+    # The shawl over the coat, in the one warm ramp she owns, and small: the
+    # accent is about a tenth of her and a wider one is a bib.
+    for i, y in enumerate(range(34 + m["sdy"], p.h)):
+        w = 7 + i * 3
+        p.row(y, max(0, 25 - w), max(0, 30 - w), ROSE[1])
+        p.row(y, min(p.w - 1, 20 + w), min(p.w - 1, 25 + w), ROSE[2])
+        p.row(y, max(0, 25 - w), max(0, 26 - w), ROSE[0])
+
+    pp_face(p, dict(OLLARD_FACE, skin=SKIN_ASH, hair=HAIR_WHITE), m)
+    # The bun: a knob two rows proud of the crown and set BACK. Centred and
+    # tapering it is a wizard's hat, which is what the sprite's first cut was.
+    dy = m["hdy"]
+    p.box(30, 9 + dy, 37, 16 + dy, HAIR_WHITE[2])
+    p.row(9 + dy, 31, 36, HAIR_WHITE[1])
+    p.row(8 + dy, 32, 35, HAIR_WHITE[0])
+    p.row(16 + dy, 31, 36, HAIR_WHITE[3])
+    p.px(37, 13 + dy, HAIR_WHITE[4])
+    p.px(15, 16 + dy, HAIR_WHITE[1])                          # a strand come loose
+    p.px(14, 18 + dy, HAIR_WHITE[2])
+    p.px(14, 20 + dy, HAIR_WHITE[3])
+    return p.img.resize((PW * PSCALE, PW * PSCALE), Image.NEAREST)
+
+
+# --- the children's plate ---------------------------------------------------------
+#
+# Two of them, because there are two of them, and one speaker record covers
+# both: Pell does the talking and Bird is behind the crate wall with the jar.
+# Bird is CUT OFF AT THE CHIN by the wall, which is how you draw depth with no
+# depth -- she is behind it, and a whole second head at the same size beside the
+# first would read as twins rather than as a fort with two children in it.
+#
+# The mood is the stick. `posted` has it across the bottom of the plate;
+# `stood_down` has it leaning at the edge, out of the way. That reads at 1:1
+# before either face resolves, which is the only thing that matters here,
+# because the beat this portrait exists for is a decision and not a feeling.
+
+PELL_FACE = dict(cx=18, top=12, rows=21, w=19, hairline=5,
+                 eye_y=11, eye_sep=5, nose_y=3, mouth_y=7, mouth_w=3)
+BIRD_FACE = dict(cx=43, top=21, rows=18, w=16, hairline=5,
+                 eye_y=10, eye_sep=4, nose_y=2, mouth_y=6, mouth_w=3)
+
+FORT_MOOD = {
+    "posted":     dict(hdy=0, sdy=0, lid=0, brow=3, tilt=(0, 0), curl=-1,
+                       gaze=0, bird=dict(hdy=0, lid=1, brow=2, tilt=(0, 0),
+                                         curl=0, gaze=0), stick=True),
+    "stood_down": dict(hdy=1, sdy=0, lid=0, brow=4, tilt=(-1, 0), curl=0,
+                       gaze=0, bird=dict(hdy=-1, lid=0, brow=3, tilt=(-1, -1),
+                                         curl=1, gaze=0), stick=False),
+}
+PP_MOODS["fort"] = list(FORT_MOOD)
+
+
+def pp_fort_ground(p):
+    """The inside of the fort: leaf-mould walls, a crate wall at the right, and
+    the slot they watch the lane through -- which is the one bright thing in the
+    plate and is deliberately behind Pell's shoulder, so the way out is visible
+    and she is in front of it."""
+    for y in range(p.h):
+        base = mix(C["bg"], mix(C["good"], C["bg"], 0.74), 0.30 + 0.30 * (1.0 - y / 56.0))
+        for x in range(p.w):
+            u = (x - 24.0) / 36.0
+            p.px(x, y, mix(base, C["bg"], min(1.0, u * u * 1.4)))
+    # leaf litter: a scatter, deterministic, so a rerun is byte-identical
+    for y in range(0, 56, 2):
+        for x in range((y * 7) % 5, 56, 5):
+            p.px(x, y, mix(C["bg"], C["good"], 0.20 if (x + y) % 3 else 0.11))
+    p.box(30, 0, 33, 55, mix(C["bg"], C["accent"], 0.14))     # a crate upright
+    p.col(30, 0, 55, mix(C["bg"], BLACK, 0.20))
+    p.col(33, 0, 55, mix(C["bg"], BLACK, 0.14))
+    p.box(34, 0, 55, 55, mix(C["bg"], C["accent"], 0.10))     # the crate wall
+    for y in (12, 26, 40):
+        p.row(y, 34, 55, mix(C["bg"], BLACK, 0.18))
+    p.box(6, 6, 15, 21, mix(C["bg"], C["accent_2"], 0.30))    # the slot, and the
+    p.box(7, 7, 14, 20, mix(C["bg"], C["accent_2"], 0.44))    # lane through it
+    p.row(21, 6, 15, mix(C["bg"], BLACK, 0.24))
+
+
+def portrait_fort(mood):
+    m = FORT_MOOD[mood]
+    b = m["bird"]
+    p = Plate(PW, PW, C["bg"])
+    pp_fort_ground(p)
+
+    # Bird first: she is behind everything, and the crate lid below cuts her off
+    # at the chin, which is the depth.
+    pp_face(p, dict(BIRD_FACE, skin=SKIN_DEEP, hair=HAIR_STRAW), b)
+    p.box(32, 38, 55, 55, mix(C["bg"], C["accent"], 0.16))       # the crate lid,
+    p.row(38, 32, 55, mix(C["bg"], C["accent"], 0.26))           # which cuts her
+    p.row(39, 32, 55, mix(C["bg"], BLACK, 0.20))                 # off at the chin
+    jy = 42
+    p.box(38, jy, 48, jy + 12, cloth5(mix(C["accent_2"], C["text"], 0.20))[2])
+    p.row(jy, 39, 47, cloth5(mix(C["accent_2"], C["text"], 0.20))[1])
+    p.row(jy + 1, 38, 40, cloth5(mix(C["accent_2"], C["text"], 0.20))[0])
+    for i, (px_, py_) in enumerate(((40, jy + 8), (43, jy + 9), (45, jy + 7),
+                                    (41, jy + 10), (46, jy + 10))):
+        p.px(px_, py_, LEAF[3] if i % 2 else LEAF[4])            # the pebbles
+        p.px(px_ + 1, py_, LEAF[4])
+
+    # Pell in front, with the leaf crown.
+    p.box(14, 32 + m["sdy"], 22, 40 + m["sdy"], SKIN_WARM[3])
+    p.box(14, 32 + m["sdy"], 16, 40 + m["sdy"], SKIN_WARM[2])
+    p.row(32 + m["sdy"], 14, 22, SKIN_WARM[4])
+    pp_shoulders(p, m["sdy"], 38, LEAF, cx=18, clip=31)
+    pp_face(p, dict(PELL_FACE, skin=SKIN_WARM, hair=HAIR_DARK), m)
+    dy = m["hdy"]
+    cy = 12 + dy
+    p.row(cy, 10, 26, LEAF[1])
+    p.row(cy, 10, 12, LEAF[0])
+    p.px(26, cy, LEAF[2])
+    for x, h in ((12, 3), (18, 5), (24, 2)):                     # three points,
+        for k in range(h):                                       # uneven. An even
+            p.row(cy - 1 - k, x, x + 1, LEAF[1] if k < h - 1 else LEAF[0])
+    p.px(18, cy - 6, LEAF[2])
+
+    if m["stick"]:
+        # The gate, in the picture. Across the plate at knee height, in front of
+        # everything, and it is the whole of the mood.
+        wood = hue5(mix(C["accent"], C["bg"], 0.55))
+        for i, x in enumerate(range(0, 56)):
+            y = 50 - i // 6
+            p.px(x, y, wood[1])
+            p.px(x, y + 1, wood[2])
+            p.px(x, y + 2, wood[4])
+    else:
+        wood = hue5(mix(C["accent"], C["bg"], 0.55))
+        p.col(2, 18, 55, wood[2])                                # leaning, done
+        p.col(3, 18, 55, wood[4])
+        p.px(2, 18, wood[1])
+    return p.img.resize((PW * PSCALE, PW * PSCALE), Image.NEAREST)
+
+
+TOWN_PORTRAITS = {"busybody": (OLLARD_MOOD, portrait_ollard),
+                  "fort": (FORT_MOOD, portrait_fort)}
+
+
+def town_portrait_contact(plates):
+    """Every mood of every face at 1:1 on the real panel_alt colour inside the
+    real accent frame -- which is the check that matters, because a face that
+    only works at 4x is a drawing of a portrait -- and again enlarged, which is
+    only for finding WHICH pixel is wrong after the small one has told you that
+    something is."""
+    rows = [(stem, mood) for stem in sorted(TOWN_PORTRAITS)
+            for mood in TOWN_PORTRAITS[stem][0]]
+    pad, gap, zoom = 20, 20, 3
+    w = pad * 2 + max(len(rows) * (112 + gap), len(rows) * (112 * zoom + gap))
+    h = pad * 3 + 112 + 112 * zoom + 34
+    out = Image.new("RGBA", (w, h), tuple(C["bg"]) + (255,))
+    d = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    for i, (stem, mood) in enumerate(rows):
+        x = pad + i * (112 + gap)
+        panel = Image.new("RGBA", (120, 120), tuple(C["panel_alt"]) + (255,))
+        ImageDraw.Draw(panel).rectangle([0, 0, 119, 119], outline=C["accent"] + (255,))
+        out.alpha_composite(panel, (x - 4, pad - 4))
+        out.alpha_composite(plates[(stem, mood)], (x, pad))
+        d.text((x, pad + 116), "%s / %s  1:1" % (stem, mood),
+               fill=C["muted"] + (255,), font=font)
+    y = pad * 2 + 112 + 26
+    for i, (stem, mood) in enumerate(rows):
+        big = plates[(stem, mood)].resize((112 * zoom, 112 * zoom), Image.NEAREST)
+        out.alpha_composite(big, (pad + i * (112 * zoom + gap), y))
+        d.text((pad + i * (112 * zoom + gap), y - 12), "%s / %s" % (stem, mood),
+               fill=C["muted"] + (255,), font=font)
+    return out
+
+
+def write_town_portraits():
+    os.makedirs(PORTRAITS, exist_ok=True)
+    plates = {}
+    names = []
+    for stem in sorted(TOWN_PORTRAITS):
+        moods, fn = TOWN_PORTRAITS[stem]
+        for mood in moods:
+            plates[(stem, mood)] = fn(mood)
+            name = "%s_%s.png" % (stem, mood)
+            plates[(stem, mood)].save(os.path.join(PORTRAITS, name))
+            names.append(name)
+    town_portrait_contact(plates).save(os.path.join(PORTRAITS, "_town_portraits.png"))
+    names.append("_town_portraits.png")
+    print()
+    print("  town portraits %dx%d (%d logical x%d): %s"
+          % (PW * PSCALE, PW * PSCALE, PW, PSCALE, ", ".join(names)))
+    for stem in sorted(TOWN_PORTRAITS):
+        moods = list(TOWN_PORTRAITS[stem][0])
+        a, b = plates[(stem, moods[0])], plates[(stem, moods[1])]
+        diff = sum(1 for u, v in zip(a.getdata(), b.getdata()) if u != v)
+        print("    %-9s %s vs %s: %.1f%% of pixels differ -- one face, two moods"
+              % (stem, moods[0], moods[1],
+                 100.0 * diff / float(PW * PSCALE * PW * PSCALE)))
+    return names
 
 
 if __name__ == "__main__":

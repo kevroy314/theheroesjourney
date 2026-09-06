@@ -1,12 +1,12 @@
 {
-  "columns": 29,
+  "columns": 33,
   "image": "../assets/tiles/tileset.png",
   "imageheight": 32,
-  "imagewidth": 928,
+  "imagewidth": 1056,
   "margin": 0,
   "name": "heroes",
   "spacing": 0,
-  "tilecount": 29,
+  "tilecount": 33,
   "tiledversion": "1.12.2",
   "tileheight": 32,
   "tiles": [
@@ -297,6 +297,46 @@
           "name": "name",
           "type": "string",
           "value": "wall_timber"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "roof_thatch"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "roof_slate"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "roof_pantile"
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "wall_brick"
         }
       ]
     }

@@ -1,0 +1,288 @@
+{
+  "_comment": "Mrs Ollard, from PROPOSALS/NPC-CONCEPTS.md #3, who is the most fully specified person in Kevin's notes and therefore the one where the notes are the spec and this file is only the transcription.\n\nWHAT THE NOTES ASK FOR AND WHERE EACH PART LANDED:\n\n  looks in windows                 -- the opening beat, every time.\n  errands to go and talk to people -- `errand`. It is a real cross-NPC quest with no new machinery: she names Tobin, and the reply that collects the reward is gated on `has_tag: met_tobin`, which data/dialogue/tobin.json sets. Two files, one tag, no code.\n  pays in candy, a speed buff      -- HALF BUILT. A dialogue effect cannot grant a buff: Objectives.apply_effects implements grit/deadline/resolve/item/tag/objective/log and nothing else, and `buff` lives in the *hook* vocabulary that interactables use. So the sweet pays grit, which is a real resource and a real payoff, and the buff version wants either a `buff` arm in Objectives.apply_effects or an interactable on her that carries { \"type\": \"buff\", \"buff\": \"candy\" }. See docs/CHARACTER-TOWNSFOLK.md.\n  ...which is sometimes her medication -- BUILT, and without any randomness, which is better. A conversation cannot roll dice, and faking it with a left-hand/right-hand choice teaches the player which hand after one try. So: the FIRST sweet in a loop is a sweet. The second is the other tin, because she has forgotten she already gave you one -- which is not a dice roll, it is her, and it makes taking a second one a real decision rather than a free one.\n  free candy for bringing an animal -- BUILT, via `dog_called`, which data/content/critters.json now sets on the dog's waiting -> following transition. A critter transition may carry an `effect` and `tag` is in that vocabulary, so an animal following you is a fact the writing can read. It is deliberately loose -- the tag says 'you have called the dog at some point this loop', not 'the dog is beside you now' -- and her line is written so the looseness is the joke rather than the seam.\n  the cat, and the secret name     -- NOT BUILT past the hooks. `cat_lure` sets `looking_for_cat`; data/content/critters.json now makes the cat bolt from `carrying_candy` and approach `carrying_fish`, which is the whole of Kevin's smell mechanic in data. What is missing is the line-of-sight condition (Critters._conditions_met has no `los` term), the fish and the candy as items, and whatever sets `cat_home`. The payoff branch is written and waits on that tag.\n\nHER NAME IS THE MECHANIC. `Sunny` is what the cat quest pays out, and the reply that uses it is gated on `knows_secret_name`. The notes say it goes in the mind palace as part of her character card; there is no character card, so for now it is a run tag and the knowledge dies with the loop, which is at least thematically the correct kind of sad.",
+
+  "speakers": [
+    {
+      "id": "busybody",
+      "name": "Mrs Ollard",
+      "portrait": "busybody",
+      "accent": "accent_2",
+      "desc": "Elderly, upholstered, and at somebody else's window. She is not spying. She is checking. There is a difference and she will explain it.",
+      "moods": [
+        { "id": "nosy", "name": "delighted",
+          "desc": "Both hands on the sill and her whole face out. This is the best thing that has happened to her today and it is going to be." },
+        { "id": "adrift", "name": "somewhere else",
+          "desc": "The sentence has gone. She is still holding the shape of it, waiting to see if it comes back." }
+      ]
+    }
+  ],
+
+  "dialogues": [
+    {
+      "id": "ollard_window",
+      "speaker": "busybody",
+      "start": "window",
+      "nodes": [
+        {
+          "id": "window",
+          "mood": "nosy",
+          "lines": [
+            "There is an elderly woman standing on an upturned bucket with her hands on somebody else's windowsill and her entire face pressed into the gap in their curtains.",
+            "She hears you, and turns round on the bucket without any embarrassment at all, and beams.",
+            "\"Oh good,\" she says. \"Somebody.\""
+          ],
+          "replies": [
+            { "text": "\"Are you all right?\"", "when": { "lacks_tag": "met_ollard" }, "goto": "intro" },
+            { "text": "\"Whose window is that?\"", "when": { "lacks_tag": "met_ollard" }, "goto": "whose_window" },
+            { "text": "\"Mrs Ollard.\"", "when": { "has_tag": "met_ollard" }, "goto": "again" },
+            { "text": "\"Hello, Sunny.\"", "when": { "has_tag": "knows_secret_name" }, "goto": "sunny" }
+          ]
+        },
+        {
+          "id": "whose_window",
+          "mood": "nosy",
+          "lines": [
+            "\"Theirs,\" she says, with the patience of a woman answering a question she considers slow.",
+            "\"I'm not looking IN. I'm looking to see whether there's anyone in there looking out. There isn't. That's four days.\"",
+            "She gets down off the bucket, which takes a while, and picks the bucket up, which takes longer."
+          ],
+          "next": "intro"
+        },
+        {
+          "id": "intro",
+          "mood": "nosy",
+          "lines": [
+            "\"Ollard,\" she says. \"Mrs. There's no Mr, before you're polite about it.\"",
+            "\"I do the rounds. Somebody has to know who's in and who isn't, and this town has got very bad at noticing when a person stops being in it.\"",
+            "She looks at you with sudden, total attention. \"You're the one from the house on the end. You go out and you come back and you look like you've been running.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "met_ollard" }
+          ],
+          "replies": [
+            { "text": "\"Can I help with anything?\"", "goto": "errand" },
+            { "text": "\"How do you know that?\"", "goto": "how_know" },
+            { "text": "\"I should get on.\"", "goto": "goodbye" }
+          ]
+        },
+        {
+          "id": "how_know",
+          "mood": "nosy",
+          "lines": [
+            "\"Windows,\" she says, as though you had asked how she knew what day it was.",
+            "Then her face does something else for a second — a small correction, like a person adjusting a picture that was not crooked.",
+            "\"You have a way of arriving,\" she says. \"You arrive very often.\""
+          ],
+          "next": "errand"
+        },
+
+        {
+          "id": "errand",
+          "mood": "nosy",
+          "lines": [
+            "\"Yes. Go and talk to Tobin at the bar.\"",
+            "\"Not about anything. Just go and be a person at him for ten minutes. He gets in a state and he cleans, and when he's cleaned everything he starts on the ceiling, and I am too old to be got up a ladder to fetch a publican down.\"",
+            "\"Do that and there's a sweet in it.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "ollard_errand" }
+          ],
+          "replies": [
+            { "text": "\"I've been. He's fine.\"", "when": { "has_tag": "met_tobin" }, "goto": "errand_done" },
+            { "text": "\"A sweet.\"", "goto": "sweet_offer" },
+            { "text": "\"I'll go.\"", "goto": "goodbye" }
+          ]
+        },
+        {
+          "id": "errand_done",
+          "mood": "nosy",
+          "lines": [
+            "\"Was he on the ceiling?\"",
+            "You say that he was not on the ceiling. She nods, twice, and something goes out of her shoulders.",
+            "\"Good. Right.\" She digs in a coat pocket and comes out with a paper twist. \"There. That's earned, that one, so don't say thank you.\""
+          ],
+          "effects": [
+            { "type": "grit", "amount": 12 },
+            { "type": "tag", "tag": "had_candy" },
+            { "type": "log", "text": "Barley sugar. It is extremely good and slightly furred with pocket.", "kind": "good" }
+          ],
+          "next": "goodbye"
+        },
+
+        {
+          "id": "sweet_offer",
+          "mood": "nosy",
+          "lines": [
+            "\"A sweet,\" she confirms. \"I keep them in the left one. The right one's my tablets, so I keep them in the right one, and that's how I keep them straight.\"",
+            "She holds out a paper twist. Her hand is in her right pocket."
+          ],
+          "replies": [
+            { "text": "Take it.", "when": { "lacks_tag": "had_candy" }, "goto": "sweet_good" },
+            { "text": "Take it.", "when": { "has_tag": "had_candy" }, "goto": "sweet_bad" },
+            { "text": "\"Which pocket was that?\"", "goto": "which_pocket" }
+          ]
+        },
+        {
+          "id": "which_pocket",
+          "mood": "adrift",
+          "lines": [
+            "She looks down at her own hand for a moment.",
+            "\"...the left,\" she says. \"I've just said. The left.\"",
+            "The hand does not move. Neither does she."
+          ],
+          "replies": [
+            { "text": "Take it anyway.", "when": { "lacks_tag": "had_candy" }, "goto": "sweet_good" },
+            { "text": "Take it anyway.", "when": { "has_tag": "had_candy" }, "goto": "sweet_bad" },
+            { "text": "\"I'm all right, thank you.\"", "goto": "declined" }
+          ]
+        },
+        {
+          "id": "sweet_good",
+          "mood": "nosy",
+          "lines": [
+            "Barley sugar, in a twist of newspaper that has been in that pocket a long time.",
+            "It is astonishingly good. You stand in the lane for a second with your eyes shut."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 10 },
+            { "type": "tag", "tag": "had_candy" }
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "sweet_bad",
+          "mood": "adrift",
+          "lines": [
+            "\"Have one,\" she says warmly. \"Go on, you've not had one.\"",
+            "You have had one. You had one about an hour ago, out of the other pocket.",
+            "This one is chalky and faintly bitter and by the time you understand what it is, your hands have gone a long way away and the lane has got noticeably longer."
+          ],
+          "effects": [
+            { "type": "grit", "amount": -9 },
+            { "type": "log", "text": "That was the right-hand pocket. Everything is slow for a while.", "kind": "bad" }
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "declined",
+          "mood": "nosy",
+          "lines": [
+            "\"Suit yourself,\" she says, entirely unbothered, and puts it back in the pocket it did not come from."
+          ],
+          "next": "goodbye"
+        },
+
+        {
+          "id": "again",
+          "mood": "nosy",
+          "lines": [
+            "\"You again,\" she says, with enormous satisfaction. \"Good. Sit down. Don't sit down, I've nowhere for you to sit.\""
+          ],
+          "replies": [
+            { "text": "\"You said something about a sweet.\"", "goto": "sweet_offer" },
+            { "text": "\"I've got a dog with me somewhere.\"", "when": { "has_tag": "dog_called" }, "goto": "animal" },
+            { "text": "\"You were looking for a cat.\"", "when": { "has_tag": "looking_for_cat" }, "goto": "cat_report" },
+            { "text": "\"Is there anything you need?\"", "goto": "errand" },
+            { "text": "\"Have you lost something?\"", "when": { "lacks_tag": "looking_for_cat" }, "goto": "cat_lure" }
+          ]
+        },
+
+        {
+          "id": "animal",
+          "mood": "nosy",
+          "lines": [
+            "\"You HAVE,\" she says, and her whole face reorganises. \"I can hear it. That's a dog that's been called, that is, they've got a particular way of coming when they've been called.\"",
+            "She is already digging in the left pocket, and she is not looking at you at all any more.",
+            "\"Here. That's for the dog. You can have it, the dog won't want it, but it's for the dog.\""
+          ],
+          "effects": [
+            { "type": "grit", "amount": 8 },
+            { "type": "log", "text": "It is for the dog. You eat it.", "kind": "good" }
+          ],
+          "next": "goodbye"
+        },
+
+        {
+          "id": "cat_lure",
+          "mood": "adrift",
+          "lines": [
+            "The delight goes off her like a light going out.",
+            "\"My cat,\" she says. \"Grey. Enormous. Face like a magistrate. He's been gone —\" and she stops, because she does not know how long, and you can see her decide not to guess in front of you.",
+            "\"He knows the smell of the sweets,\" she says. \"He won't come near them, he thinks they're the tablets. Don't go after him with sweets in your pocket, you'll only push him further off. Fish, if you've got fish. And don't let him see you coming.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "looking_for_cat" }
+          ],
+          "replies": [
+            { "text": "\"I'll look for him.\"", "goto": "goodbye" },
+            { "text": "\"What's his name?\"", "goto": "cat_name" }
+          ]
+        },
+        {
+          "id": "cat_name",
+          "mood": "adrift",
+          "lines": [
+            "\"He hasn't got one,\" she says. \"I've never needed one. I've only ever had to say it in the one house.\""
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "cat_report",
+          "mood": "nosy",
+          "lines": [
+            "\"Well?\"",
+            "She says it lightly, and she has both hands on the bucket handle, and she is not breathing very much."
+          ],
+          "replies": [
+            { "text": "\"He's home.\"", "when": { "has_tag": "cat_home" }, "goto": "cat_returned" },
+            { "text": "\"Not yet.\"", "goto": "cat_not_yet" }
+          ]
+        },
+        {
+          "id": "cat_not_yet",
+          "mood": "adrift",
+          "lines": [
+            "\"No,\" she agrees. \"No, well.\"",
+            "She picks the bucket up and goes to look in the next window along, and by the time she gets there she is delighted again."
+          ],
+          "end": true
+        },
+        {
+          "id": "cat_returned",
+          "mood": "nosy",
+          "lines": [
+            "She does not say anything for long enough that you begin to worry.",
+            "Then: \"Sunny.\" She is looking at the wall, not at you. \"That's mine. My name. It's what he called me — my husband — and there's nobody left who's used it, and I have got very tired of being Mrs Ollard at everybody.\"",
+            "\"So you use it. When you see me. And there'll always be a sweet in it, and it'll always be the left pocket, because I'll be paying attention.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "knows_secret_name" },
+            { "type": "log", "text": "Sunny. You will remember it for as long as this loop lasts.", "kind": "good" }
+          ],
+          "end": true
+        },
+        {
+          "id": "sunny",
+          "mood": "nosy",
+          "lines": [
+            "She stops dead on the bucket.",
+            "\"Sunny,\" she agrees, and gets down, and gets the left-hand pocket out before she has even finished turning round."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 10 }
+          ],
+          "next": "goodbye"
+        },
+
+        {
+          "id": "goodbye",
+          "mood": "nosy",
+          "lines": [
+            "\"Go on then,\" she says, and gets back up on the bucket. \"Some of us are working.\""
+          ],
+          "end": true
+        }
+      ]
+    }
+  ]
+}

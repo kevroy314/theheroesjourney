@@ -1,0 +1,174 @@
+{
+  "_comment": "Ansel Cobb, of Cobb's Provisions. PROPOSALS/BUILDINGS.md #2 is four words -- 'General Store (owner sleeps in back)' -- and the four words are the character: a man who has staff (#8, the neighbour across the street works here) and still sleeps in his own shop, because he cannot bear to leave the stock and because the shop is the only place he has ever been any use.\n\nHIS MECHANIC IS HIS JOKE. He is delighted by a customer and constitutionally incapable of completing a sale, because every item has a story and you are going to hear it. The shop is slow. That is not a bug in the writing, it is the shop.\n\nSHOP-SHAPED WITHOUT A SHOP. There is no inventory screen and no economy, so this is a conversation with the SHAPE of a shop in it: a hub with categories as replies, a thing you can actually acquire, and -- the part worth keeping when somebody builds the real one -- an ORDER. You ask for something, he takes the order, and it is ready when you come back. Browse, buy, collect is a shop's real loop and it is three tags. It is also, usefully, the second-meeting content: `cobb_order` is what makes the second visit a different conversation instead of the same one.\n\nWAKING HIM UP IS THE FIRST BEAT, every loop, because 'sleeps in the back' should be something you do rather than something you are told. On the second visit he is awake and has always been awake.",
+
+  "speakers": [
+    {
+      "id": "cobb",
+      "name": "Ansel Cobb",
+      "portrait": "cobb",
+      "accent": "warn",
+      "desc": "Cobb's Provisions. Spectacles, waistcoat, a belly he leans on the counter, and a camp bed behind the flour that he will tell you is for stocktaking."
+    }
+  ],
+
+  "dialogues": [
+    {
+      "id": "cobb_shop",
+      "speaker": "cobb",
+      "start": "shop",
+      "nodes": [
+        {
+          "id": "shop",
+          "lines": [
+            "The shop is dark and enormously full. There are things hanging from the beams that have been hanging from the beams for a while.",
+            "Behind the counter, past a wall of flour sacks, somebody is asleep on a camp bed with their spectacles still on.",
+            "A bell over the door has already gone off. Nothing happens for a moment."
+          ],
+          "replies": [
+            { "text": "Cough.", "when": { "lacks_tag": "met_cobb" }, "goto": "wake" },
+            { "text": "Leave him.", "when": { "lacks_tag": "met_cobb" }, "goto": "leave_asleep" },
+            { "text": "\"Mr Cobb.\"", "when": { "has_tag": "met_cobb" }, "goto": "again" }
+          ]
+        },
+        {
+          "id": "leave_asleep",
+          "lines": [
+            "You get two steps back towards the door.",
+            "\"NO,\" says the flour, \"no no no, I'm — one moment — I am OPEN —\"",
+            "There is a noise like a shelf giving up."
+          ],
+          "next": "wake"
+        },
+        {
+          "id": "wake",
+          "lines": [
+            "He arrives at the counter at speed, straightening a waistcoat that has slept in, and beams at you with total and slightly alarming gratitude.",
+            "\"Ansel Cobb. Provisions. Yes. Sorry. Stocktaking.\" He gestures at the camp bed, which has a pillow on it. \"Overnight stocktaking.\"",
+            "\"Right. What can I do for you. Take your time. Genuinely, take as long as you like.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "met_cobb" }
+          ],
+          "replies": [
+            { "text": "\"What have you got?\"", "goto": "stock" },
+            { "text": "\"You sleep here.\"", "goto": "sleeps" },
+            { "text": "\"I need something you haven't got.\"", "goto": "order" }
+          ]
+        },
+        {
+          "id": "sleeps",
+          "lines": [
+            "\"I stocktake here,\" he says, with dignity.",
+            "\"There's a girl comes in mornings and she's very good and she does not need me here, which I am aware of, thank you.\"",
+            "He straightens something on the counter that was straight. \"It's a lot of stock. Somebody ought to be with it.\""
+          ],
+          "next": "stock"
+        },
+        {
+          "id": "stock",
+          "lines": [
+            "\"Rope. Lamp oil. Boots, but only the one size and it isn't yours. Salt. Nails, loose, by weight. Everything on that shelf, which I could not tell you the purpose of.\"",
+            "\"And biscuit.\" He says this with weight. \"I do a very good biscuit. People come from the mill.\""
+          ],
+          "replies": [
+            { "text": "\"Biscuit.\"", "goto": "biscuit" },
+            { "text": "\"Tell me about the shelf.\"", "goto": "shelf" },
+            { "text": "\"Can you order something in?\"", "goto": "order" }
+          ]
+        },
+        {
+          "id": "biscuit",
+          "lines": [
+            "It comes out of a tin with a picture of a lighthouse on it, and there is no lighthouse within two hundred miles, and he has never once been asked about this.",
+            "\"On the house,\" he says. \"You'll come back for the next one, that's the whole trick of it, I'm not even hiding it from you.\"",
+            "It is a very good biscuit."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 11 },
+            { "type": "log", "text": "A very good biscuit, out of a tin with a lighthouse on it.", "kind": "good" }
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "shelf",
+          "lines": [
+            "It takes eleven minutes.",
+            "You learn about a man called Ferris who brings things in off the roads, about a brass fitting that goes to nothing anybody has ever identified, and about the correct way to store a coil of rope, at length, twice.",
+            "You leave knowing more about rope than you have ever wanted to and oddly cheered up."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 6 },
+            { "type": "deadline", "amount": -1 }
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "order",
+          "lines": [
+            "His face changes completely. This is the good part of the job and he has not been asked in some time.",
+            "He gets a ledger out from under the counter, and a pencil from behind his ear, and licks the pencil, and writes with enormous care.",
+            "\"Right,\" he says. \"That'll be a day. Come back tomorrow and it'll be under the counter with your name on it. It will actually have your name on it, I write it on.\""
+          ],
+          "effects": [
+            { "type": "tag", "tag": "cobb_order" },
+            { "type": "log", "text": "Cobb has written it in the ledger. It will be under the counter.", "kind": "info" }
+          ],
+          "next": "goodbye"
+        },
+
+        {
+          "id": "again",
+          "lines": [
+            "He is at the counter, awake, upright, and has clearly been awake and upright for hours.",
+            "\"Yes,\" he says. \"Hello. Yes.\" The camp bed behind the flour has been folded, badly, at speed."
+          ],
+          "replies": [
+            { "text": "\"Is my order in?\"", "when": { "has_tag": "cobb_order" }, "goto": "collect" },
+            { "text": "\"Can you order something in?\"", "when": { "lacks_tag": "cobb_order" }, "goto": "order" },
+            { "text": "\"Biscuit.\"", "goto": "biscuit" },
+            { "text": "\"Do you ever go home?\"", "goto": "home" },
+            { "text": "\"Just looking.\"", "goto": "just_looking" }
+          ]
+        },
+        {
+          "id": "just_looking",
+          "lines": [
+            "\"Please do,\" he says, with feeling. \"Look at all of it. Look behind things.\"",
+            "He goes back to not doing anything at the far end of the counter, at a distance he has clearly calculated."
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "collect",
+          "lines": [
+            "It is under the counter. It has your name on it, in pencil, in a hand that took its time.",
+            "\"There,\" he says, and cannot stop himself adding: \"I had it done last night, actually. It's been sat there since about nine.\"",
+            "He has also put a biscuit in with it, unasked, and taken the paper off it so it does not get stale."
+          ],
+          "effects": [
+            { "type": "grit", "amount": 14 },
+            { "type": "tag", "tag": "cobb_collected" },
+            { "type": "log", "text": "Your order, and a biscuit, and he took the paper off the biscuit.", "kind": "good" }
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "home",
+          "lines": [
+            "\"I've got a house,\" he says. \"Up past the mill. It's a very good house.\"",
+            "\"There's nothing in it, though. That's the thing about it. Everything's in here.\"",
+            "He looks round at the beams, and the sacks, and the shelf he cannot account for, with something that is not quite pride."
+          ],
+          "next": "goodbye"
+        },
+        {
+          "id": "goodbye",
+          "lines": [
+            "The bell goes off over the door on the way out, and he says \"thank you\" to it after you have gone."
+          ],
+          "end": true
+        }
+      ]
+    }
+  ]
+}

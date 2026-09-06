@@ -29,9 +29,11 @@
       },
       "transitions": [
         {
+          "_comment": "The tag is the only reason Mrs Ollard can say 'you have got a dog with you'. A transition may carry an `effect` from the same vocabulary hooks and interactables use, so an animal changing its mind is a fact the writing can read -- and that is the whole of the escort/companion seam #78 asks for, with no new code. It is deliberately loose: `dog_called` means 'you have called him at some point this loop', not 'he is beside you now', because there is no proximity term a conversation can evaluate. data/dialogue/busybody.json is written so the looseness is the joke.",
           "from": "waiting",
           "on": "petted",
-          "to": "following"
+          "to": "following",
+          "effect": { "type": "tag", "tag": "dog_called" }
         },
         {
           "from": "following",
@@ -73,9 +75,49 @@
         "watching": {
           "goal": "hold",
           "say": "It has stopped, at a distance it picked."
+        },
+        "lured": {
+          "goal": "approach",
+          "target": "player",
+          "keep": 1,
+          "pace": 0.5,
+          "say": "It comes, but it takes the long way round and pretends it was going there anyway."
         }
       },
       "transitions": [
+        {
+          "_comment": "THE CAT'S NOSE, from PROPOSALS/NPC-CONCEPTS.md #3: it knows the smell of Mrs Ollard's sweets because it thinks they are her tablets, so carrying candy pushes it further away, and fish brings it in. Both are `has_tag`, which HJCritters._conditions_met already implements, so the entire smell mechanic is four transitions and one state and no engine change. Candy is FIRST because order is priority and the sweets have to beat the fish -- that asymmetry is the design, not a tie-break. Nothing sets either tag yet: there is no candy item and no fish item, and the line-of-sight half of the quest ('it cannot see you coming') needs a term HJCritters does not have. See docs/CHARACTER-TOWNSFOLK.md.",
+          "from": [
+            "dozing",
+            "skulking",
+            "stalking",
+            "watching",
+            "lured"
+          ],
+          "when": {
+            "has_tag": "carrying_candy"
+          },
+          "to": "bolting"
+        },
+        {
+          "from": [
+            "dozing",
+            "skulking",
+            "stalking",
+            "watching"
+          ],
+          "when": {
+            "has_tag": "carrying_fish"
+          },
+          "to": "lured"
+        },
+        {
+          "from": "lured",
+          "when": {
+            "lacks_tag": "carrying_fish"
+          },
+          "to": "skulking"
+        },
         {
           "from": [
             "dozing",
@@ -133,6 +175,110 @@
           "to": "stalking"
         }
       ]
+    },
+    {
+      "_comment": "THE TOWNSFOLK. Six people in the same shape Spite already proved: a species with a `sheet` override that says 'this is a person, three columns of 32x48', and a state machine that is mostly `hold`, because a shopkeeper who wanders off is a shopkeeper you cannot find. Placement is world data and is not this file's business -- an interactables record whose catalogue entry carries `critter` spawns one where it stands. Their conversations are in data/dialogue/ and their art is authored in tools/make_sprites.py from one shared body table; see docs/CHARACTER-TOWNSFOLK.md.",
+      "id": "kid_pell",
+      "name": "Pell",
+      "sprite": "kid_pell",
+      "sheet": { "cols": 3, "rows": 4, "w": 32, "h": 48 },
+      "start": "posted",
+      "states": {
+        "posted": {
+          "goal": "hold",
+          "say": "She puts the stick back across the gap without appearing to decide to."
+        },
+        "off_duty": {
+          "goal": "wander",
+          "target": "home",
+          "keep": 2,
+          "pace": 0.5,
+          "restless": 0.4,
+          "say": "The stick is against the wall. She is eleven again and it shows."
+        }
+      },
+      "transitions": [
+        {
+          "_comment": "She stands down when the gate is open, and only then. The tag is set by the `toll` node in data/dialogue/fort.json -- so the thing that changes how she stands in the world is the same thing that changed her mind, and there is no second copy of the condition anywhere.",
+          "from": "posted",
+          "when": { "has_tag": "fort_open" },
+          "to": "off_duty"
+        }
+      ]
+    },
+    {
+      "id": "kid_bird",
+      "name": "Bird",
+      "sprite": "kid_bird",
+      "sheet": { "cols": 3, "rows": 4, "w": 32, "h": 48 },
+      "start": "counting",
+      "states": {
+        "counting": {
+          "goal": "hold",
+          "say": "She does not look up. She is not being rude; she is on nine."
+        }
+      }
+    },
+    {
+      "id": "busybody",
+      "name": "Mrs Ollard",
+      "sprite": "busybody",
+      "sheet": { "cols": 3, "rows": 4, "w": 32, "h": 48 },
+      "_comment": "The only townsperson who moves on her own, and she moves the way she is written: a slow four-cell round from wherever she was placed, because she is doing the windows. `restless` low so she stands at each one long enough to be caught at it.",
+      "start": "rounds",
+      "states": {
+        "rounds": {
+          "goal": "wander",
+          "target": "home",
+          "keep": 4,
+          "pace": 1.1,
+          "restless": 0.18,
+          "say": "She is at the next window along by the time you turn round."
+        }
+      }
+    },
+    {
+      "id": "bram",
+      "name": "Bram Hollis",
+      "sprite": "bram",
+      "sheet": { "cols": 3, "rows": 4, "w": 32, "h": 48 },
+      "start": "verge",
+      "states": {
+        "verge": {
+          "goal": "wander",
+          "target": "home",
+          "keep": 6,
+          "pace": 0.8,
+          "restless": 0.3,
+          "say": "He is working his way along the verge, turning things over with the stick."
+        }
+      }
+    },
+    {
+      "id": "tobin",
+      "name": "Tobin",
+      "sprite": "tobin",
+      "sheet": { "cols": 3, "rows": 4, "w": 32, "h": 48 },
+      "start": "bar",
+      "states": {
+        "bar": {
+          "goal": "hold",
+          "say": "He is behind the bar. He is always behind the bar."
+        }
+      }
+    },
+    {
+      "id": "cobb",
+      "name": "Ansel Cobb",
+      "sprite": "cobb",
+      "sheet": { "cols": 3, "rows": 4, "w": 32, "h": 48 },
+      "start": "counter",
+      "states": {
+        "counter": {
+          "goal": "hold",
+          "say": "He straightens something on the counter that was already straight."
+        }
+      }
     },
     {
       "id": "spite",

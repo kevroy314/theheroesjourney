@@ -243,9 +243,9 @@ MATERIALS = {
     # Means obey the solid rule (>= 12 luma below every walkable material they
     # border, checked by verify_contrast against ADJACENCY): grass is 42 and
     # path is 46, so nothing here goes above 30 however pale real straw is.
-    "roof_thatch":   dict(hue=_hue((C["warn"], 1.0), (C["accent"], 0.65), (C["muted"], 0.30)), mean=27, spread=22, walk=False, family="thatch"),
-    "roof_slate":    dict(hue=_hue((C["line"], 1.0), (C["accent_2"], 0.40)), mean=20, spread=18, walk=False, family="slate"),
-    "roof_pantile":  dict(hue=_hue((C["danger"], 1.0), (C["accent"], 0.70)), mean=28, spread=22, walk=False, family="pantile"),
+    "roof_thatch":   dict(hue=_hue((C["warn"], 1.0), (C["accent"], 0.65), (C["muted"], 0.30)), mean=27, spread=27, walk=False, family="thatch"),
+    "roof_slate":    dict(hue=_hue((C["line"], 1.0), (C["accent_2"], 0.40)), mean=20, spread=25, walk=False, family="slate"),
+    "roof_pantile":  dict(hue=_hue((C["danger"], 1.0), (C["accent"], 0.70)), mean=28, spread=25, walk=False, family="pantile"),
     "wall_brick":    dict(hue=_hue((C["danger"], 1.0), (C["line"], 1.10), (C["muted"], 0.25)), mean=24, spread=18, walk=False, family="brickwork"),
 }
 
@@ -3176,7 +3176,7 @@ def b_structure(img, rng, p):
         # ragged and the box is drawn square against it.
         needles, leaves, box = PP["pine"], PP["leaf_dry"], PP["wood"]
         for dx in range(-15, 16):
-            h = 20 + int(6 * math.sin((dx + 15) * 0.7)) + rng.randint(-3, 3)
+            h = 30 + int(8 * math.sin((dx + 15) * 0.7)) + rng.randint(-4, 4)
             for dy in range(h):
                 pal = needles if (dx + dy) % 3 else leaves
                 c = pal["base"]
@@ -3187,21 +3187,21 @@ def b_structure(img, rng, p):
                 if dy > h - 4:
                     c = pal["tip"]
                 pp_(img, dx, dy, c)
-        for _ in range(120):                       # the pine needles, on end
+        for _ in range(180):                       # the pine needles, on end
             dx = rng.randint(-15, 15)
-            dy = rng.randint(2, 24)
+            dy = rng.randint(2, 34)
             pp_(img, dx, dy, needles["tip"] if rng.random() < 0.4 else leaves["dark"])
-        for dy in range(0, 12):                    # the box holding it up
+        for dy in range(0, 14):                    # the box holding it up
             for dx in range(-14, -3):
                 c = box["base"] if dx < -9 else box["dark"]
-                if dy in (0, 11) or dx in (-14, -4):
+                if dy in (0, 13) or dx in (-14, -4):
                     c = box["deep"]
                 pp_(img, dx, dy, c)
         for dx in range(-14, -3):                  # a slat across it
-            pp_(img, dx, 6, box["mid"])
-        for dy in range(0, 9):                     # and a plank leaning the other way
+            pp_(img, dx, 7, box["mid"])
+        for dy in range(0, 20):                    # and a plank leaning the other way
             for dx in range(8, 13):
-                pp_(img, dx + dy // 3, dy, box["mid"] if dx < 10 else box["deep"])
+                pp_(img, dx + dy // 4, dy, box["mid"] if dx < 10 else box["deep"])
         return 15
     if kind == "campfire":
         # The fort's fire. Solid, because a fire is not somewhere to stand, and
@@ -4187,7 +4187,7 @@ def interior_demo(tiles, sprites, zoom=3):
         ("table", 8, 9), ("chair", 7, 9), ("chair_pulled", 9, 9),
         ("table", 1, 11), ("chair", 2, 10), ("chair", 2, 11),
         ("floor_lamp", 3, 12), ("book_open", 2, 12), ("barrel", 11, 10),
-        ("crate", 10, 12), ("bench", 6, 12), ("boots", 7, 12),
+        ("crate", 10, 12), ("bench", 5, 12), ("boots", 7, 12),
         ("dog", 6, 11),
         ("shelf_open", 13, 7), ("shelf_open", 14, 7), ("shelf_open", 15, 7),
         ("barrel", 16, 7), ("crate", 16, 8), ("barrel", 13, 8),

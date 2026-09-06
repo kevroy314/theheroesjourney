@@ -527,7 +527,16 @@ def carve_road(world, rng, a, b, avoid=frozenset(), bridge=True):
             through = 60.0 if bridge else 4000.0
         elif here in (T["forest"], T["rock"]):
             through = 30.0
-        return 1.0 + climb + jitter(tx, ty) + through
+        step = 1.0 + climb + jitter(tx, ty) + through
+        # THE ROAD-REUSE DISCOUNT. docs/PROCGEN-RESEARCH.md §2.1 calls this the
+        # highest-value line in the document, and it is one line: a cell that
+        # already carries road is a tenth of the price. Routes then converge
+        # into shared trunks and branch late, which is what a road network
+        # actually looks like and what no per-road search can produce on its
+        # own -- the five roads out of the gate leave town as one road.
+        if here in (T["path_dirt"], T["bridge"], T["floor_stone"]):
+            step *= 0.1
+        return step
 
     open_heap = [(0.0, 0, a)]
     came = {a: None}
@@ -551,7 +560,11 @@ def carve_road(world, rng, a, b, avoid=frozenset(), bridge=True):
                 best[(nx, ny)] = g
                 came[(nx, ny)] = cur
                 tick += 1
-                h = abs(b[0] - nx) + abs(b[1] - ny)
+                # 0.1 per step, because the reuse discount makes that the
+                # cheapest a step can be. A heuristic of 1.0 per step would
+                # overestimate along an existing road and A* would stop being
+                # optimal exactly where we most want it to follow one.
+                h = 0.1 * (abs(b[0] - nx) + abs(b[1] - ny))
                 heapq.heappush(open_heap, (g + h, tick, (nx, ny)))
     if not found:
         raise SystemExit(
@@ -666,6 +679,14 @@ STREETS = [
     ("low_street",  [(122, 159), (132, 160), (142, 160), (151, 159)], 1, "path_dirt"),
     ("back_lane",   [(154, 127), (154, 123)], 0, "path_dirt"),
     ("empty_track", [(101, 153), (103, 156), (105, 157)], 0, "path_dirt"),
+    # Water Lane, up the west bank between the house and the leat to the mill
+    # pond and the west field, and the Sheep Walk south between the tinkerer's
+    # and the mayor's. Neither is here for elegance: without them the north-west
+    # of the vale and the south meadow are LAND THE PLAYER CAN SEE AND NEVER
+    # STAND ON, which the pocket check in main() reports as a build failure.
+    ("water_lane",  [(106, 150), (106, 141), (105, 133), (103, 125),
+                     (101, 117), (100, 109), (99, 103)], 1, "path_dirt"),
+    ("sheep_walk",  [(130, 161), (130, 170), (132, 177)], 1, "path_dirt"),
 ]
 
 SQUARE = (132, 132, 13, 9)
@@ -686,19 +707,31 @@ BUILDINGS = [
     ("empty_house", 101, 158, 9, 9, (105, 158), "wall_timber", "roof_thatch"),
     ("farmhouse", 108, 99, 11, 9, (118, 103), "wall_timber", "roof_thatch"),
     ("neighbour_w", 80, 142, 6, 7, (83, 148), "wall_timber", "roof_thatch"),
-    ("neighbour_e", 107, 142, 7, 7, (110, 148), "wall_timber", "roof_thatch"),
+    ("neighbour_e", 108, 142, 7, 7, (111, 148), "wall_timber", "roof_thatch"),
     ("across", 92, 155, 8, 7, (95, 155), "wall_plaster", "roof_thatch"),
+]
+
+## Extensions: a second roof over part of a building, because a building that
+## grew has a seam. The tavern is the case Kevin named -- "timber-framed with
+## plaster infill because it was cheap and got extended twice" -- and one
+## rectangle of pantile over the east third of a thatched roof says that in a
+## way no amount of footprint variation can. It is the cheapest piece of history
+## in the town and it costs four lines.
+##
+## (building id, x, y, w, h, roof)
+EXTENSIONS = [
+    ("tavern", 143, 146, 4, 9, "roof_pantile"),
+    ("farmhouse", 108, 105, 11, 3, "roof_slate"),
 ]
 
 OUTBUILDINGS = [
     (100, 100, 5, 4, "roof_thatch"),      # the barn, in the fields
     (101, 105, 4, 3, "roof_thatch"),      # the byre
     (150, 124, 3, 3, "roof_pantile"),     # the inn's stable, off the back lane
-    (156, 125, 3, 3, "roof_pantile"),
     (137, 156, 4, 3, "roof_thatch"),      # the tavern's brewhouse
     (148, 155, 3, 3, "roof_thatch"),
     (128, 123, 3, 3, "roof_slate"),       # the mill's cart shed
-    (108, 138, 3, 3, "roof_thatch"),      # the woodshed behind the girl's
+    (109, 137, 3, 3, "roof_thatch"),      # the woodshed behind the girl's
     (80, 137, 3, 3, "roof_thatch"),       # and behind the guy's
     (155, 142, 3, 3, "roof_slate"),       # the store's stock shed
 ]
@@ -740,10 +773,27 @@ def vale_plan():
         streets[c] = "floor_stone"
 
     buildings = []
+    extension_roof = {}
     for (bid, x, y, w, h, door, wall, roof) in BUILDINGS:
+        foot = _rect(x, y, w, h)
+        # The doorstep is derived, never declared: it is the neighbour of the
+        # door that is not part of the building. A hand-written doorstep is a
+        # second statement of where the door is, and the two drift.
+        step = [(door[0] + dx, door[1] + dy)
+                for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))
+                if (door[0] + dx, door[1] + dy) not in foot]
+        ext = set()
+        for (eid, ex, ey, ew, eh, eroof) in EXTENSIONS:
+            if eid != bid:
+                continue
+            patch = _rect(ex, ey, ew, eh) & foot
+            ext |= patch
+            for c in patch:
+                extension_roof[c] = eroof
         buildings.append(dict(id=bid, x=x, y=y, w=w, h=h, door=door,
-                              wall=wall, roof=roof,
-                              foot=_rect(x, y, w, h), ring=_ring(x, y, w, h),
+                              doorstep=step[0], wall=wall, roof=roof,
+                              foot=foot, ring=_ring(x, y, w, h),
+                              extensions=ext,
                               inside=_rect(x + 1, y + 1, w - 2, h - 2)))
     sheds = [dict(x=x, y=y, w=w, h=h, roof=m, foot=_rect(x, y, w, h))
              for (x, y, w, h, m) in OUTBUILDINGS]
@@ -755,19 +805,33 @@ def vale_plan():
         built |= s["foot"]
 
     return dict(water=water, barrier=barrier, bridges=bridges, streets=streets,
+                extension_roof=extension_roof,
                 buildings=buildings, sheds=sheds, built=built,
                 square=_rect(*SQUARE), fort_wall=set(FORT_WALL),
                 gate=FORT_GATE, pond=_blob(*POND),
                 brook=_grow(_poly(BROOK_N), 1) | _grow(_poly(BROOK_S), 1) | _blob(*POND))
 
 
-def stamp_vale(world, plan):
-    """Water, boundary and bridges. Called before the town and again after the
-    roads, because the whole point of the boundary is that nothing may reopen
-    it -- and a road carver is exactly the kind of later pass that would."""
+def stamp_vale(world, plan, only=None):
+    """Water, boundary and bridges.
+
+    Called twice. The second time is after the roads, because a road carver is
+    exactly the kind of later pass that reopens a boundary -- it lays dirt in a
+    plus around every cell it walks, so a road running ALONGSIDE the hedge
+    paints over it without ever entering it.
+
+    `only` scopes that second pass. It has to be scoped: outside the vale a road
+    is allowed to bridge the Wend, and a blanket re-stamp would put the river
+    back over its own bridge and cut the west of the world off. Ask for the
+    unreachable-anchor failure that taught this; it is not visible in a picture.
+    """
     for (x, y) in plan["water"]:
+        if only is not None and (x, y) not in only:
+            continue
         world.put(x, y, T["water"])
     for (x, y) in plan["barrier"]:
+        if only is not None and (x, y) not in only:
+            continue
         # A thorn hedge and a field boundary, drawn as closed canopy: it is the
         # material the tileset already has for "you go round this, not through
         # it", and it costs no props, which matters when the boundary is 300
@@ -820,6 +884,8 @@ def stamp_town(world, plan):
     for b in plan["buildings"]:
         for (x, y) in b["foot"]:
             world.put(x, y, T[b["roof"]])
+        for (x, y) in b["extensions"]:
+            world.put(x, y, T[plan["extension_roof"][(x, y)]])
         for (x, y) in b["ring"]:
             world.put(x, y, T[b["wall"]])
         world.put(b["door"][0], b["door"][1], T["door"])
@@ -1063,8 +1129,16 @@ def house_plan(cells):
             ("table", 8, 9), ("chair", 7, 9), ("chair_pulled", 9, 9),
             ("table", 1, 11), ("chair", 2, 10), ("chair", 2, 11),
             ("floor_lamp", 3, 12), ("book_open", 2, 12),
-            ("barrel", 11, 10), ("crate", 10, 12), ("bench", 6, 12),
-            # and the boots by the front door, with the dog beside them
+            ("barrel", 11, 10), ("crate", 10, 12), ("bench", 5, 12),
+            # and the boots by the front door, with the dog beside them.
+            #
+            # The bench used to be at (6,12), directly SOUTH of the dog, and on
+            # the device that read as the dog standing on the furniture: a prop
+            # is drawn 96 px tall in a 32 px cell and the cells are painted
+            # north to south, so anything south of a prop is drawn over the
+            # bottom two thirds of it. The dog is a live sprite, so he is the
+            # one it shows on. It is checked now rather than remembered -- see
+            # the interactables assertion in main().
             ("boots", 7, 12), ("dog", 6, 11),
             # -- the pantry ----------------------------------------------------
             # The one room that is allowed to read as storage, because storage is
@@ -1152,7 +1226,18 @@ def stamp_summit(world, cells):
     world.put(cx, cy - 6, T["door"])
 
 
-def reachable(world, start):
+ORTHOGONAL = ((1, 0), (-1, 0), (0, 1), (0, -1))
+## Eight-way, INCLUDING corner-cutting. #84 has diagonal movement on the table
+## and docs/PROCGEN-RESEARCH.md §2.5 names the hazard exactly: on a diagonal
+## grid a one-tile river is crossable at any kitty-corner pinch, so a boundary
+## proved with a four-way fill is not proved at all. Every seal in this file is
+## checked with BOTH relations and the barrier is built wide enough to survive
+## the harsher one; that way the answer does not change on the day the movement
+## code does.
+DIAGONAL = ORTHOGONAL + ((1, 1), (1, -1), (-1, 1), (-1, -1))
+
+
+def reachable(world, start, moves=ORTHOGONAL):
     """Every cell you can actually walk to from the spawn.
 
     Generated worlds are full of places that look connected and are not, and a
@@ -1169,7 +1254,7 @@ def reachable(world, start):
         if not world.walkable(x, y):
             continue
         seen.add(cell)
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        for dx, dy in moves:
             nxt = (x + dx, y + dy)
             if nxt not in seen:
                 stack.append(nxt)
@@ -1290,7 +1375,7 @@ def encode(tiles):
     return base64.b64encode(zlib.compress(raw, 9)).decode("ascii")
 
 
-def scatter_props(world, elev, rng, reach, plane):
+def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
     """Put things in the world.
 
     The measured failure was that half of all possible screens showed exactly
@@ -1322,6 +1407,14 @@ def scatter_props(world, elev, rng, reach, plane):
                 # Never on a road or in a doorway: those are the two places the
                 # player is guaranteed to be walking through.
                 if world.at(cx, cy) in (T["path_dirt"], T["door"], T["bridge"]):
+                    return False
+                # And never on a doorstep. The door cell is refused above, but
+                # the cell you land on when you come out of it is ordinary grass
+                # and a scattered tree took four of them -- which is a building
+                # nobody can enter and, for the house, nowhere for Spite to
+                # stand. Passed in rather than derived, because this function
+                # knows about materials and nothing about doors.
+                if (cx, cy) in keep_clear:
                     return False
         return True
 
@@ -1494,13 +1587,13 @@ def town_props(plan):
     # -- High Street: the lit spine of the parish ------------------------------
     add("street_lamp", (126, 131), (140, 126), (154, 131))
     add("lamppost", (133, 126), (147, 126), (122, 131))
-    add("milestone", (159, 131))
+    add("milestone", (158, 131))
     add("signpost", (130, 126))
     add("trash_can", (150, 131))
     add("bench", (137, 126))
 
     # -- shop fronts. The sign is how a building says what it sells ------------
-    add("sign_shop", (147, 135),                   # the general store
+    add("sign_shop", (147, 138),                   # the general store
         (139, 145),                                # the tavern
         (142, 124),                                # the commonhouse
         (124, 122),                                # the mill
@@ -1522,39 +1615,43 @@ def town_props(plan):
     add("cart", (131, 123))
     add("crate", (132, 122), (133, 123))
     add("barrel", (120, 123), (121, 122))
-    add("bench", (117, 124))                       # somebody sits and watches it
-    add("reed_bed", (105, 118), (106, 121), (119, 110), (117, 122),
-        (103, 114), (121, 118))
+    add("bench", (112, 123))                       # somebody sits and watches it
+    add("reed_bed", (104, 115), (105, 119), (108, 122), (113, 110),
+        (118, 112), (119, 119))
 
     # -- the fields: what a farm looks like from the road ----------------------
-    add("haystack", (106, 108), (110, 109), (99, 106), (96, 101))
-    add("cart", (107, 98))
-    add("crate", (105, 99))
-    add("field_gate", (119, 98))
-    add("fence_rail", *[(x, 97) for x in range(120, 132)])
-    add("fence_rail", *[(133, y) for y in range(98, 103)])
-    add("washing_line", (105, 97))
+    add("haystack", (106, 108), (108, 109), (99, 106), (96, 101))
+    add("cart", (107, 103))
+    add("crate", (105, 104))
+    # A paddock corner rather than a fence line: two short runs and a gate, so
+    # it reads as an enclosure without being a second boundary. A long solid run
+    # of props inside the vale can strand land behind it, which the flood fill
+    # would catch -- but the honest fix is not to build one.
+    add("fence_rail", *[(97, y) for y in range(103, 109)])
+    add("fence_rail", *[(x, 109) for x in range(98, 104)])
+    add("field_gate", (97, 109))
+    add("washing_line", (106, 102))
 
     # -- the mayor's garden. Nobody else in town has a fence in front ----------
     add("fence_rail", *[(x, 162) for x in range(132, 144) if x != 138])
-    add("plant_pot", (136, 163), (140, 163))
+    add("plant_pot", (135, 163), (141, 163))
     add("bench", (134, 163))
-    add("lamppost", (138, 163))
+    add("lamppost", (140, 163))
 
     # -- the hamlet: four cottages and the evidence that people live in them ---
-    add("washing_line", (85, 150), (101, 147), (97, 153))
+    add("washing_line", (86, 149), (107, 146), (97, 153))
     add("boots", (83, 149))
-    add("bench", (93, 153), (109, 149))
-    add("crate", (86, 143), (106, 141))
+    add("bench", (93, 153), (110, 149))
+    add("crate", (86, 145), (107, 138))
     add("barrel", (86, 144))
     add("street_lamp", (91, 149))
-    add("lamppost", (105, 149))
-    add("plant_pot", (95, 154), (110, 141))
+    add("lamppost", (104, 149))
+    add("plant_pot", (93, 154), (111, 141))
     add("cart", (99, 152))
     # The empty house gets NO lamp, no washing and a bramble across the path.
     # An absence is the cheapest characterisation there is.
-    add("bramble", (104, 157), (108, 157), (101, 161))
-    add("crate", (110, 160))
+    add("bramble", (102, 157), (104, 157), (110, 161))
+    add("crate", (110, 163))
 
     # -- the children's defence -----------------------------------------------
     #
@@ -1564,11 +1661,11 @@ def town_props(plan):
     # between a wall and a place children are holding.
     add("leaf_wall", *plan["fort_wall"])
     add("campfire", (157, 126))
-    add("crate", (156, 125), (158, 124), (157, 132))
-    add("barrel", (156, 133))
-    add("signpost", (158, 133))
-    add("bramble", (155, 135), (156, 122))
-    add("washing_line", (154, 133))
+    add("crate", (156, 125), (158, 126), (159, 132))
+    add("barrel", (156, 127))
+    add("signpost", (159, 131))
+    add("bramble", (160, 134), (159, 124))
+    add("washing_line", (159, 133))
     return out
 
 
@@ -1615,7 +1712,7 @@ MIN_CLIFF_RUN = 4         # cells; shorter than this reads as a block, not a blu
 MIN_CLIFF_DROP = 0.004    # elevation, so a cliff only forms on genuinely steep ground
 
 
-def cliff_plane(steps, elev):
+def cliff_plane(steps, elev, graded=frozenset()):
     """Where the ground steps down hard enough and far enough to be a cliff.
 
     Returns a plane the renderer draws directly rather than a rule it has to
@@ -1632,18 +1729,33 @@ def cliff_plane(steps, elev):
       the drop must be long      — a bluff three cells wide is a crate
 
     1 left end, 2 middle, 3 right end.
+
+    `graded` BREAKS A RUN. A road is a cutting: the terrace is derived from
+    elevation and knows nothing about what has been built on it, so a contour
+    ran an unclimbable face straight across three cells of the Sheep Walk and
+    put 216 cells of the south meadow behind it. Handled here rather than by
+    clearing cells afterwards, because the run codes are positional -- zeroing
+    a middle cell leaves a run with no left end, the Tiled importer normalises
+    it back, and the byte-identical round trip fails on cliffs_b64_deflate.
+    Breaking the run here means each half gets its own ends and its own length
+    test, which is also the correct answer: half a bluff is still a bluff and a
+    two-cell remnant is a crate.
     """
     plane = [[0] * W for _ in range(H)]
+
+    def face(x, y):
+        return (steps[y - 1][x] > steps[y][x]
+                and elev[y - 1][x] - elev[y][x] > MIN_CLIFF_DROP
+                and (x, y) not in graded)
+
     for y in range(1, H):
         x = 0
         while x < W:
-            if not (steps[y - 1][x] > steps[y][x]
-                    and elev[y - 1][x] - elev[y][x] > MIN_CLIFF_DROP):
+            if not face(x, y):
                 x += 1
                 continue
             start = x
-            while (x < W and steps[y - 1][x] > steps[y][x]
-                   and elev[y - 1][x] - elev[y][x] > MIN_CLIFF_DROP):
+            while x < W and face(x, y):
                 x += 1
             if x - start < MIN_CLIFF_RUN:
                 continue
@@ -1822,8 +1934,10 @@ def main():
                avoid=no_cross - door_step)
     # And re-lay the boundary and the town over the top of all of it, because
     # the seal is a promise this file makes and a road is the thing most likely
-    # to break it.
-    stamp_vale(world, vale)
+    # to break it. Scoped to `no_cross`, which is precisely the set no road was
+    # allowed into: outside it the roads' own bridges over the Wend are how the
+    # western half of the world is reachable at all.
+    stamp_vale(world, vale, only=no_cross | vale["bridges"])
     stamp_town(world, vale)
     stamp_house(world, plan)
 
@@ -1836,7 +1950,13 @@ def main():
     # renderer derives the same faces from the same quantisation, so the picture
     # and the collision cannot disagree.
     steps = terrace(elev)
-    cliffs = cliff_plane(steps, elev)
+    # A ROAD IS A CUTTING: wherever somebody has made a road, they have graded
+    # what was in the way. Everything the roads and the streets laid down is
+    # handed to cliff_plane as cells a terrace face may not run through.
+    made = {(x, y) for y in range(H) for x in range(W)
+            if world.at(x, y) in (T["path_dirt"], T["floor_stone"],
+                                  T["bridge"], T["door"])}
+    cliffs = cliff_plane(steps, elev, graded=made)
     faces = {(x, y) for y in range(H) for x in range(W) if cliffs[y][x]}
 
     # The town's own furniture goes down FIRST and the scatter fills in round
@@ -1845,7 +1965,9 @@ def main():
     # and a hand-made list is the wrong one to drop.
     props = [[0] * W for _ in range(H)]
     town_prop_count = stock_town(world, props, vale, rng)
-    scatter_props(world, elev, rng, reach, props)
+    doorsteps = {b["doorstep"] for b in vale["buildings"]}
+    doorsteps |= {plan["door_outside"], plan["spite"]}
+    scatter_props(world, elev, rng, reach, props, keep_clear=doorsteps)
     furnish_house(world, props, plan)
 
     # The collision plane is *derived* from the finished prop plane rather than
@@ -1893,6 +2015,21 @@ def main():
                       for x in range(plan["x0"] - HOUSE_CLEARANCE,
                                      plan["x0"] + plan["w"] + HOUSE_CLEARANCE)}
 
+    # STORY ANCHORS ARE SNAPPED TO GROUND THEY CAN BE STOOD ON.
+    #
+    # region_cells() places them by bearing and radius, which is the right way
+    # to say where a chapter *is* and no way at all to say what is there -- and
+    # the answer, once the world has a river in it, is sometimes water. The
+    # tall grass landed on one stray cell of the Wend's wobbled bank and was
+    # reported as an UNREACHABLE story anchor, which is a build failure and was
+    # the correct one: a chapter you cannot walk to is a run you cannot finish.
+    # Snapping is what HJWorld.nearest_walkable already does at runtime; doing
+    # it here means the data agrees with the engine rather than relying on it.
+    for name in list(cells):
+        if name in ("waking_room", "the_house") or cells[name] in reach:
+            continue
+        cells[name] = nearest_open(cells[name], reach, frozenset())
+
     # Spite stands on the doorstep, and he has to actually be standable on: his
     # reach is `adjacent`, which is the eight cells around him plus his own, so
     # a Spite three cells into the long grass is a Spite you cannot talk to. The
@@ -1911,9 +2048,16 @@ def main():
         return (c in reach and c not in house_cells
                 and c != plan["door_outside"])
 
+    def clear_south(c):
+        x, y = c[0], c[1] + 1
+        return not (0 <= x < W and 0 <= y < H and props[y][x])
+
     spite = (next((c for c in ring if standable(c)
-                   and not props[c[1]][c[0]]
+                   and not props[c[1]][c[0]] and clear_south(c)
                    and ORDER[world.at(*c)] != "path_dirt"), None)
+             or next((c for c in ring if standable(c)
+                      and not props[c[1]][c[0]]
+                      and ORDER[world.at(*c)] != "path_dirt"), None)
              or next((c for c in ring if standable(c)
                       and ORDER[world.at(*c)] != "path_dirt"), None)
              or next((c for c in ring if standable(c)), None))
@@ -1963,15 +2107,190 @@ def main():
 
     stranded = [n for n, c in cells.items() if c not in reach]
 
+    # THE VALE MUST BE SEALED BUT FOR THE FORT.
+    #
+    # This is the standing goal, in flood fills. PROPOSALS/BUILDINGS.md says the
+    # town is bounded by the river on two sides and the farmland on the third,
+    # "and you must pass through [the children's fort] to get out of town" -- so
+    # the boundary IS the gate, and a boundary the player can walk round is not
+    # one. The hole would not be visible in a picture and it would not be
+    # visible in the tile histogram: it would be one cell, put there by some
+    # later pass, exactly as the road once drove seven columns of dirt through
+    # the house's east wall.
+    #
+    # Three fills, because two of them describe a prison rather than a gate.
+    # docs/PROCGEN-RESEARCH.md §2.5 names the third and it is the one everybody
+    # forgets:
+    #
+    #   SHUT, cannot leave   with the gate solid, no cell outside the vale is
+    #                        reachable from the bed.
+    #   OPEN, can leave      with the gate walkable, the world outside IS
+    #                        reachable. A provably enclosed town that stays
+    #                        enclosed when the gate opens is a bug, not a gate.
+    #   SHUT, town usable    with the gate solid, every doorstep in town is
+    #                        still reachable -- the whole first act happens
+    #                        while it is shut.
+    #
+    # And the first is run with BOTH movement relations. #84 has diagonal
+    # movement on the table, and on a diagonal grid a one-cell river is
+    # crossable at any kitty-corner pinch, so a seal proved four-way is not
+    # proved. The Wend is five cells wide and the thorn three for that reason.
+    gate = vale["gate"]
+    VALE_BOX = (68, 86, 170, 192)                 # x0, y0, x1, y1, inclusive
+    OUTSIDE_ANCHORS = ("tall_grass", "long_road", "foothills",
+                       "observatory", "summit")
+
+    def outside(fill):
+        return sorted(c for c in fill
+                      if not (VALE_BOX[0] <= c[0] <= VALE_BOX[2]
+                              and VALE_BOX[1] <= c[1] <= VALE_BOX[3]))
+
+    barred = World(world.tiles, elev)
+    barred.blocked = blocked | {gate}
+    for relation, label in ((ORTHOGONAL, "four-way"), (DIAGONAL, "eight-way")):
+        penned = reachable(barred, spawn, relation)
+        escaped = outside(penned)
+        reached = [n for n in OUTSIDE_ANCHORS if cells[n] in penned]
+        if escaped or reached:
+            raise SystemExit(
+                "the vale is not sealed under %s movement: with the fort gate "
+                "shut, %d cell(s) outside it are reachable from the bed, "
+                "starting at %s%s. The gate is the whole of the early game's "
+                "progression, and a hole anywhere in the Wend, the field fence "
+                "or the thorn bypasses it."
+                % (label, len(escaped), escaped[0] if escaped else "-",
+                   "; anchors reached: " + ", ".join(reached) if reached else ""))
+    penned = reachable(barred, spawn)
+
+    # ...and it has to OPEN. `reach` is the same fill with the gate walkable.
+    if not outside(reach):
+        raise SystemExit(
+            "the fort gate at %s leads nowhere: with it open, nothing outside "
+            "the vale is reachable. A town that stays sealed when the gate "
+            "opens is a prison, not a gate." % (gate,))
+
+    # ...and there must be no POCKETS. This is the house's `stranded` check at
+    # town scale and it is the one that found real bugs: a single crate in the
+    # one-cell gap between the house and the girl next door's cut 737 cells of
+    # the vale -- the whole north-west, the west field and the pond's west
+    # shore -- off from everywhere, and 217 more sat behind the mayor's house
+    # with no lane past it. Land the player can see and never stand on.
+    everywhere = {(x, y) for y in range(H) for x in range(W)
+                  if world.walkable(x, y)}
+    beyond = reachable(barred, (gate[0] + 4, gate[1]))
+    orphaned = everywhere - penned - beyond
+    lumps = []
+    unseen = set()
+    for cell in sorted(orphaned):
+        if cell in unseen:
+            continue
+        lump = set()
+        stack = [cell]
+        while stack:
+            here = stack.pop()
+            if here in unseen or here not in orphaned:
+                continue
+            unseen.add(here)
+            lump.add(here)
+            stack += [(here[0] + dx, here[1] + dy) for dx, dy in ORTHOGONAL]
+        if len(lump) >= 20 and any(VALE_BOX[0] <= c[0] <= VALE_BOX[2]
+                                   and VALE_BOX[1] <= c[1] <= VALE_BOX[3]
+                                   for c in lump):
+            lumps.append(sorted(lump))
+    if lumps:
+        raise SystemExit(
+            "%d pocket(s) of the vale are cut off from both the town and the "
+            "world: %s. A pocket is land the player can see, walk at and never "
+            "stand on."
+            % (len(lumps), "; ".join("%d cells at %s" % (len(l), l[0])
+                                     for l in lumps)))
+
+    # ...and the town has to work while it is shut, because the whole first act
+    # happens before the gate opens.
+    unreached = [b["id"] for b in vale["buildings"]
+                 if b["doorstep"] not in penned]
+    if unreached:
+        raise SystemExit(
+            "%d building(s) have a doorstep nobody can reach with the fort "
+            "shut: %s. A door that opens onto somewhere you cannot walk is a "
+            "building that is not in the town."
+            % (len(unreached), ", ".join(unreached)))
+
     interactables = [{"x": plan["door"][0], "y": plan["door"][1],
                       "type": "front_door", "label": "Front door"},
-                     {"x": spite[0], "y": spite[1], "type": "spite"}]
+                     {"x": spite[0], "y": spite[1], "type": "spite"},
+                     # The fort gate. The physical barricade is stamped by
+                     # stamp_vale; this is what makes the cell in it actually
+                     # shut. Same mechanism as the front door one radius out --
+                     # HJWorld._shut() reads `blocks_until_tag` off the
+                     # catalogue and walkable() returns false, so the town's
+                     # boundary is respected by every path query without the
+                     # movement code knowing a boundary exists. The tag comes
+                     # from the town objective completing, and because run tags
+                     # die with the loop, the children have to be convinced
+                     # again next time -- which is right, the holes are back.
+                     {"x": FORT_GATE[0], "y": FORT_GATE[1],
+                      "type": "leaf_gate", "label": "The barricade"}]
     for (kind, i, j, label) in plan["interactables"]:
         x, y = plan["cell"](i, j)
         entry = {"x": x, "y": y, "type": kind}
         if label:
             entry["label"] = label
         interactables.append(entry)
+
+    # EVERY INTERACTABLE HAS TO BE SOMEWHERE YOU CAN STAND, AND NOTHING MAY BE
+    # DRAWN OVER IT.
+    #
+    # The dog was reported standing on a table. He was not: he was at (6,11) of
+    # the hall with a bench at (6,12), and a prop is a 96 px sprite in a 32 px
+    # cell drawn north to south, so the bench was painted over two thirds of
+    # him. The class of bug is the one that matters -- an interactable's cell
+    # and the furniture pass did not know about each other, and any of the
+    # placements could have landed under a prop. The animals are simply where it
+    # shows, because they are live sprites on top of whatever is there.
+    #
+    # So it is a build failure now, the way a chair that cannot be placed is.
+    # Three conditions, and the third is the one nobody would think of:
+    #   * the cell is walkable, so you can reach the thing;
+    #   * nothing solid stands on it;
+    #   * for anything DRAWN -- an animal, a person -- nothing stands on the
+    #     cell directly south of it, because a 96px prop in a 32px cell is
+    #     painted north-to-south and buries whatever is above it. That is the
+    #     rule that caught the dog under a bench, and it applies to figures
+    #     rather than to every interactable: the fort gate is a cell in a
+    #     barricade with barricade necessarily south of it, and it has no
+    #     sprite of its own to bury. Over-applying it forbids the one placement
+    #     the town's whole boundary depends on.
+    drawn_over = []
+    animals = {"dog", "cat", "spite"}
+    for entry in interactables:
+        ix, iy = entry["x"], entry["y"]
+        # Reach is `adjacent`, so the test is not "can you stand ON it" -- the
+        # stove is a solid prop and always will be -- but "can you stand BESIDE
+        # it".
+        if not any((ix + dx, iy + dy) in reach for dx, dy in ORTHOGONAL):
+            drawn_over.append("%s at (%d,%d) has no walkable cell beside it"
+                              % (entry["type"], ix, iy))
+            continue
+        # Anything drawn as a live sprite has to stand on floor of its own.
+        if entry["type"] in animals and (ix, iy) in blocked:
+            drawn_over.append("%s at (%d,%d) is standing on something solid"
+                              % (entry["type"], ix, iy))
+        if entry["type"] in animals and iy + 1 < H and props[iy + 1][ix]:
+            # props_by_plane() is {plane: {solid, foot}} -- no id, no plane
+            # key. Written against a shape that does not exist, so the report
+            # crashed with a KeyError at the exact moment it had something to
+            # say. PROPS is the list this plane indexes into.
+            plane = props[iy + 1][ix]
+            over = next((c["id"] for c in json.load(open(os.path.join(
+                ROOT, "assets", "tiles", "tiles.json")))["props"]["list"]
+                if int(c.get("plane", -1)) == plane), "something")
+            drawn_over.append("%s at (%d,%d) is drawn over by the %s at (%d,%d) "
+                              "south of it" % (entry["type"], ix, iy, over,
+                                               ix, iy + 1))
+    if drawn_over:
+        raise SystemExit("interactables are in the wrong place:\n  "
+                         + "\n  ".join(drawn_over))
 
     payload = {
         "_comment": "Generated by tools/make_world.py. Do not hand-edit; edit in "
@@ -2036,7 +2355,21 @@ def main():
     solid_props = len(blocked - faces)
     print("props: %d placed (%.1f%% of cells), %d of them solid"
           % (filled, 100.0 * filled / (W * H), solid_props))
-    print("cliff cells: %d" % len(faces))
+    print("cliff cells: %d (%d cells of made road the terrace may not cross)"
+          % (len(faces), len(made)))
+    in_vale = [a for a in anomalies
+               if (a["x"], a["y"]) in penned]
+    print("the vale: %d walkable cells behind the Wend, the field fence and the "
+          "thorn" % len(penned))
+    print("  %d buildings + %d outbuildings, %d street cells, %d water cells, "
+          "%d cells of boundary"
+          % (len(vale["buildings"]), len(vale["sheds"]), len(vale["streets"]),
+             len(vale["water"]), len(vale["barrier"])))
+    print("  %d town props placed by hand; the fort gate is at %s and %d "
+          "anomalies are inside the vale"
+          % (town_prop_count, vale["gate"], len(in_vale)))
+    print("  sealed under four-way AND eight-way movement with the gate shut; "
+          "opens to %d outside cells when it is not" % len(outside(reach)))
     house_anom = [a for a in anomalies if a.get("area") == "waking_room"][0]
     print("house: %dx%d at (%d,%d), %d walkable cells inside, sealed but for the door"
           % (plan["w"], plan["h"], plan["x0"], plan["y0"], len(inside)))
