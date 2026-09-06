@@ -1,0 +1,2 @@
+Something interesting I'd like to play with here is a reversal of the typical "night time is scary" and maybe think about what it would be like if night time was peaceful and daytime was scary. This penalyzes players playing during the day subtly by having them encounter more bad guys and having less access to quests. Maybe this is region specific. In home town, things are normal, but the player runs across another town later that has this inverted schedule.
+

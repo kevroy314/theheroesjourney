@@ -592,6 +592,61 @@ def world_pass(report, docs, schema):
                          "anomaly at (%s,%s) points at area '%s', which does not exist"
                          % (entry.get("x"), entry.get("y"), target))
 
+    # An interactable typed wrong in Tiled is silently invisible in game: the
+    # placement is there, nothing in the catalogue matches it, and no affordance
+    # ever appears. Exactly the failure mode this tool exists to catch.
+    # gather(), not docs_in(): the catalogue is a list inside one file under
+    # data/content, not a directory of files the way areas are. docs_in would
+    # find nothing and report every placement as untyped, which is a validator
+    # that fails loudly about itself.
+    kinds = set()
+    for _origin, record, _trail in gather(docs, schema["types"]["interactables"]):
+        kinds.add(record.get("id"))
+    for entry in world.get("interactables", []):
+        kind = entry.get("type")
+        if kind not in kinds:
+            report.error("data/world/overworld.json",
+                         "interactable at (%s,%s) is type '%s', which is in no catalogue"
+                         % (entry.get("x"), entry.get("y"), kind))
+
+    # The light contract. assets/tiles/tiles.json is where the art says where
+    # the lamps are; scripts/ui/Lighting.gd is the only thing that reads it, and
+    # it reads it by key. So a misspelt field does not draw a wrong light, it
+    # draws no light at all, and a stove that has quietly stopped glowing is the
+    # kind of loss nobody notices until somebody asks why the kitchen is dark.
+    spec_light = spec.get("prop_light", {})
+    hexcolour = re.compile(r"^#[0-9A-Fa-f]{6}$")
+    emitters = set()
+    for prop in tiles["props"]["list"]:
+        light = prop.get("light")
+        if light is None:
+            continue
+        emitters.add(prop["plane"])
+        where = "prop '%s' light" % prop["id"]
+        for key in spec_light.get("required", []):
+            if key not in light:
+                report.error("assets/tiles/tiles.json",
+                             "%s is missing '%s'" % (where, key))
+        radius = light.get("radius")
+        if isinstance(radius, bool) or not isinstance(radius, (int, float)) or radius <= 0:
+            report.error("assets/tiles/tiles.json",
+                         "%s radius is %r; it must be a number greater than 0"
+                         % (where, radius))
+        colour = light.get("color")
+        if not isinstance(colour, str) or not hexcolour.match(colour):
+            report.error("assets/tiles/tiles.json",
+                         "%s color is %r; it must be #RRGGBB" % (where, colour))
+        flicker = light.get("flicker")
+        if isinstance(flicker, bool) or not isinstance(flicker, (int, float)) \
+                or not 0.0 <= flicker <= 1.0:
+            report.error("assets/tiles/tiles.json",
+                         "%s flicker is %r; it must be between 0.0 and 1.0"
+                         % (where, flicker))
+        for key in light:
+            if key not in spec_light.get("required", []):
+                report.warn("assets/tiles/tiles.json",
+                            "%s carries '%s', which nothing reads" % (where, key))
+
     order = tiles["order"]
     walkable = tiles["walkable"]
     width, height = int(world["w"]), int(world["h"])
@@ -659,6 +714,14 @@ def world_pass(report, docs, schema):
             report.warn("assets/tiles/tiles.json",
                         "prop '%s' does not appear in the world: %s" % (prop["id"], reason))
 
+    # A declared light nobody ever placed lights nothing. Checking the placement
+    # as well as the declaration is the same argument as the prop check above:
+    # ground truth is the plane the generator produced, not the rule it follows.
+    if emitters and plane and not (emitters & set(plane)):
+        report.warn("data/world/overworld.json",
+                    "%d props declare a light and not one of them is placed "
+                    "anywhere in the world" % len(emitters))
+
 
 def _plane(world, key, expected):
     """One byte per cell, or None when the key is absent or malformed."""
@@ -716,6 +779,12 @@ def main():
     reconcile(report, schema, arms(game, "tap_node"), "node_types", "Game.tap_node")
     reconcile(report, schema, arms(outcomes, "_award"), "loot_types", "HJOutcomes._award")
     reconcile(report, schema, const_dict_keys(main_gd, "SCREENS"), "screens", "Main.SCREENS")
+    # Dialogue lines, dialogue replies and objective rewards all carry effects,
+    # and Objectives.apply_effects is the single implementation -- three of its
+    # arms delegate to Game.apply_effects rather than paying a second way.
+    objectives_gd = os.path.join(SCRIPTS, "autoload", "Objectives.gd")
+    reconcile(report, schema, arms(objectives_gd, "apply_effects"), "story_effects",
+              "Objectives.apply_effects")
 
     hook_names = set()
     for path in gd_sources():

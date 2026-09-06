@@ -449,6 +449,65 @@ static func nav_bar(omit: String = "") -> Control:
 	return row
 
 
+## Every buff currently running, as icons with a countdown.
+##
+## A buff the player cannot see is a number that changed for no reason. The
+## Boon of the White Room is the case that proves it: walking is free, and
+## without a mark on screen the only evidence is a counter that fails to move.
+##
+## Self-updating rather than rebuilt by its parent — it has to tick a countdown
+## once a second and redraw when a buff lands or lapses, and making every screen
+## that shows it remember to do both is how one of them ends up stale.
+class BuffStrip extends HBoxContainer:
+	func _init() -> void:
+		add_theme_constant_override("separation", 6)
+
+	func _ready() -> void:
+		Buffs.changed.connect(_rebuild)
+		Events.tick.connect(_rebuild)
+		_rebuild()
+
+	func _exit_tree() -> void:
+		if Buffs.changed.is_connected(_rebuild):
+			Buffs.changed.disconnect(_rebuild)
+		if Events.tick.is_connected(_rebuild):
+			Events.tick.disconnect(_rebuild)
+
+	func _rebuild() -> void:
+		for child in get_children():
+			child.queue_free()
+		for b in Buffs.active():
+			add_child(_pill(b))
+		visible = get_child_count() > 0
+
+	func _pill(b: Dictionary) -> Control:
+		var left := int(b.get("seconds_left", -1))
+		# Under a minute is where a countdown earns its place; above that the
+		# exact second is noise and the shape of the number changing every tick
+		# is worse than a coarse read.
+		var role := "warn" if left >= 0 and left < 300 else "accent"
+		var pill := PanelContainer.new()
+		pill.add_theme_stylebox_override("panel", HJUI.stylebox(
+			Palette.ca("panel_alt", 0.9), HJUI.RADIUS, Palette.c(role), 2))
+		var row: HBoxContainer = HJUI.hbox(6)
+		row.add_theme_constant_override("separation", 6)
+		var pad := MarginContainer.new()
+		for side in ["left", "right"]:
+			pad.add_theme_constant_override("margin_" + side, 8)
+		for side in ["top", "bottom"]:
+			pad.add_theme_constant_override("margin_" + side, 4)
+		var mark := String(b.get("icon", ""))
+		if HJUI.has_icon(mark):
+			row.add_child(HJUI.icon(mark, 24, role))
+		row.add_child(HJUI.label(String(b.get("name", "")), HJUI.FS_TINY, role))
+		if left >= 0:
+			row.add_child(HJUI.label(HJClock.format_remaining(left), HJUI.FS_TINY, "muted"))
+		pad.add_child(row)
+		pill.add_child(pad)
+		pill.tooltip_text = String(b.get("desc", ""))
+		return pill
+
+
 ## An icon centred inside a Button, which lays out no children of its own.
 static func _centred_icon(id: String) -> Control:
 	var wrap := CenterContainer.new()

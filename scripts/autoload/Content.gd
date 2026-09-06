@@ -27,7 +27,18 @@ var rooms: Array = []
 ## and weight at the moment you step into one.
 var anomalies: Array = []
 var palace: Dictionary = {}
+## Buffs are modifier bundles with an expiry; interactables are the catalogue of
+## things in the world you can act on. Both loaded here rather than by a
+## side-loader so the in-game validator sees them like everything else.
+var buffs: Array = []
+var interactables: Array = []
 var config: Dictionary = {}
+## Who talks, and what they say. See scripts/autoload/Dialogue.gd.
+var speakers: Dictionary = {}     ## id -> speaker
+var dialogues: Dictionary = {}    ## id -> conversation graph
+## What you are trying to do. See scripts/autoload/Objectives.gd.
+var objectives: Dictionary = {}   ## id -> objective
+var objective_order: Array = []   ## authored order, for the Hearth
 
 var _loaded := false
 
@@ -98,6 +109,10 @@ func load_all() -> void:
 			anomalies.append_array(doc["anomalies"])
 		if doc.has("palace"):
 			palace.merge(doc["palace"], true)
+		if doc.has("buffs"):
+			buffs.append_array(doc["buffs"])
+		if doc.has("interactables"):
+			interactables.append_array(doc["interactables"])
 		if doc.has("axes"):
 			achievements = doc
 		for t in doc.get("trinkets", []):
@@ -108,6 +123,27 @@ func load_all() -> void:
 			items[i["id"]] = i
 			if not item_order.has(i["id"]):
 				item_order.append(i["id"])
+
+	for file_name in list_json(DATA_ROOT + "/dialogue"):
+		var doc: Variant = read_json(DATA_ROOT + "/dialogue/" + file_name)
+		if not (doc is Dictionary):
+			continue
+		for s in doc.get("speakers", []):
+			_claim(speakers, String(s["id"]), "speaker")
+			speakers[s["id"]] = s
+		for d in doc.get("dialogues", []):
+			_claim(dialogues, String(d["id"]), "dialogue")
+			dialogues[d["id"]] = d
+
+	for file_name in list_json(DATA_ROOT + "/objectives"):
+		var doc: Variant = read_json(DATA_ROOT + "/objectives/" + file_name)
+		if not (doc is Dictionary):
+			continue
+		for o in doc.get("objectives", []):
+			_claim(objectives, String(o["id"]), "objective")
+			objectives[o["id"]] = o
+			if not objective_order.has(o["id"]):
+				objective_order.append(o["id"])
 
 	# Cheapest first, so the free starter pack heads the list in Camp.
 	pack_order.sort_custom(func(a, b): return int(packs[a].get("cost", 0)) < int(packs[b].get("cost", 0)))
@@ -160,6 +196,21 @@ func movement(id: String) -> Dictionary:
 
 func area(id: String) -> Dictionary:
 	return areas.get(id, {})
+
+
+func buff(id: String) -> Dictionary:
+	return _by_id(buffs, id)
+
+
+func interactable(id: String) -> Dictionary:
+	return _by_id(interactables, id)
+
+
+static func _by_id(pool: Array, id: String) -> Dictionary:
+	for entry in pool:
+		if String(entry.get("id", "")) == id:
+			return entry
+	return {}
 
 
 func echo(id: String) -> Dictionary:

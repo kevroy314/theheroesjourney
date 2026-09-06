@@ -14,6 +14,7 @@ const SCREENS := {
 	"workshop": preload("res://scripts/screens/WorkshopScreen.gd"),
 	"stores": preload("res://scripts/screens/StoresScreen.gd"),
 	"hearth": preload("res://scripts/screens/HearthScreen.gd"),
+	"dialogue": preload("res://scripts/screens/DialogueScreen.gd"),
 	"observatory": preload("res://scripts/screens/ObservatoryScreen.gd"),
 	"area": preload("res://scripts/screens/AreaScreen.gd"),
 	"overworld": preload("res://scripts/screens/OverworldScreen.gd"),

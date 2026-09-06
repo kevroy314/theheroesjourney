@@ -4,7 +4,9 @@
 > export documented below is a development preview: it is how a UI change
 > is checked in a browser in seconds, and what the self-test drives. It has
 > no step counter behind it, so it cannot run the actual game loop. See
-> the **Android** section for how the app is really built and shipped.
+> the **Android** section for how the app is really built and shipped, and
+> [`TESTING-ON-DEVICE.md`](TESTING-ON-DEVICE.md) for running that build on
+> the emulator before it reaches a phone.
 
 ```bash
 npm run build        # export + content-hash + precompress + serve
@@ -137,6 +139,10 @@ the version it just built — so the numbers in the APK and in `releases.json`
 come from the same place and cannot disagree. Everything below about *cutting*
 a release is what that call does; you only run it by hand to re-publish a build
 you already have.
+
+`--apk-only --no-publish` is the emulator loop: it builds the one artefact
+`npm run emu:install` looks for, and skips the AAB and the publish. See
+[`TESTING-ON-DEVICE.md`](TESTING-ON-DEVICE.md).
 
 It exports twice, because `gradle_build/export_format` in `[preset.2]` is the
 only thing that decides APK vs AAB and there is no CLI override. The script

@@ -1,0 +1,127 @@
+{
+  "_comment": "Spite already exists in data/content/spite.json as a weighted table of one-line drive-bys with a mechanical effect each — that is the random encounter *inside* an anomaly, and it stays exactly as it is. This is the other thing he is: an authored, once-only conversation on the front step, which hands over the town objective and the Finder. The two sit beside each other and share the character rather than the machinery. `mood` on a node names one of the alters in spite.json, so this is the same person in both places.",
+
+  "speakers": [
+    {
+      "id": "spite",
+      "name": "Spite",
+      "portrait": "spite",
+      "accent": "warn",
+      "desc": "The part of you that sneers. Not a villain — the loudest thing left over when you talk yourself out of something."
+    }
+  ],
+
+  "dialogues": [
+    {
+      "id": "spite_doorstep",
+      "speaker": "spite",
+      "once": true,
+      "start": "arrival",
+      "_comment": "Beat 6. Forced, first run only, the moment the front door opens.",
+      "nodes": [
+        {
+          "id": "arrival",
+          "mood": "wary",
+          "lines": [
+            "Someone is sitting on your step with their back to the door. They do not get up.",
+            "\"Four hundred and six,\" they say. \"That's how many times you have opened that door. You always look so pleased with yourself about it.\"",
+            "\"I'm Spite. You have heard the voice. This is the face that goes with it.\""
+          ],
+          "replies": [
+            { "text": "\"What do you want?\"", "goto": "want" },
+            { "text": "\"Four hundred and six?\"", "goto": "count" },
+            { "text": "Say nothing.", "goto": "silence" }
+          ]
+        },
+        {
+          "id": "count",
+          "mood": "wary",
+          "lines": [
+            "\"Give or take. I stop counting when it starts getting embarrassing for you.\"",
+            "\"You get further some times than others. You have never once got far enough.\""
+          ],
+          "next": "want"
+        },
+        {
+          "id": "silence",
+          "mood": "kind",
+          "lines": [
+            "They look at you for a long moment, and something in the face gives.",
+            "\"Fine. You are not in the mood. Neither, frankly, am I.\""
+          ],
+          "next": "want"
+        },
+        {
+          "id": "want",
+          "mood": "wary",
+          "lines": [
+            "\"What do I want. I want you to stop stopping.\"",
+            "\"Look at the town. Actually look at it. It is full of holes.\"",
+            "\"Every one of them is a door into a version of you that did the thing. Shut them. All of them. Then we can have a conversation about the mountain.\""
+          ],
+          "effects": [
+            { "type": "objective", "objective": "close_town_anomalies" }
+          ],
+          "replies": [
+            { "text": "\"How many are there?\"", "goto": "how_many" },
+            { "text": "\"Why do you care?\"", "goto": "why" },
+            { "text": "\"Fine.\"", "goto": "gift" }
+          ]
+        },
+        {
+          "id": "how_many",
+          "mood": "wary",
+          "lines": [
+            "\"Enough that you will want to quit halfway. Not so many that quitting is reasonable.\""
+          ],
+          "next": "gift"
+        },
+        {
+          "id": "why",
+          "mood": "kind",
+          "lines": [
+            "\"Because I am what is left over when you talk yourself out of things,\" they say. \"There is a great deal of me. I would like there to be less.\""
+          ],
+          "next": "gift"
+        },
+        {
+          "id": "gift",
+          "mood": "kind",
+          "lines": [
+            "They press something into your hand: a flat disc, warm, twitching very slightly, as though it is trying to point.",
+            "\"It gets louder near a hole. It also lies. Not enough to be useless, just enough that you still have to walk.\""
+          ],
+          "effects": [
+            { "type": "item", "item": "finder", "silent": true },
+            { "type": "log", "text": "Spite presses the Finder into your hand.", "kind": "good" }
+          ],
+          "replies": [
+            {
+              "text": "\"I have been out past the foothills. I do not need a compass.\"",
+              "when": { "zone_gte": 2 },
+              "goto": "smug"
+            },
+            { "text": "Take it.", "goto": "end" }
+          ]
+        },
+        {
+          "id": "smug",
+          "mood": "wary",
+          "lines": [
+            "\"You have been past the foothills the way a stone has been past a window.\""
+          ],
+          "next": "end"
+        },
+        {
+          "id": "end",
+          "mood": "wary",
+          "lines": [
+            "\"Go on, then. I will be around.\"",
+            "\"That is rather the problem.\""
+          ],
+          "end": true
+        }
+      ]
+    }
+  ]
+}

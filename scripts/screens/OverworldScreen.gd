@@ -72,6 +72,11 @@ func build() -> void:
 		chips.add_child(HJUI.chip("Burn", "%.1fx" % Steps.burn, "danger", "deadline"))
 	v.add_child(chips)
 
+	# Beside the budget, because every buff currently in the game changes what
+	# walking costs or what it earns. A buff the player cannot see is a number
+	# that changed for no reason.
+	v.add_child(HJUI.BuffStrip.new())
+
 	_world = HJTileWorld.new(run, run.world_pos)
 	_world.node_entered.connect(_on_node)
 	_world.blocked.connect(_on_blocked)
@@ -84,7 +89,7 @@ func build() -> void:
 		if run.anomalies_cleared.has(key):
 			_world.collapse_anomaly(run.world_pos)
 	# The world does not reset when the screen does. Remember where he stopped.
-	_world.moved.connect(func(cell: Vector2i) -> void: run.world_pos = cell)
+	_world.moved.connect(_on_moved)
 	# The map is the screen. Everything else is a strip around it, so the world
 	# takes whatever the strips leave and never less than a usable window.
 	_world.custom_minimum_size.y = 300
@@ -99,6 +104,8 @@ func build() -> void:
 	v.add_child(_pad)
 
 	_sync_budget()
+	if run.world_pos.x >= 0:
+		_offer_nearby.call_deferred(run.world_pos)
 
 
 ## Connected here rather than in build(): build() runs on every rebuild, and
@@ -259,6 +266,63 @@ func _sync_budget() -> void:
 		_where.text = Steps.describe()
 
 
+## Every step. Three things hang off it, and the order matters: remember where
+## we are, let the tutorial see the threshold before anything else reacts to it,
+## then offer whatever is within arm's reach.
+func _on_moved(cell: Vector2i) -> void:
+	var run: HJRun = Game.run
+	if run == null:
+		return
+	run.world_pos = cell
+	Game.tutorial.note_moved(cell)
+	_offer_nearby(cell)
+
+
+## The thing you are standing next to, as the primary action.
+##
+## Reuses the same button the node affordance uses, because a screen with two
+## "the important one" buttons has none. A node underfoot wins — you walked onto
+## it deliberately — and otherwise the nearest interactable takes the slot.
+func _offer_nearby(cell: Vector2i) -> void:
+	if _act == null or not is_instance_valid(_act):
+		return
+	if _world != null and is_instance_valid(_world) and _world.here() != "":
+		return
+	var near: Array = Game.interactables_near(cell)
+	if near.is_empty():
+		_set_act("Walk to something", false, "")
+		return
+
+	var it: Dictionary = near[0]
+	var label := String(it.get("name", "?"))
+	var verb := String(it.get("verb", "Use"))
+	var cost := int(it.get("cost", 0))
+	var key := String(it.get("key", ""))
+
+	if bool(it.get("spent", false)):
+		_set_act(String(it.get("spent_text", "%s — done" % label)), false, "")
+		return
+	if not bool(it.get("affordable", true)):
+		# Naming the price on a button you cannot press is the point: this is
+		# where the player learns Grit buys the world, and a greyed button with
+		# no number teaches nothing.
+		_set_act("%s — %d %s needed" % [verb, cost, Palette.word("grit")], false, "")
+		return
+
+	var text := verb if cost <= 0 else "%s — %d %s" % [verb, cost, Palette.word("grit")]
+	_set_interact(text, key)
+
+
+func _set_interact(text: String, key: String) -> void:
+	var replacement := HJUI.button(text, "primary")
+	replacement.custom_minimum_size.y = 84
+	replacement.size_flags_vertical = Control.SIZE_SHRINK_END
+	replacement.pressed.connect(func() -> void:
+		if Game.interact(key):
+			refresh())
+	_swap_act(replacement)
+
+
 func _on_blocked() -> void:
 	Events.logged.emit("No steps left. Walk, and the world opens up.", "warn")
 
@@ -283,8 +347,13 @@ func _set_act(text: String, enabled: bool, id: String) -> void:
 	var replacement := HJUI.button(text, "primary" if enabled else "quiet", enabled)
 	replacement.custom_minimum_size.y = 84
 	replacement.size_flags_vertical = Control.SIZE_SHRINK_END
-	if enabled:
+	if enabled and id != "":
 		replacement.pressed.connect(func() -> void: Game.tap_node(id))
+	_swap_act(replacement)
+
+
+## Replace the action button in place, keeping its slot in the layout.
+func _swap_act(replacement: Button) -> void:
 	var parent := _act.get_parent()
 	var index := _act.get_index()
 	parent.remove_child(_act)

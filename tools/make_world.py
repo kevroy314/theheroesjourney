@@ -385,7 +385,8 @@ def solid_ids():
     path = os.path.join(ROOT, "assets", "tiles", "tiles.json")
     if os.path.exists(path):
         return set(json.load(open(path)).get("solid_ids", []))
-    names = ["wall_plaster", "wall_stone", "water", "rock", "void", "forest", "roof"]
+    names = ["wall_plaster", "wall_stone", "wall_timber", "water", "rock",
+             "void", "forest", "roof"]
     return {T[n] for n in names if n in T}
 
 
@@ -507,26 +508,163 @@ def coast_stop(world, bearing):
     return last
 
 
-def stamp_house(world, cells):
-    """The house you wake in.
+# --- the house ----------------------------------------------------------------
+#
+# Beat 1 of docs/FIRST-THIRTY.md is "the player wakes in a house that has walls,
+# an interior floor, furniture, a lit window and a front door that will not
+# open", and the owner's note on the old one was "it doesn't even have walls yet
+# lol". It had four, in the sense that a rectangle has four sides, and then the
+# road carver drove straight through the east one — see the re-stamp in main().
+#
+# What it has now, and why each part is there rather than being one big room:
+#
+#   a BEDROOM   with the bed the player wakes in, on plank flooring with a rug
+#               in front of the bed, so the first tile they stand on is not the
+#               same tile as the last one
+#   a KITCHEN   on tile, with the stove that is the only warm light in the house
+#   a HALL      on boards, running the width of the building, with the front
+#               door at the end of it and the hole in reality somewhere in it
+#
+# Three rooms, three floors, because §5: "each room inside a building has its
+# own floor", and a change of material is what tells you that you have gone
+# somewhere. Two internal walls with three doorways between them, so the space
+# has to be walked rather than seen.
+#
+# All of the geometry is in one function that returns a description, and every
+# other function here reads that description. Nothing computes a wall position
+# twice: the old code worked out the internal wall in stamp_house and worked it
+# out AGAIN, differently and wrongly, in furnish_house, which is how a chair
+# came to be placed inside a wall and silently dropped.
 
-    Restored: the radial rewrite dropped this along with the observatory and the
-    summit, so the first room of the game was an unmarked patch of town square
-    with a bed standing in it. The waking room and the house are the same
-    building — upstairs and down — which is why they share an anchor.
+HOUSE_W, HOUSE_H = 19, 15         # outside dimensions, walls included
+
+
+def house_plan(cells):
+    """Where every wall, floor, doorway and stick of furniture in the house is.
+
+    Interior coordinates (i, j) run 0..16 across and 0..12 down from the cell
+    inside the north-west corner, so the layout below reads as a floor plan and
+    not as a list of magic world coordinates.
     """
     cx, cy = cells["waking_room"]
-    x0, y0, w, h = cx - 8, cy - 7, 17, 14
+    x0, y0 = cx - HOUSE_W // 2, cy - HOUSE_H // 2
+    ix, iy = x0 + 1, y0 + 1                       # origin of the interior grid
+
+    def cell(i, j):
+        return (ix + i, iy + j)
+
+    plan = {
+        "x0": x0, "y0": y0, "w": HOUSE_W, "h": HOUSE_H,
+        "ix": ix, "iy": iy, "iw": HOUSE_W - 2, "ih": HOUSE_H - 2,
+        "cell": cell,
+        # room -> (i0, j0, i1, j1) inclusive, and the material it is floored in
+        "rooms": {
+            "bedroom": ((0, 0, 6, 6), "floor_plank"),
+            "kitchen": ((8, 0, 16, 6), "floor_tile"),
+            "hall":    ((0, 8, 16, 12), "floor_boards"),
+        },
+        # the rug is a patch of a fourth floor inside the bedroom, laid where
+        # the player's feet land when they get out of bed
+        "rug": (1, 4, 4, 6),
+        # internal walls, as runs, and the doorways punched through them
+        "walls": [(7, 0, 7, 6), (0, 7, 16, 7)],
+        "doorways": [(7, 4), (2, 7), (12, 7)],
+        # the front door sits in the south exterior wall; the road stops at the
+        # cell outside it, never inside the building
+        "door": (x0 + HOUSE_W // 2, y0 + HOUSE_H - 1),
+        "door_outside": (x0 + HOUSE_W // 2, y0 + HOUSE_H),
+        # windows are props standing on wall cells, so they are (x, y) already
+        "windows": [(x0 + 4, y0), (x0 + 13, y0),
+                    (x0 + HOUSE_W - 1, y0 + 4), (x0, y0 + 11)],
+        # you wake beside the bed, on the rug, and the hole in reality is in the
+        # hall — Beat 2: "the player does not spawn on the anomaly"
+        "spawn": cell(2, 4),
+        # The one hole in reality inside the house, in the hall, two rooms from
+        # the bed. Beat 2: "the player does not spawn on the anomaly; it is
+        # somewhere else in the house and they have to walk into it."
+        "anomaly": cell(12, 10),
+        # And where to start looking for the second one, out in the yard. It is
+        # resolved against the walkable world in main() rather than fixed here,
+        # because what is outside the south wall is generated terrain.
+        "yard": (x0 + HOUSE_W + 4, y0 + HOUSE_H + 3),
+        # (catalogue id, i, j). Placed by hand rather than scattered, because
+        # this is the first room anyone sees and a randomly positioned bed is
+        # worse than none. Every entry is checked on placement -- see
+        # furnish_house, which now raises rather than dropping a piece.
+        #
+        # The second half of each room's list is §"evidence of use": "a level
+        # should imply an event that already happened. A chair pulled out from a
+        # table. A cup left on the counter. Boots by the door." They cost
+        # nothing, they are the only narrative device in the room, and the old
+        # house used none of them.
+        "furniture": [
+            # bedroom -- somebody got out of this bed and did not make it
+            ("bed", 1, 3), ("chest", 4, 1), ("candle", 5, 1),
+            ("floor_lamp", 6, 5), ("book_open", 0, 5), ("bottle", 0, 1),
+            ("cat", 3, 6), ("chair", 0, 3), ("bookshelf", 6, 1),
+            ("plant_pot", 6, 3), ("boots", 2, 2),
+            # kitchen -- a stove lit, a run of counter, a cup left on the end
+            ("stove", 9, 1), ("counter", 11, 1), ("counter", 12, 1),
+            ("counter", 13, 1), ("cup", 14, 1), ("shelf_open", 16, 1),
+            ("table", 12, 4), ("chair", 11, 4), ("chair_pulled", 13, 4),
+            ("bottle", 14, 4), ("plant_pot", 16, 6), ("barrel", 8, 1),
+            ("crate", 8, 6), ("book_open", 10, 4), ("shelf_open", 16, 3),
+            ("chest", 9, 6),
+            # hall -- and the boots by the front door
+            ("bookshelf", 1, 8), ("chest", 15, 8), ("crate", 13, 9),
+            ("boots", 7, 12), ("plant_pot", 0, 12), ("dog", 5, 11),
+            ("table", 3, 10), ("chair", 2, 10), ("chair_pulled", 4, 10),
+            ("cup", 3, 9), ("bench", 9, 8), ("barrel", 16, 12),
+            ("floor_lamp", 11, 12), ("bottle", 12, 8), ("rug", 8, 11),
+        ],
+        # (type, i, j, label or None). `type` names an entry in
+        # data/content/interactables.json; the world only says where.
+        "interactables": [
+            ("stove", 9, 1, None),
+            ("counter", 12, 1, None),
+            ("cat", 3, 6, None),
+            ("dog", 5, 11, None),
+        ],
+    }
+    return plan
+
+
+def stamp_house(world, plan):
+    """Paint the house. Idempotent, and called twice on purpose.
+
+    The second call is after the roads are carved, and it is not belt and
+    braces: the road to the house used to aim at the house's *centre*, and
+    carve_road lays path_dirt in a plus around every cell it walks, so the
+    generated world had seven columns of road driven through the east wall and
+    out across the bedroom floor. A road may arrive at the doorstep and it may
+    not come in. Aiming it at `door_outside` fixes the intent; re-stamping
+    afterwards makes it true whatever any later pass does.
+    """
+    x0, y0, w, h = plan["x0"], plan["y0"], plan["w"], plan["h"]
+    cell = plan["cell"]
+
     for y in range(y0, y0 + h):
         for x in range(x0, x0 + w):
             edge = x in (x0, x0 + w - 1) or y in (y0, y0 + h - 1)
-            world.put(x, y, T["wall_plaster"] if edge else T["floor_boards"])
-    # An internal wall with a doorway: the room you wake in, and the one with
-    # the kettle in it.
-    for x in range(x0 + 1, x0 + w - 1):
-        if abs(x - cx) > 1:
-            world.put(x, cy, T["wall_plaster"])
-    world.put(cx, y0 + h - 1, T["door"])
+            world.put(x, y, T["wall_timber"] if edge else T["floor_boards"])
+    for (i0, j0, i1, j1), material in plan["rooms"].values():
+        for j in range(j0, j1 + 1):
+            for i in range(i0, i1 + 1):
+                world.put(*cell(i, j), tile=T[material])
+    ri0, rj0, ri1, rj1 = plan["rug"]
+    for j in range(rj0, rj1 + 1):
+        for i in range(ri0, ri1 + 1):
+            world.put(*cell(i, j), tile=T["floor_rug"])
+    for (i0, j0, i1, j1) in plan["walls"]:
+        for j in range(j0, j1 + 1):
+            for i in range(i0, i1 + 1):
+                world.put(*cell(i, j), tile=T["wall_timber"])
+    for (i, j) in plan["doorways"]:
+        # A doorway is a GAP, not a door: the wall's overlay set draws its face
+        # into the opening, which reads as a lintel over your head. A `door`
+        # tile in an internal wall would be a second front door.
+        world.put(*cell(i, j), tile=T["floor_boards"])
+    world.put(plan["door"][0], plan["door"][1], T["door"])
 
 
 def stamp_observatory(world, cells):
@@ -578,6 +716,38 @@ def reachable(world, start):
     return seen
 
 
+## Story anchors whose difficulty is NOT their ring.
+##
+## Difficulty is position everywhere else in this file, and that is the design:
+## the player chooses how hard the game is by choosing how far to walk. The
+## tutorial is the one place it cannot be, because the first anomaly anyone ever
+## steps into has to come out of the easiest pool and the house happens to stand
+## 34 tiles from town, which is ring 1. So this is a short, explicit list of
+## exceptions rather than a rule bent to fit one case.
+FORCED_TIER = {"waking_room": 0}
+
+
+def nearest_open(want, reach, forbid, *keep_clear):
+    """The reachable cell closest to `want` that is not in `forbid` and not
+    within four cells of anything in `keep_clear`."""
+    best = None
+    for radius in range(0, 40):
+        for dy in range(-radius, radius + 1):
+            for dx in range(-radius, radius + 1):
+                if max(abs(dx), abs(dy)) != radius:
+                    continue
+                cell = (want[0] + dx, want[1] + dy)
+                if cell not in reach or cell in forbid:
+                    continue
+                if any(math.hypot(cell[0] - k[0], cell[1] - k[1]) < 4.0
+                       for k in keep_clear):
+                    continue
+                return cell
+        if best:
+            break
+    raise SystemExit("no reachable cell for a yard anomaly near %s" % (want,))
+
+
 def name_anomalies(cells, anomalies):
     """The eight written chapters, as fixed anomalies at their own anchors.
 
@@ -593,19 +763,31 @@ def name_anomalies(cells, anomalies):
         radius = math.hypot(cx - CENTRE[0], cy - CENTRE[1])
         named.append({
             "x": cx, "y": cy,
-            "tier": tier_at(radius),
+            "tier": FORCED_TIER.get(area_id, tier_at(radius)),
             "sector": SECTORS[max(range(4), key=lambda i: sector_weights(polar(cx, cy)[1])[i])][3],
             "area": area_id,
         })
     # A procedural spawn sitting on a story anchor would hide it, so the named
     # ones win their cell.
     taken = {(a["x"], a["y"]) for a in named}
+    # HJWorld._anomaly_at is a Dictionary keyed by cell, so two anomalies on one
+    # cell is not two anomalies -- the second overwrites the first and a written
+    # chapter silently stops existing. `waking_room` and `the_house` shared an
+    # anchor and therefore shared a cell, which is exactly how that happened.
+    if len(taken) != len(named):
+        seen, clashes = {}, []
+        for a in named:
+            key = (a["x"], a["y"])
+            if key in seen:
+                clashes.append("%s and %s both at %s" % (seen[key], a["area"], key))
+            seen[key] = a["area"]
+        raise SystemExit("two story anomalies on one cell: " + "; ".join(clashes))
     return named + [a for a in anomalies
                     if (a["x"], a["y"]) not in taken
                     and all(math.hypot(a["x"] - n["x"], a["y"] - n["y"]) > 8 for n in named)]
 
 
-def place_anomalies(world, rng, reach):
+def place_anomalies(world, rng, reach, forbid=frozenset()):
     """Where the roguelite content lives.
 
     Difficulty is position: the tier of an anomaly is its ring, so the player
@@ -624,7 +806,7 @@ def place_anomalies(world, rng, reach):
             radius = (tier + rng.random()) * RING_WIDTH
             x = int(round(CENTRE[0] + math.cos(angle) * radius))
             y = int(round(CENTRE[1] - math.sin(angle) * radius))
-            if (x, y) not in reach:
+            if (x, y) not in reach or (x, y) in forbid:
                 continue
             if any(math.hypot(x - a["x"], y - a["y"]) < 14 for a in out):
                 continue
@@ -718,31 +900,75 @@ def scatter_props(world, elev, rng, reach):
     return plane, blocked
 
 
-def furnish_house(world, plane, cells):
-    """The bedroom you wake in, which had nothing in it at all.
+def furnish_house(world, plane, plan):
+    """Put the furniture in, and refuse to lose a piece of it.
 
-    Placed by hand rather than scattered, because this is the first thing anyone
-    sees and a randomly positioned bed is worse than none.
+    The old version worked the internal wall out for itself, got it wrong, and
+    then `continue`d past anything that landed on one -- so a chair was placed
+    into a wall and silently dropped, and the only way to find out was to decode
+    the plane and look. Nothing checks `placed` props: they have no density, so
+    the validator's "this prop never appears" warning cannot see them.
+
+    So this reads the geometry out of house_plan rather than recomputing it, and
+    it raises on anything it cannot place. A missing chair is a build failure
+    now, which is the only weight that keeps a hand-placed layout honest.
     """
     manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
-    interior = {p["id"]: p["plane"] for p in manifest["props"]["list"]
+    interior = {p["id"]: p for p in manifest["props"]["list"]
                 if p["biome"] == "placed"}
-    cx, cy = cells["waking_room"]
-    # dy == 0 is the internal wall stamp_house lays down for every x more than
-    # one cell from centre, so a chair at (cx+2, cy) was being placed into a
-    # wall and silently dropped — a piece of furniture that has never existed.
-    # Nothing checks `placed` props, so the only way to find this was to look.
-    layout = [("bed", -2, -1), ("chair", 2, -1), ("table", 3, -2),
-              ("bookshelf", -3, 1), ("chest", 2, 2), ("floor_lamp", -3, -2),
-              ("plant_pot", 3, 2), ("rug", 0, 1)]
-    for name, dx, dy in layout:
-        if dy == 0 and abs(dx) > 1:
-            continue        # would be the internal wall; skip rather than lose it silently
-        if name not in interior:
+    cell = plan["cell"]
+    problems = []
+
+    def put(name, x, y, on_wall=False):
+        prop = interior.get(name)
+        if prop is None:
+            problems.append("%s is not in the catalogue" % name)
+            return
+        if not (0 <= x < W and 0 <= y < H):
+            problems.append("%s at (%d,%d) is off the map" % (name, x, y))
+            return
+        if plane[y][x]:
+            problems.append("%s at (%d,%d) lands on another prop" % (name, x, y))
+            return
+        # A window stands IN a wall; everything else stands on a floor. Anything
+        # else -- furniture on a wall, a window in mid-air -- is the bug this
+        # function exists to catch.
+        material = ORDER[world.at(x, y)]
+        if on_wall:
+            if material != "wall_timber":
+                problems.append("%s at (%d,%d) wants a wall and found %s"
+                                % (name, x, y, material))
+                return
+        elif not world.walkable(x, y):
+            problems.append("%s at (%d,%d) lands on %s, which is not floor"
+                            % (name, x, y, material))
+            return
+        plane[y][x] = prop["plane"]
+
+    for (name, i, j) in plan["furniture"]:
+        put(name, *cell(i, j))
+    for (x, y) in plan["windows"]:
+        put("window_lit", x, y, on_wall=True)
+
+    if problems:
+        raise SystemExit("the house layout is wrong:\n  " + "\n  ".join(problems))
+
+    # The furniture must not seal a room off, and it must not stand on the cell
+    # the player wakes on or the one the anomaly is in. Checked here rather than
+    # trusted, because the failure mode is a run nobody can finish.
+    solid_here = set()
+    for (name, i, j) in plan["furniture"]:
+        prop = interior[name]
+        if not prop["solid"]:
             continue
-        x, y = cx + dx, cy + dy
-        if 0 <= x < W and 0 <= y < H and world.walkable(x, y):
-            plane[y][x] = interior[name]
+        x, y = cell(i, j)
+        for fy in range(prop["foot"][1]):
+            for fx in range(prop["foot"][0]):
+                solid_here.add((x + fx, y - fy))
+    for label in ("spawn", "anomaly"):
+        if plan[label] in solid_here:
+            raise SystemExit("the %s cell has furniture standing on it" % label)
+    return solid_here
 
 
 def terrace(elev, levels=5):
@@ -794,9 +1020,15 @@ def stock_town(world, plane, centre, rng):
     put("well", cx + 1, cy - 2)
     for i, name in enumerate(["market_stall", "cart", "barrel", "crate"]):
         put(name, cx - 6 + i * 3, cy + 4)
-    for offset in (-13, -5, 5, 13):
-        put("lamppost", cx + offset, cy - 9)
-        put("lamppost", cx + offset, cy + 9)
+    # Alternating lamppost and street lamp, because §6: anything that appears
+    # more than ten times needs more than one silhouette, and because a street
+    # that is lit is the single cheapest thing that makes a town read as a town
+    # (§3). Both declare a `light` in the catalogue; neither draws one.
+    for i, offset in enumerate((-13, -5, 5, 13)):
+        kind = "street_lamp" if i % 2 else "lamppost"
+        put(kind, cx + offset, cy - 9)
+        put("lamppost" if kind == "street_lamp" else "street_lamp",
+            cx + offset, cy + 9)
     put("bench", cx - 3, cy - 2)
     put("bench", cx + 4, cy + 2)
     put("standing_stone", cx - 15, cy - 14)
@@ -896,6 +1128,10 @@ def draw_map(world, cells, anomalies, px=3):
         T["bridge"]: mix(C["accent"], C["bg"], 0.55),
         T["floor_stone"]: mix(C["muted"], C["bg"], 0.52),
         T["floor_boards"]: mix(C["accent"], C["bg"], 0.70),
+        T["floor_plank"]: mix(mix(C["accent"], C["warn"], 0.30), C["bg"], 0.66),
+        T["floor_tile"]: mix(mix(C["panel_alt"], C["accent_2"], 0.30), C["bg"], 0.46),
+        T["floor_rug"]: mix(mix(C["danger"], C["accent"], 0.35), C["bg"], 0.62),
+        T["wall_timber"]: mix(C["muted"], C["text"], 0.24),
         T["wall_plaster"]: mix(C["muted"], C["bg"], 0.40),
         T["wall_stone"]: mix(C["muted"], C["bg"], 0.34),
         T["roof"]: mix(C["accent"], C["bg"], 0.60),
@@ -956,8 +1192,16 @@ def main():
     world = World(tiles, elev)
     cells = region_cells()
 
+    plan = house_plan(cells)
+    # `waking_room` is the tutorial's one hole in reality and it is in the hall.
+    # `the_house` used to share the same anchor and therefore the same cell, and
+    # a Dictionary keyed by cell kept only one of them -- so it moves out into
+    # the yard, where it is also the first thing the player can walk to after
+    # Spite. Its exact cell is resolved once the world is walkable; see below.
+    cells["waking_room"] = plan["anomaly"]
+
     stamp_town(world, rng, CENTRE)
-    stamp_house(world, cells)
+    stamp_house(world, plan)
     stamp_observatory(world, cells)
     stamp_summit(world, cells)
 
@@ -966,15 +1210,23 @@ def main():
     # stamped after the carve and simply overwrote it.
     # Out of town every way, not only toward the northern story beats. The
     # player may leave in any direction and should find a road doing the same.
-    for name in ("summit", "observatory", "foothills", "long_road", "tall_grass",
-                 "waking_room"):
+    for name in ("summit", "observatory", "foothills", "long_road", "tall_grass"):
         carve_road(world, rng, CENTRE, cells[name])
+    # The road to the house stops at the DOORSTEP. Aimed at the anchor, which is
+    # inside the building, carve_road walked in through the east wall and laid
+    # seven columns of path_dirt across the bedroom -- which is most of why the
+    # house has never had walls. Then re-stamp, so nothing any later pass does
+    # can open the building up again.
+    carve_road(world, rng, CENTRE, plan["door_outside"])
     for bearing in (0.0, 90.0, 180.0, 270.0):
         target = coast_stop(world, bearing)
         if target is not None:
             carve_road(world, rng, CENTRE, target)
+    stamp_house(world, plan)
 
-    spawn = cells["the_town"]
+    # You wake in the bedroom, on the rug beside the bed, with the front door
+    # two rooms away. Beat 1.
+    spawn = plan["spawn"]
     reach = reachable(world, spawn)
 
     # A cliff face is the wall of a terrace, and you cannot walk up a wall. The
@@ -986,7 +1238,7 @@ def main():
 
     props, _scattered = scatter_props(world, elev, rng, reach)
     stock_town(world, props, CENTRE, rng)
-    furnish_house(world, props, cells)
+    furnish_house(world, props, plan)
 
     # The collision plane is *derived* from the finished prop plane rather than
     # accumulated while scattering, and it is derived by the same function the
@@ -1013,9 +1265,50 @@ def main():
     # bare terrain underneath it.
     world.blocked = blocked
     reach = reachable(world, spawn)
-    anomalies = name_anomalies(cells, place_anomalies(world, rng, reach))
+    house_cells = {(x, y)
+                   for y in range(plan["y0"], plan["y0"] + plan["h"])
+                   for x in range(plan["x0"], plan["x0"] + plan["w"])}
+
+    # The yard anomaly: the nearest reachable cell to the plan's suggestion that
+    # is outside the building and not on the doorstep. Searched rather than
+    # fixed, because what is south-east of the house is generated terrain and
+    # may be a tree, a road or the sea.
+    cells["the_house"] = nearest_open(plan["yard"], reach, house_cells,
+                                      plan["door_outside"], plan["anomaly"])
+
+    # A procedural hole in the kitchen would make Beat 2 unfindable and Beat 4
+    # unreachable, so the house footprint is off limits to everything but its
+    # own named anomaly.
+    anomalies = name_anomalies(
+        cells, place_anomalies(world, rng, reach, forbid=house_cells))
+
+    # THE HOUSE MUST BE SEALED. HJWorld.walkable() returns false on the front
+    # door cell until the player has paid the Grit to open it, so that one cell
+    # is the entire Beat 4 gate: a gap anywhere else in the wall and the whole
+    # tutorial economy is bypassed by walking round it. Flood-filling with the
+    # door treated as solid is the only honest way to know, because the hole
+    # would not be in the plan -- it would be something a later pass did, which
+    # is precisely what happened when the road drove through the east wall.
+    shut = World(world.tiles, elev)
+    shut.blocked = blocked | {plan["door"]}
+    inside = reachable(shut, spawn)
+    leaked = sorted(c for c in inside if c not in house_cells)
+    if leaked:
+        raise SystemExit(
+            "the house is not sealed: with the front door shut, %d cells "
+            "outside it are still reachable from the bed, starting at %s"
+            % (len(leaked), leaked[0]))
 
     stranded = [n for n, c in cells.items() if c not in reach]
+
+    interactables = [{"x": plan["door"][0], "y": plan["door"][1],
+                      "type": "front_door", "label": "Front door"}]
+    for (kind, i, j, label) in plan["interactables"]:
+        x, y = plan["cell"](i, j)
+        entry = {"x": x, "y": y, "type": kind}
+        if label:
+            entry["label"] = label
+        interactables.append(entry)
 
     payload = {
         "_comment": "Generated by tools/make_world.py. Do not hand-edit; edit in "
@@ -1038,6 +1331,22 @@ def main():
         "terrace_levels": 5,
         "regions": {n: {"x": c[0], "y": c[1]} for n, c in cells.items()},
         "anomalies": anomalies,
+        # Things you can act on. `type` names an entry in
+        # data/content/interactables.json; this file only says where they are.
+        # The {x, y, ...} shape is the one tools/world_to_tiled.py classifies as
+        # an object layer, so these arrive in Tiled as draggable, retypable
+        # objects with no tooling change -- which is the point: the house agent
+        # places them and the designer moves them.
+        "interactables": interactables,
+        # Where "inside" is, for the Boon of the White Room and for the three
+        # things that fire when the player crosses the threshold (Beat 5). One
+        # rectangle covers it because the house is one rectangle: the whole
+        # footprint including its walls and the front door cell, so the boon
+        # breaks on the first cell of ground OUTSIDE the building rather than in
+        # the doorway. Deriving it from the floor material would break the first
+        # time somebody floors a porch.
+        "indoors": {"x": plan["x0"], "y": plan["y0"],
+                    "w": plan["w"], "h": plan["h"]},
         "spawn": {"x": spawn[0], "y": spawn[1]},
     }
     path = os.path.join(DATA_OUT, "overworld.json")
@@ -1061,6 +1370,17 @@ def main():
     print("props: %d placed (%.1f%% of cells), %d of them solid"
           % (filled, 100.0 * filled / (W * H), len(blocked)))
     print("cliff cells: %d" % len(faces))
+    house_anom = [a for a in anomalies if a.get("area") == "waking_room"][0]
+    print("house: %dx%d at (%d,%d), %d walkable cells inside, sealed but for the door"
+          % (plan["w"], plan["h"], plan["x0"], plan["y0"], len(inside)))
+    print("  wake at %s; the hole in reality is at (%d,%d), %.1f tiles away, tier %d"
+          % (spawn, house_anom["x"], house_anom["y"],
+             math.hypot(house_anom["x"] - spawn[0], house_anom["y"] - spawn[1]),
+             house_anom["tier"]))
+    near = [a for a in anomalies
+            if max(abs(a["x"] - spawn[0]), abs(a["y"] - spawn[1])) <= 1]
+    if near:
+        raise SystemExit("an anomaly is on or beside the spawn cell: %s" % near)
     named = sum(1 for a in anomalies if a.get("area"))
     print("anomalies: %d  (%d named story beats, %d procedural)"
           % (len(anomalies), named, len(anomalies) - named))

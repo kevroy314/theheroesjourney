@@ -192,6 +192,24 @@ MATERIALS = {
     "mud":           dict(hue=_hue((C["accent"], 1.0), (C["line"], 1.3)), mean=39, spread=16, walk=True,  family="silt"),
     "cliff":         dict(hue=_hue((C["line"], 1.0), (C["accent_2"], 0.18)), mean=29, spread=26, walk=False, family="strata"),
     "ice":           dict(hue=_hue((C["accent_2"], 1.0), (C["muted"], 0.45)), mean=66, spread=24, walk=True,  family="sheet"),
+    # --- appended for the interiors. Ids 25..28, nothing renumbered.
+    #
+    # §5 of docs/AESTHETIC-EDA.md: "every interior uses floor materials the
+    # exterior never uses, and the change of material is what says you are
+    # inside" -- and one per *room*, so a doorway is a change of ground rather
+    # than a change of nothing. Four floors now exist where there was one, and
+    # they are deliberately different in family, not merely in hue: boards run
+    # east-west, planks run north-south and are wider, tile is a laid pattern
+    # and rug is woven cloth. At 32px a hue shift is invisible; a change of
+    # direction is not.
+    "floor_plank":   dict(hue=_hue((C["accent"], 1.0), (C["warn"], 0.5), (C["panel"], 0.7)), mean=48, spread=20, walk=True,  family="plankwide"),
+    "floor_tile":    dict(hue=_hue((C["panel_alt"], 1.0), (C["accent_2"], 0.35)), mean=52, spread=22, walk=True,  family="chequer"),
+    "floor_rug":     dict(hue=_hue((C["danger"], 1.0), (C["accent"], 0.55)), mean=40, spread=22, walk=True,  family="weave"),
+    # §2: "a wall is a light stone cap with a darker vertical face below it, so
+    # the building reads as an extrusion from the ground rather than a painted
+    # rectangle." The *cap* is the material; the face lives in the overlay set
+    # and is drawn on the cell below. See _wall_overlay().
+    "wall_timber":   dict(hue=_hue((C["panel_alt"], 1.0), (C["accent"], 0.55), (C["muted"], 0.4)), mean=74, spread=16, walk=False, family="captop"),
 }
 
 # Sheet index IS the id stored in the world grid, so this order is load-bearing:
@@ -203,6 +221,7 @@ ORDER = [
     "water", "rock", "void",
     "sand", "scree", "snow", "bridge", "forest", "roof",
     "ocean", "dune", "hardpan", "jungle", "undergrowth", "mud", "cliff", "ice",
+    "floor_plank", "floor_tile", "floor_rug", "wall_timber",
 ]
 
 # Which tiles the player may stand on. Derived from MATERIALS so the art and the
@@ -221,6 +240,16 @@ PRECEDENCE = [
     "ocean", "water", "ice", "mud", "sand", "dune", "hardpan", "snow",
     "scree", "grass_short", "grass_tall", "undergrowth", "forest", "jungle",
     "rock", "cliff", "path_dirt",
+    # The interior stack, appended so no existing rank moves -- a rank IS an
+    # atlas row block, and renumbering would repaint every transition in the
+    # world. Floors are here for one reason that matters more than their own
+    # edges: a material with no rank neither gives nor TAKES an overlay, so a
+    # floor outside the stack could never receive the wall face below. Rug over
+    # plank over tile over boards is the order a room is actually laid.
+    "floor_boards", "floor_tile", "floor_plank", "floor_rug",
+    # Top of the stack: a wall overlays everything, because a wall is in front
+    # of everything.
+    "wall_timber",
 ]
 RANK = {name: i for i, name in enumerate(PRECEDENCE)}
 OVERLAY_MATS = PRECEDENCE[1:]           # everything that owns an edge set
@@ -236,6 +265,10 @@ ADJACENCY = [
     ("floor_boards", "wall_plaster"), ("floor_stone", "wall_stone"),
     ("floor_stone", "roof"), ("path_dirt", "roof"), ("grass_short", "roof"),
     ("dune", "hardpan"), ("hardpan", "cliff"), ("ice", "cliff"),
+    ("floor_boards", "wall_timber"), ("floor_plank", "wall_timber"),
+    ("floor_tile", "wall_timber"), ("floor_rug", "wall_timber"),
+    ("grass_short", "wall_timber"), ("path_dirt", "wall_timber"),
+    ("floor_plank", "floor_rug"), ("floor_boards", "floor_tile"),
 ]
 
 
@@ -826,6 +859,122 @@ def f_doorway(name, v, r, rng):
     return img
 
 
+def f_plankwide(name, v, r, rng):
+    """Bedroom planking. The same wood as `boards` turned ninety degrees and
+    made wider, because two floors that differ only in hue are one floor at
+    32px -- what separates them at a glance is the direction of the grain.
+
+    Seams at 10, 11 and 11 pixels rather than a clean quarter of the tile: an
+    even division is a lattice the moment the tile repeats."""
+    img = canvas(r["base"])
+    speckle(img, rng, 54, r["dark"])
+    off = (0, 3, 5, 8)[v % 4]
+    seams = [off, off + 10, off + 21]
+    for sx in seams:
+        vline(img, sx, 0, N - 1, r["deep"])
+        vline(img, sx + 1, 0, N - 1, r["mid"])
+    for i, sx in enumerate(seams):
+        wide = (10, 11, 11)[i]
+        for _ in range(5):
+            gx = sx + rng.randint(3, wide - 1)
+            y = rng.randint(0, N - 1)
+            for _ in range(rng.randint(2, 4)):
+                run = rng.randint(4, 9)
+                for j in range(run):
+                    px(img, gx, y + j, r["dark"])
+                y += run + rng.randint(2, 5)
+        # A knot every so often. One per plank at most, and not on every plank.
+        if rng.random() < 0.5:
+            kx, ky = sx + wide // 2, rng.randint(0, N - 1)
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    px(img, kx + dx, ky + dy, r["deep"] if abs(dx) + abs(dy) < 2 else r["dark"])
+    return img
+
+
+def f_chequer(name, v, r, rng):
+    """The kitchen. Laid tile: an 8px square grid with grout, alternating value,
+    and a per-square tone jitter so it is a floor somebody laid rather than a
+    checkerboard texture. Period 8 divides 32, so the pattern runs unbroken
+    across cell boundaries -- which is the whole point of a tiled floor."""
+    img = canvas(r["base"])
+    tone = {}
+    for gy in range(4):
+        for gx in range(4):
+            tone[(gx, gy)] = rng.uniform(-0.35, 0.45)
+    for y in range(N):
+        for x in range(N):
+            gx, gy = x // 8, y // 8
+            dark = (gx + gy + v) % 2 == 0
+            base = r["dark"] if dark else r["mid"]
+            t = tone[(gx, gy)]
+            c = mix(base, r["lit"] if t > 0 else r["deep"], abs(t) * 0.55)
+            px(img, x, y, c)
+    # Grout, and a lit north-west shoulder on every square so the tiles read as
+    # laid pieces with a thickness rather than as painted squares.
+    for i in range(0, N, 8):
+        hline(img, i, 0, N - 1, r["deep"])
+        vline(img, i, 0, N - 1, r["deep"])
+        hline(img, i + 1, 0, N - 1, r["lit"])
+        vline(img, i + 1, 0, N - 1, r["lit"])
+    speckle(img, rng, 22, r["deep"])
+    return img
+
+
+def f_weave(name, v, r, rng):
+    """The rug. A basketweave of two-pixel warp and weft with a diamond motif on
+    a 16px period, so the field is busy at arm's length and quiet at a glance.
+
+    No border here on purpose: a rug's border is where it *ends*, which is a
+    property of the boundary and not of the field, so the fringe is drawn by the
+    overlay set. A border baked into the fill would repeat every 32 pixels and
+    turn one rug into a grid of doormats."""
+    img = canvas(r["base"])
+    for y in range(N):
+        for x in range(N):
+            warp = ((x // 2) + (y // 4) * 0 + v) % 2 == 0
+            weft = ((y // 2)) % 2 == 0
+            c = r["mid"] if (warp == weft) else r["dark"]
+            px(img, x, y, c)
+    for cy in (8, 24):
+        for cx in (8, 24):
+            for dy in range(-5, 6):
+                span = 5 - abs(dy)
+                for dx in range(-span, span + 1):
+                    edge = abs(dx) + abs(dy) >= 4
+                    px(img, cx + dx, cy + dy, r["lit"] if edge else r["base"])
+    speckle(img, rng, 40, r["deep"])
+    return img
+
+
+def f_captop(name, v, r, rng):
+    """The TOP of a wall, seen from directly above, and nothing else.
+
+    This is the half of §2 that a tileset can express. A wall is two surfaces:
+    a light cap catching the sky, and a dark vertical face under it. The cap is
+    a material -- it is what the wall's own cell holds. The face is drawn by the
+    wall's overlay set onto the cell in front of it, exactly the way the cliff
+    set already draws a terrace, and for the same reason: the face belongs to
+    the boundary, not to either cell.
+
+    So this fill carries no direction at all. Everything directional is in
+    _wall_overlay(), which is what makes the autotiling work: the same cap sits
+    in the middle of a wall run, on a corner and on a stub, and the sixteen
+    cases differ only in which faces and shadows the neighbours draw."""
+    img = canvas(r["base"])
+    lab, k = voronoi(rng, 5 + v)
+    tone = [rng.uniform(-0.55, 0.55) for _ in range(k)]
+    for y in range(N):
+        for x in range(N):
+            t = tone[lab[y][x]]
+            px(img, x, y, mix(r["base"], r["lit"] if t > 0 else r["dark"], abs(t) * 0.5))
+    for (x, y) in edges_of(lab):
+        px(img, x, y, r["mid"])
+    speckle(img, rng, 70, r["mid"])
+    speckle(img, rng, 26, r["dark"])
+    return img
+
+
 FAMILIES = {
     "boards": f_boards, "paving": f_paving, "turf": f_turf, "blades": f_blades,
     "trodden": f_trodden, "plaster": f_plaster, "blocks": f_blocks,
@@ -833,6 +982,8 @@ FAMILIES = {
     "grain": f_grain, "cracked": f_cracked, "silt": f_silt, "sheet": f_sheet,
     "strata": f_strata, "canopy": f_canopy, "shingle": f_shingle,
     "planks": f_planks, "void": f_void, "doorway": f_doorway,
+    "plankwide": f_plankwide, "chequer": f_chequer, "weave": f_weave,
+    "captop": f_captop,
 }
 
 def _mean_luma_rgba(img):
@@ -976,7 +1127,24 @@ OVERLAY_STYLE = {
     "rock":        dict(d0=5, amp=7.5, dmax=18, scatter=0.48, bite=0.28, lip="rag",   tall=True),
     "cliff":       dict(d0=5, amp=7.0, dmax=18, scatter=0.40, bite=0.26, lip="rag",   tall=True),
     "path_dirt":   dict(d0=5, amp=6.0, dmax=15, scatter=0.38, bite=0.26, lip="verge", tall=False),
+    # Interiors. `style` selects the generator; everything without one is the
+    # organic front above, which is right for ground and wrong for anything
+    # somebody built. A floorboard does not lap over a tile in a fractal lobe;
+    # it stops at a threshold strip. And a wall does not lap over anything at
+    # all -- it stands in front of it.
+    "floor_boards": dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=False, style="seam"),
+    "floor_tile":   dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=False, style="seam"),
+    "floor_plank":  dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=False, style="seam"),
+    "floor_rug":    dict(d0=2, amp=0.0, dmax=3, scatter=0.0, bite=0.0, lip="fringe", tall=False, style="seam"),
+    "wall_timber":  dict(d0=3, amp=0.0, dmax=4, scatter=0.0, bite=0.0, lip="thresh", tall=True,  style="wall"),
 }
+
+## How tall the wall stands, in pixels, per variant. This is the single number
+## that decides whether the house reads as an extrusion or as a floor plan:
+## below about ten pixels at 32 the face is a dark line, and above about sixteen
+## the wall swallows the cell in front of it. Three values so a long run does
+## not repeat.
+WALL_FACE_H = (13, 12, 14)
 
 
 def side_profile(mat, side, variant):
@@ -1158,6 +1326,119 @@ def _outside_is_material(mat, kind, mask, x, y):
     return False
 
 
+def _wall_overlay(mat, kind, mask, variant):
+    """The wall, drawn on the cell IN FRONT OF IT.
+
+    §2 of docs/AESTHETIC-EDA.md, and the reason the house has never read as a
+    building: "a wall is a light stone cap with a darker vertical face below it,
+    so the building reads as an extrusion from the ground rather than a painted
+    rectangle. A floor tile in a different colour is what we have now."
+
+    A tile cannot draw outside its own 32 pixels, so the two surfaces have to
+    live on two cells: the CAP is the wall material's own fill, and the FACE is
+    this -- an overlay the wall paints onto whichever neighbour is looking at it.
+    That is exactly the construction cliffs already use (lip / face / shadow on
+    three stacked cells) and it is why walls needed no new machinery, only a
+    place in the precedence stack.
+
+    Which surface a neighbour sees is decided by where the wall is, and that is
+    the four-bit mask the overlay atlas is indexed by, so the sixteen cases and
+    their four diagonal companions ARE the autotile set. Nothing enumerates
+    corners; the composition does it.
+
+      wall to the N   its south face, full width, WALL_FACE_H tall, with a
+                      contact shadow on the ground under it
+      wall to the W   the sliver of its east face, plus the shadow it throws
+                      east -- light is from the north-west in every sprite in
+                      this file
+      wall to the E   lit on the side we can see, so no shadow: one dark
+                      contact line and nothing else
+      wall to the S   we are looking at the top of the cap; a single ambient
+                      line where the two surfaces meet
+
+    Drawn E/W first and N last, because a corner is a wall in front of a wall
+    and the face nearest the camera wins.
+    """
+    img = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    r = R[mat]
+    rng = rng_for("wallface", mat, kind, mask, variant)
+    face_h = WALL_FACE_H[variant % len(WALL_FACE_H)]
+    # The face is the cap's own hue driven well down -- the same material in
+    # shadow, not a second material. Timber uprights over it, because a facade
+    # with no vertical division is a slab.
+    deep = mix(r["deep"], BLACK, 0.30)
+    beam = mix(R["floor_boards"]["deep"], BLACK, 0.20)
+    beam_lit = R["floor_boards"]["dark"]
+
+    def shade(y):
+        """Value down the face: brightest just under the cap, darkest at the
+        ground, which is what a vertical surface lit from above actually does."""
+        t = min(1.0, max(0.0, y / float(max(1, face_h - 1))))
+        return mix(r["dark"], deep, 0.25 + 0.72 * t)
+
+    if kind == "edge":
+        n, e, sth, w = mask & 1, mask & 2, mask & 4, mask & 8
+        if w:
+            for y in range(N):
+                pxa(img, 0, y, mix(shade(y * 0.35), BLACK, 0.10))
+                pxa(img, 1, y, shade(y * 0.35))
+                for k in (2, 3):
+                    pxa(img, k, y, SHADOW, SHADOW_A)
+        if e:
+            for y in range(N):
+                pxa(img, N - 1, y, mix(r["dark"], BLACK, 0.15))
+        if sth:
+            for y in (N - 1,):
+                for x in range(N):
+                    pxa(img, x, y, mix(r["dark"], BLACK, 0.20))
+        if n:
+            for x in range(N):
+                for y in range(face_h):
+                    pxa(img, x, y, shade(y))
+            # The joint where cap meets face: one dark line, one lit line under
+            # it. Two pixels, and they are what make the cap sit ON the face.
+            for x in range(N):
+                pxa(img, x, 0, mix(deep, BLACK, 0.35))
+                pxa(img, x, 1, mix(r["mid"], r["dark"], 0.45))
+            # Uprights. Wobbled by a pixel over the run so they are timbers and
+            # not a ruled grid, and never on the cell boundary.
+            gx = 3 + rng.randint(0, 5)
+            while gx < N - 2:
+                for y in range(2, face_h):
+                    pxa(img, gx, y, beam if y < face_h - 1 else mix(beam, BLACK, 0.4))
+                    pxa(img, gx - 1, y, beam_lit)
+                gx += rng.randint(8, 13)
+            # Sill: the bottom two rows of the face go darkest, then the ground
+            # takes three rows of hard contact shadow.
+            for x in range(N):
+                pxa(img, x, face_h - 1, mix(deep, BLACK, 0.45))
+                for k in range(3):
+                    y = face_h + k
+                    if y < N:
+                        pxa(img, x, y, SHADOW, SHADOW_A)
+        return img
+
+    # Corners: the wall is only diagonal from here, so all that reaches this
+    # cell is the shadow off its corner. NW throws the biggest one; SE throws
+    # none at all, because the light comes from over its shoulder.
+    ne, se, sw, nw = mask & 1, mask & 2, mask & 4, mask & 8
+    if nw:
+        for y in range(5):
+            for x in range(5 - y):
+                pxa(img, x, y, shade(y) if x + y < 3 else SHADOW, 255 if x + y < 3 else SHADOW_A)
+    if ne:
+        for y in range(4):
+            for x in range(4 - y):
+                pxa(img, N - 1 - x, y, shade(y))
+    if sw:
+        for y in range(3):
+            for x in range(3 - y):
+                pxa(img, x, N - 1 - y, SHADOW, SHADOW_A)
+    if se:
+        pxa(img, N - 1, N - 1, mix(r["dark"], BLACK, 0.20))
+    return img
+
+
 def overlay_tile(mat, kind, mask, variant):
     """One overlay sprite: the material's own seamless texture, cut to an
     organic mask, finished with a lip and -- if it stands tall enough -- a hard
@@ -1171,6 +1452,8 @@ def overlay_tile(mat, kind, mask, variant):
     if mask == 0:
         return img
     s = OVERLAY_STYLE[mat]
+    if s.get("style") == "wall":
+        return _wall_overlay(mat, kind, mask, variant)
     r = R[mat]
     region = mask_region(mat, kind, mask, variant)
     src = fill(mat, 0).load()
@@ -1240,6 +1523,17 @@ def overlay_tile(mat, kind, mask, variant):
                     pxa(img, x + dx, y + dy, r["deep"])
         elif lip == "crack":
             pxa(img, x, y, r["deep"])
+        elif lip == "thresh":
+            # A laid floor stops at a threshold strip: one lit edge, one dark
+            # one, no scatter and no lobes. Somebody cut this to fit.
+            pxa(img, x, y, r["lit"] if lit_side else r["deep"])
+        elif lip == "fringe":
+            pxa(img, x, y, r["lit"] if lit_side else r["dark"])
+            for dx, dy, _d in outs:
+                if rng.random() < 0.55:
+                    pxa(img, x + dx, y + dy, r["mid"])
+                    if rng.random() < 0.4:
+                        pxa(img, x + dx * 2, y + dy * 2, r["dark"])
 
         if s["tall"] and dark_side:
             for dx, dy, d in outs:
@@ -1920,26 +2214,44 @@ def b_furniture(img, rng, p):
     kind = p["kind"]
     wood, cloth = PP["wood"], PP["cloth"]
     if kind == "bed":
-        for dy in range(4):
-            for dx in range(-11, 12):
-                pp_(img, dx, dy, wood["dark"] if dy < 2 else wood["base"])
-        for dy in range(4, 22):
-            for dx in range(-10, 11):
-                c = cloth["base"]
-                if dx < -8:
-                    c = cloth["lit"]
-                elif dx > 8:
+        # Two cells long and one wide, which is what `foot` says and what the
+        # old one did not do: it declared a 2x2 footprint and drew 23 pixels,
+        # so the bed the player wakes in was smaller than the cell it blocked.
+        # A footprint of (1, k) is the only multi-cell shape the anchor
+        # convention actually honours -- the art is centred on the anchor cell
+        # and grows upward, and so does the footprint.
+        #
+        # The covers are thrown back on the west side. §"evidence of use": the
+        # first thing the player sees should say somebody got out of this bed,
+        # not that a bed is present.
+        for dy in range(6):                               # footboard
+            for dx in range(-14, 15):
+                pp_(img, dx, dy, wood["dark"] if dy < 3 else wood["base"])
+        for dy in range(6, 45):                           # mattress and covers
+            for dx in range(-13, 14):
+                thrown = dx < -4 and dy > 14              # the turned-back half
+                c = PP["pale"]["base"] if thrown else cloth["base"]
+                if dx < -11:
+                    c = PP["pale"]["lit"] if thrown else cloth["lit"]
+                elif dx > 11:
                     c = cloth["deep"]
-                if dy > 17:
-                    c = PP["pale"]["lit"] if dx < 8 else PP["pale"]["base"]
                 pp_(img, dx, dy, c)
-        for dx in range(-10, 11):
-            pp_(img, dx, 12, cloth["dark"])
-            pp_(img, dx, 13, cloth["mid"])
-        for dy in range(22, 30):
+        for dx in range(-13, 14):                         # the fold of the quilt
+            pp_(img, dx, 22, cloth["dark"] if dx >= -4 else PP["pale"]["dark"])
+            pp_(img, dx, 23, cloth["mid"] if dx >= -4 else PP["pale"]["mid"])
+        for dy in range(15, 45):                          # the edge of the turn-back
+            pp_(img, -4, dy, cloth["deep"])
+            pp_(img, -5, dy, PP["pale"]["lit"])
+        for dy in range(36, 45):                          # the pillow, dented
             for dx in range(-11, 12):
-                pp_(img, dx, dy, wood["mid"] if dy > 27 else (wood["base"] if dx < 0 else wood["dark"]))
-        return 12
+                dent = abs(dx + 2) < 5 and 38 < dy < 43
+                pp_(img, dx, dy, PP["pale"]["mid"] if dent else
+                    (PP["pale"]["lit"] if dx < 0 else PP["pale"]["base"]))
+        for dy in range(45, 56):                          # headboard
+            for dx in range(-14, 15):
+                pp_(img, dx, dy, wood["mid"] if dy > 53 else
+                    (wood["base"] if dx < 0 else wood["dark"]))
+        return 14
     if kind == "table":
         for dy in range(9):
             for dx in ((-9, -8, 8, 9) if dy < 9 else ()):
@@ -2002,7 +2314,299 @@ def b_furniture(img, rng, p):
                     c = cloth["mid"]
                 pp_(img, dx, dy, c)
         return 0
+    if kind == "chair_pulled":
+        # The same chair, turned away from the table and pushed back. §"evidence
+        # of use": somebody got up from this and has not come back. It is one
+        # sprite and it is the cheapest sentence of story in the whole tileset.
+        for dy in range(8):
+            for dx in (-6, 3):
+                pp_(img, dx + dy // 4, dy, wood["dark"])
+        for dy in range(8, 11):
+            for dx in range(-7, 6):
+                pp_(img, dx + dy // 6, dy, wood["lit"] if dy > 9 else wood["base"])
+        for dy in range(11, 20):
+            lean = (dy - 11) // 3
+            for dx in range(-8 + lean, 4 + lean):
+                pp_(img, dx, dy, wood["base"] if dx < -2 else wood["dark"])
+        return 7
+    if kind == "stove":
+        metal, ember = PP["metal"], PP["gold"]
+        for dy in range(15):
+            for dx in range(-9, 10):
+                c = metal["dark"] if dx > 2 else metal["base"]
+                if dy < 2:
+                    c = metal["deep"]
+                pp_(img, dx, dy, c)
+        # The firebox, and the one warm thing in the room.
+        for dy in range(4, 10):
+            for dx in range(-6, 3):
+                edge = dy in (4, 9) or dx in (-6, 2)
+                pp_(img, dx, dy, metal["deep"] if edge else
+                    (ember["tip"] if (dx + dy) % 3 else ember["base"]))
+        for dy in range(15, 19):
+            span = int(10 * math.sqrt(max(0.0, 1 - ((dy - 16.5) / 2.5) ** 2)))
+            for dx in range(-span, span + 1):
+                pp_(img, dx, dy, metal["lit"] if dx < 0 else metal["mid"])
+        for dx in (-6, -2, 3, 7):                 # hotplates
+            for dy in range(17, 19):
+                pp_(img, dx, dy, metal["deep"])
+                pp_(img, dx + 1, dy, metal["dark"])
+        for dy in range(19, 32):                  # the flue
+            for dx in (-2, -1, 0, 1):
+                pp_(img, dx, dy, metal["base"] if dx < 0 else metal["dark"])
+        return 10
+    if kind == "counter":
+        for dy in range(13):
+            for dx in range(-14, 15):
+                c = wood["base"] if dx < 0 else wood["dark"]
+                if dy < 2:
+                    c = wood["deep"]
+                pp_(img, dx, dy, c)
+        for dy in (5, 9):                          # drawer seams
+            for dx in range(-13, 14):
+                pp_(img, dx, dy, wood["deep"])
+            for dx in (-8, 7):
+                pp_(img, dx, dy - 2, PP["metal"]["lit"])
+                pp_(img, dx + 1, dy - 2, PP["metal"]["base"])
+        for dy in range(13, 17):                   # the worktop, overhanging
+            for dx in range(-15, 16):
+                pp_(img, dx, dy, PP["stone"]["lit"] if dy > 14 else PP["stone"]["mid"])
+        return 14
+    if kind == "shelf_open":
+        for dy in range(20):
+            for dx in (-10, 9):
+                pp_(img, dx, dy, wood["dark"])
+        for dy in (3, 11, 18):
+            for dx in range(-10, 10):
+                pp_(img, dx, dy, wood["mid"])
+                pp_(img, dx, dy - 1, wood["deep"])
+            for dx in range(-8, 8, 4):
+                col = (PP["pale"], PP["ice"], PP["cloth"])[rng.randint(0, 2)]
+                hh = rng.randint(3, 5)
+                for j in range(1, hh):
+                    pp_(img, dx, dy + j, col["base"])
+                    pp_(img, dx + 1, dy + j, col["dark"])
+                    pp_(img, dx - 1, dy + j, col["lit"])
+        return 10
     return 6
+
+
+def b_clutter(img, rng, p):
+    """Evidence of use.
+
+    The environmental-storytelling literature is unanimous and docs/AESTHETIC-EDA
+    calls it the big one: a level should imply an event that already happened. A
+    cup left on the counter, boots kicked off by the door, a book left open. None
+    of these is a mechanic and none of them is more than forty pixels; between
+    them they are the difference between a room with furniture in it and a room
+    somebody lives in.
+
+    All of them are small, all of them are lit from the north-west, and none of
+    them is solid -- you walk over a book, you do not walk round it."""
+    kind = p["kind"]
+    if kind == "cup":
+        pal = PP["pale"]
+        for dy in range(6):
+            span = 3 if dy < 5 else 2
+            for dx in range(-span, span + 1):
+                pp_(img, dx, dy + 1, pal["lit"] if dx < 0 else pal["base"])
+        for dy in range(1, 5):
+            pp_(img, 4, dy + 1, pal["mid"])
+        for dx in range(-3, 4):
+            pp_(img, dx, 7, pal["tip"] if dx < 1 else pal["mid"])
+        pp_(img, -1, 6, PP["wood"]["deep"])          # what is left in it
+        pp_(img, 0, 6, PP["wood"]["dark"])
+        return 3
+    if kind == "boots":
+        pal = PP["bark"]
+        for side, lean in ((-4, -1), (4, 1)):
+            for dy in range(9):
+                span = 2 if dy > 3 else 3
+                for dx in range(-span, span + 1):
+                    pp_(img, side + dx + (lean if dy > 6 else 0), dy + 1,
+                        pal["mid"] if dx < 0 else pal["base"])
+            for dx in range(-3, 4):
+                pp_(img, side + dx, 1, pal["deep"])   # the sole, on the floor
+            pp_(img, side - 3, 9, pal["lit"])
+        return 8
+    if kind == "book":
+        pal, page = PP["cloth"], PP["pale"]
+        for dy in range(7):
+            for dx in range(-8, 9):
+                spine = abs(dx) < 1
+                c = pal["dark"] if spine else (page["lit"] if dx < 0 else page["base"])
+                if dy == 0:
+                    c = pal["deep"]
+                pp_(img, dx, dy + 1, c)
+        for dy in (2, 4):
+            for dx in list(range(-7, -1)) + list(range(2, 8)):
+                pp_(img, dx, dy + 1, page["dark"])
+        return 8
+    if kind == "candle":
+        pal, wax = PP["metal"], PP["pale"]
+        for dx in range(-4, 5):
+            pp_(img, dx, 1, pal["mid"] if dx < 0 else pal["base"])
+        for dy in range(2, 10):
+            for dx in (-1, 0, 1):
+                pp_(img, dx, dy, wax["lit"] if dx < 0 else wax["base"])
+        pp_(img, 0, 10, PP["gold"]["tip"])
+        pp_(img, 0, 11, PP["flower"]["tip"])
+        pp_(img, 0, 12, PP["gold"]["lit"])
+        return 4
+    if kind == "bottle":
+        pal = PP["ice"]
+        for dy in range(7):
+            for dx in (-2, -1, 0, 1, 2):
+                pp_(img, dx, dy + 1, pal["mid"] if dx < 0 else pal["dark"])
+        for dy in range(8, 13):
+            for dx in (-1, 0):
+                pp_(img, dx, dy, pal["lit"] if dx < 0 else pal["base"])
+        pp_(img, 0, 13, PP["bark"]["dark"])
+        pp_(img, -1, 13, PP["bark"]["base"])
+        return 3
+    return 4
+
+
+def b_animal(img, rng, p):
+    """The dog and the cat.
+
+    §"living props": two animals in the house, each with a Pet action, and they
+    are deliberately the cheapest possible rehearsal for the entity and mob
+    systems. This is only the still they stand in -- follow, flee and
+    approach-and-hold live in the engine -- but a Pet prompt with nothing under
+    it is the "glow with no lamp" failure in a different costume, so they have
+    to exist as sprites before they can exist as behaviour.
+
+    Facing SOUTH, toward the camera and toward the player, because an animal you
+    are invited to touch should be looking at you. Head at the near end, body
+    receding north, tail at the far end, light from the north-west."""
+    pal = PP[p.get("pal", "wood")]
+    body_w, body_h = p["w"], p["h"]
+    head_r = p.get("head", 5)
+    leg = p.get("leg", 4)
+    head_top = head_r * 2 - 1
+
+    # Legs, at the four corners of the body, drawn first so the body sits over.
+    for lx in (-body_w + 2, body_w - 3):
+        for ly in (0, body_h - 3):
+            for dy in range(leg):
+                pp_(img, lx, head_top + ly + dy, pal["deep"])
+                pp_(img, lx + 1, head_top + ly + dy, pal["dark"])
+
+    # Body: an oval seen from above and slightly behind.
+    for dy in range(body_h):
+        t = (dy + 0.5) / float(body_h)
+        span = int(body_w * math.sqrt(max(0.0, 1.0 - (2.0 * t - 1.0) ** 2 * 0.82)))
+        for dx in range(-span, span + 1):
+            c = pal["base"]
+            if dx < -span + 2:
+                c = pal["lit"]
+            elif dx > span - 2:
+                c = pal["deep"]
+            elif p.get("stripes") and (dx * 2 + dy) % 6 == 0:
+                c = pal["dark"]
+            pp_(img, dx, head_top + leg + dy, c)
+
+    # Tail, curling east off the far end.
+    tx, ty = body_w - 2, head_top + leg + body_h - 2
+    for i in range(p.get("tail", 8)):
+        pp_(img, tx + i - i * i // 10, ty + i // 2, pal["dark"] if i % 2 else pal["base"])
+
+    # Head, at the near end, looking at you.
+    for dy in range(-head_r, head_r + 1):
+        span = int(head_r * math.sqrt(max(0.0, 1.0 - (dy / float(head_r)) ** 2)))
+        for dx in range(-span, span + 1):
+            pp_(img, dx, head_r + dy, pal["lit"] if dx < 0 else pal["base"])
+    ear = p.get("ear", 3)
+    for sign in (-1, 1):
+        for k in range(ear):
+            width = max(1, ear - k)
+            for dx in range(-width, width + 1):
+                pp_(img, sign * (head_r - 1) + dx, head_top - k,
+                    pal["mid"] if sign < 0 else pal["dark"])
+    eye = PP["gold"]["tip"] if p.get("bright_eyes") else OUTLINE
+    pp_(img, -2, head_r + 1, eye)
+    pp_(img, 2, head_r + 1, eye)
+    for dx in (-1, 0, 1):                       # muzzle
+        pp_(img, dx, head_r - 2, pal["deep"])
+    pp_(img, 0, head_r - 1, pal["dark"])
+    return body_w
+
+
+def b_scatter(img, rng, p):
+    """Ground scatter: the layer §1 of docs/AESTHETIC-EDA says we are missing.
+
+    "A base tile, then a sparse scatter layer of tiny detail props on top --
+    pebbles, tufts, fallen leaves, single flowers, cracks. Core Keeper's floor
+    is maybe 8% covered in scatter and it completely destroys the grid. The
+    scatter is not autotiled and NOT ALIGNED TO THE TILE GRID -- it is placed at
+    sub-tile offsets, which is exactly what breaks the right-angle feeling."
+
+    The prop plane is one byte per cell and the renderer draws every sprite
+    bottom-centred on its cell, so there is nowhere in the data to put a sub-tile
+    offset. There does not need to be: the offset is baked into the SPRITE. `ox`
+    and `oy` move the whole drawing off the anchor, and a scatter set is six
+    props with six different offsets, so six neighbouring cells of the same
+    ground put their detail in six different places and no two line up.
+
+    Tiny, unoutlined, unshadowed, never solid. This is texture, not furniture.
+    """
+    pal = PP[p.get("pal", "stone")]
+    ox, oy = p.get("ox", 0), p.get("oy", 0)
+    kind = p["kind"]
+    n = p.get("n", 3)
+
+    def put(dx, dy, c):
+        pp_(img, ox + dx, oy + dy, c)
+
+    if kind == "pebbles":
+        for i in range(n):
+            cx = rng.randint(-11, 11)
+            cy = rng.randint(0, 9)
+            r = rng.randint(1, 2)
+            for dy in range(-r, r + 1):
+                for dx in range(-r, r + 1):
+                    if dx * dx + dy * dy > r * r + 1:
+                        continue
+                    put(cx + dx, cy + dy,
+                        pal["lit"] if (dx + dy) < 0 else (pal["deep"] if dy < 0 else pal["base"]))
+    elif kind == "tuft":
+        for i in range(n):
+            bx = rng.randint(-9, 9)
+            h = rng.randint(3, 6)
+            bend = rng.choice((-1, 0, 0, 1))
+            for j in range(h):
+                put(bx + (bend if j > h // 2 else 0), j,
+                    pal["tip"] if j == h - 1 else (pal["lit"] if j > h // 2 else pal["base"]))
+    elif kind == "leaves":
+        for i in range(n):
+            cx, cy = rng.randint(-11, 11), rng.randint(0, 8)
+            w = rng.randint(2, 3)
+            for dx in range(-w, w + 1):
+                put(cx + dx, cy, pal["lit"] if dx < 0 else pal["base"])
+            put(cx, cy + 1, pal["mid"])
+    elif kind == "crack":
+        x, y = rng.randint(-9, 4), rng.randint(1, 6)
+        for i in range(n * 4):
+            put(x, y, pal["deep"])
+            put(x, y + 1, pal["mid"])
+            x += 1
+            y += rng.choice((-1, 0, 0, 0, 1))
+    elif kind == "twig":
+        x, y = rng.randint(-10, 2), rng.randint(0, 7)
+        run = n * 3
+        for i in range(run):
+            put(x + i, y + (i // 5), pal["base"] if i % 3 else pal["lit"])
+        put(x + run // 2, y + 1 + run // 10, pal["dark"])
+        put(x + run // 2 + 1, y + 2 + run // 10, pal["dark"])
+    elif kind == "bloom":
+        for i in range(n):
+            cx, cy = rng.randint(-9, 9), rng.randint(2, 7)
+            for j in range(cy):
+                put(cx, j, PP["leaf"]["dark"])
+            for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, 1), (0, -1)):
+                put(cx + dx, cy + dy, pal["tip"] if dx == 0 and dy == 0 else pal["base"])
+    return 0
 
 
 def b_structure(img, rng, p):
@@ -2084,6 +2688,49 @@ def b_structure(img, rng, p):
         for dx in range(-4, 4):
             pp_(img, dx, 33, metal["dark"])
         return 4
+    if kind == "window":
+        # Drawn low in the slot on purpose: this prop is anchored on the WALL
+        # cell, not on the floor, so everything it draws has to land inside the
+        # 32 pixels the wall cap occupies. It is the frame and the pane; the
+        # warm wedge it throws on the floor is not art, it is the `light` entry
+        # in the catalogue, and the lighting pass owns it.
+        glow = PP["gold"]
+        for dy in range(2, 22):
+            for dx in range(-12, 13):
+                frame = dx < -10 or dx > 10 or dy < 4 or dy > 19
+                pp_(img, dx, dy, wood["dark"] if frame else
+                    (glow["tip"] if (dx + dy) % 5 else glow["lit"]))
+        for dy in range(5, 19):                    # the mullion
+            for dx in (-1, 0):
+                pp_(img, dx, dy, wood["deep"])
+        for dx in range(-12, 13):                  # the transom
+            pp_(img, dx, 12, wood["deep"])
+        for dx in range(-13, 14):                  # the sill, catching the light
+            pp_(img, dx, 1, stone["lit"] if dx < 0 else stone["mid"])
+            pp_(img, dx, 0, stone["deep"])
+        return 0
+    if kind == "street_lamp":
+        # Taller than the plain lamppost, with a lantern rather than a bulb and
+        # a cross-brace, so a street with both on it has two silhouettes.
+        for dy in range(30):
+            pp_(img, -1, dy, metal["base"])
+            pp_(img, 0, dy, metal["deep"])
+            if dy % 6 == 0 and dy > 6:
+                pp_(img, -2, dy, metal["dark"])
+                pp_(img, 1, dy, metal["dark"])
+        for dx in range(-5, 5):                    # the brace
+            pp_(img, dx, 24, metal["dark"])
+        for dy in range(30, 40):                   # the lantern
+            span = 5 - abs(dy - 35) // 2
+            for dx in range(-span, span + 1):
+                cage = abs(dx) == span or dy in (30, 39)
+                pp_(img, dx, dy, metal["deep"] if cage else
+                    (PP["gold"]["tip"] if abs(dy - 35) < 3 else PP["gold"]["base"]))
+        for dx in range(-2, 3):
+            pp_(img, dx, 41, metal["dark"])
+        for dx in range(-5, 5):                    # the foot
+            pp_(img, dx, 0, metal["mid"] if dx < 0 else metal["dark"])
+        return 5
     if kind == "bench":
         for side in (-1, 1):
             for dy in range(7):
@@ -2224,6 +2871,7 @@ BUILDERS = {
     "flat": b_flat, "box": b_box, "furniture": b_furniture,
     "structure": b_structure, "monument": b_monument, "mushroom": b_mushroom,
     "shard": b_shard, "mound": b_mound,
+    "clutter": b_clutter, "scatter": b_scatter, "animal": b_animal,
 }
 
 
@@ -2242,9 +2890,34 @@ BUILDERS = {
 # means nothing is there. Appending is safe, reordering rewrites every world.
 
 def _p(pid, build, biome, density, solid=False, foot=(1, 1), shadow=True,
-       outline=True, **params):
-    return dict(id=pid, build=build, biome=biome, density=density, solid=solid,
-                foot=list(foot), shadow=shadow, outline=outline, params=params)
+       outline=True, light=None, **params):
+    """`light` is the one field here that no code in this file reads.
+
+    THE LIGHT CONTRACT. A prop entry in assets/tiles/tiles.json may carry
+
+        "light": { "radius": 4.5, "color": "#FFC880", "flicker": 0.15 }
+
+        radius   in tiles, float -- how far the pool reaches
+        color    hex, the colour AT THE SOURCE; the falloff is the renderer's
+        flicker  0.0 to 1.0, 0 is steady
+
+    Nothing in the tileset draws it. §3 of docs/AESTHETIC-EDA.md: "light is the
+    atmosphere, and it is radial and coloured", and "a glow with a visible lamp
+    under it is atmosphere; a glow with nothing under it is a bug". So the art
+    side's whole job is to say *where the lamps are*, and it says it here, once,
+    in the same catalogue that already carries every prop's footprint and
+    solidity. The lighting pass reads the world's prop plane, looks each plane
+    id up in this manifest, and lights whatever declares a source.
+
+    Keeping it here rather than in a second file is the same argument as
+    `solid`: a lamp that stops emitting when somebody moves it is a bug nobody
+    would ever find, and a second list of positions is a second thing to get
+    out of step with the first."""
+    entry = dict(id=pid, build=build, biome=biome, density=density, solid=solid,
+                 foot=list(foot), shadow=shadow, outline=outline, params=params)
+    if light is not None:
+        entry["light"] = dict(light)
+    return entry
 
 
 PROPS = [
@@ -2328,19 +3001,44 @@ PROPS = [
     _p("well", "structure", "placed", 0.0, solid=True, foot=(2, 2), kind="well"),
     _p("cart", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="cart"),
     _p("market_stall", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="stall"),
-    _p("lamppost", "structure", "placed", 0.0, solid=True, kind="lamppost"),
+    _p("lamppost", "structure", "placed", 0.0, solid=True, kind="lamppost",
+       light=dict(radius=6.0, color="#FFC880", flicker=0.12)),
     _p("bench", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="bench"),
     _p("standing_stone", "monument", "placed", 0.0, solid=True, kind="menhir", pal="stone", h=34, w=8, runes=8),
 
     # --- placed: interiors ----------------------------------------------------
-    _p("bed", "furniture", "placed", 0.0, solid=True, foot=(2, 2), kind="bed"),
-    _p("table", "furniture", "placed", 0.0, solid=True, foot=(2, 1), kind="table"),
+    _p("bed", "furniture", "placed", 0.0, solid=True, foot=(1, 2), kind="bed"),
+    _p("table", "furniture", "placed", 0.0, solid=True, kind="table"),
     _p("chair", "furniture", "placed", 0.0, solid=True, kind="chair"),
     _p("bookshelf", "furniture", "placed", 0.0, solid=True, kind="shelf"),
     _p("chest", "box", "placed", 0.0, solid=True, w=8, h=9, d=4, lid=True),
-    _p("floor_lamp", "furniture", "placed", 0.0, kind="lamp"),
+    _p("floor_lamp", "furniture", "placed", 0.0, kind="lamp",
+       light=dict(radius=4.5, color="#FFC880", flicker=0.08)),
     _p("plant_pot", "furniture", "placed", 0.0, solid=True, kind="pot"),
     _p("rug", "furniture", "placed", 0.0, shadow=False, outline=False, kind="rug"),
+
+    # --- placed: the house that is actually a house ---------------------------
+    # §"the asset backlog": a furniture set for a real house (bed, table,
+    # chairs, stove, counter, shelf) and the evidence-of-use props under it.
+    _p("stove", "furniture", "placed", 0.0, solid=True, kind="stove",
+       light=dict(radius=4.0, color="#FF8C42", flicker=0.35)),
+    _p("counter", "furniture", "placed", 0.0, solid=True, kind="counter"),
+    _p("shelf_open", "furniture", "placed", 0.0, solid=True, kind="shelf_open"),
+    _p("chair_pulled", "furniture", "placed", 0.0, solid=True, kind="chair_pulled"),
+    _p("window_lit", "structure", "placed", 0.0, shadow=False, kind="window",
+       light=dict(radius=5.0, color="#FFD9A0", flicker=0.0)),
+    _p("candle", "clutter", "placed", 0.0, shadow=False, kind="candle",
+       light=dict(radius=2.5, color="#FFC880", flicker=0.45)),
+    _p("cup", "clutter", "placed", 0.0, shadow=False, kind="cup"),
+    _p("boots", "clutter", "placed", 0.0, shadow=False, kind="boots"),
+    _p("book_open", "clutter", "placed", 0.0, shadow=False, kind="book"),
+    _p("bottle", "clutter", "placed", 0.0, shadow=False, kind="bottle"),
+    _p("street_lamp", "structure", "placed", 0.0, solid=True, kind="street_lamp",
+       light=dict(radius=7.5, color="#FFD08A", flicker=0.10)),
+    _p("dog", "animal", "placed", 0.0, solid=True, pal="wood",
+       w=8, h=13, leg=4, head=6, ear=3, tail=9),
+    _p("cat", "animal", "placed", 0.0, solid=True, pal="pale",
+       w=6, h=10, leg=3, head=5, ear=4, tail=11, stripes=True, bright_eyes=True),
 ]
 
 # Flat literal, parsed the same way make_world.py parses ORDER. Index i is
@@ -2364,6 +3062,119 @@ PROP_ORDER = [
     "bed", "table", "chair", "bookshelf", "chest", "floor_lamp", "plant_pot",
     "rug",
 ]
+
+# The hand-authored spine ends here. Everything below is generated, and every
+# one of it is APPENDED -- slot index in props.png is the plane id minus one and
+# those ids are stored in world data and in hand edits, so reordering silently
+# rewrites every map ever made. See docs/ADDING-ASSETS.md, "Appending is the
+# only safe edit".
+assert [p["id"] for p in PROPS][:len(PROP_ORDER)] == PROP_ORDER, \
+    "PROPS and the PROP_ORDER literal have drifted"
+assert len(PROPS) >= len(PROP_ORDER)
+PROP_ORDER = PROP_ORDER + [p["id"] for p in PROPS[len(PROP_ORDER):]]
+
+
+# --- ground scatter, per biome ------------------------------------------------
+#
+# §1: "a scatter set per biome -- 6-10 tiny sprites each (8x8 to 16x16), placed
+# at sub-tile offsets, non-colliding, purely decorative." The sub-tile offset is
+# the point and it lives in `ox`/`oy`; see b_scatter for why it has to.
+#
+# Density is the set's whole budget divided by its members, so adding a seventh
+# pebble to a biome does not make that biome noisier -- it makes it more varied,
+# which is the only reason to add one.
+
+SCATTER_BUDGET = 0.050          # scatter props per walkable cell of the biome
+SCATTER_OFFSETS = [(-10, 2), (8, 5), (-4, 11), (12, 8), (2, 14), (-13, 6),
+                   (5, 0), (-7, 9)]
+
+SCATTER_SETS = {
+    "grass_short": [("pebbles", "stone", 3), ("tuft", "leaf", 4),
+                    ("leaves", "leaf_dry", 4), ("bloom", "flower", 1),
+                    ("twig", "bark", 2), ("tuft", "leaf", 2)],
+    "grass_tall":  [("tuft", "leaf", 5), ("bloom", "bloom", 1),
+                    ("leaves", "leaf", 3), ("twig", "bark", 2)],
+    "sand":        [("pebbles", "pale", 3), ("leaves", "pale", 3),
+                    ("twig", "pale", 2), ("crack", "pale", 2),
+                    ("pebbles", "stone", 2), ("tuft", "reed", 3)],
+    "dune":        [("crack", "dustpile", 2), ("pebbles", "dustpile", 3),
+                    ("tuft", "leaf_dry", 3), ("leaves", "leaf_dry", 2),
+                    ("pebbles", "stone", 2), ("twig", "bark", 2)],
+    "hardpan":     [("crack", "stone", 3), ("pebbles", "stone", 3),
+                    ("leaves", "pale", 2), ("crack", "dustpile", 2)],
+    "scree":       [("pebbles", "stone", 4), ("pebbles", "stone", 2),
+                    ("crack", "stone", 2), ("tuft", "pine", 2),
+                    ("twig", "bark", 2), ("leaves", "stone", 3)],
+    "snow":        [("pebbles", "snowpile", 3), ("tuft", "pine", 2),
+                    ("twig", "bark", 2), ("leaves", "snowpile", 3),
+                    ("crack", "ice", 2), ("pebbles", "stone", 2)],
+    "undergrowth": [("tuft", "palm", 4), ("leaves", "leaf", 4),
+                    ("bloom", "bloom", 1), ("twig", "bark", 2),
+                    ("pebbles", "stone", 2), ("tuft", "pine", 3)],
+    "mud":         [("pebbles", "stone", 3), ("tuft", "reed", 3),
+                    ("leaves", "leaf_dry", 3), ("crack", "stone", 2)],
+    "ice":         [("crack", "ice", 3), ("pebbles", "ice", 2),
+                    ("pebbles", "snowpile", 2)],
+    "path_dirt":   [("pebbles", "stone", 3), ("crack", "stone", 2),
+                    ("twig", "bark", 2), ("leaves", "leaf_dry", 2)],
+}
+
+for _biome, _set in SCATTER_SETS.items():
+    for _i, (_kind, _pal, _n) in enumerate(_set):
+        _ox, _oy = SCATTER_OFFSETS[_i % len(SCATTER_OFFSETS)]
+        PROPS.append(_p("%s_bits_%d" % (_biome, _i + 1), "scatter", _biome,
+                        SCATTER_BUDGET / len(_set), shadow=False, outline=False,
+                        kind=_kind, pal=_pal, n=_n, ox=_ox, oy=_oy))
+        PROP_ORDER.append(PROPS[-1]["id"])
+
+
+# --- prop variants ------------------------------------------------------------
+#
+# §6: "anything that appears more than ten times in a screen needs at least
+# three variants... our world places 6,037 props from 17 kinds. That ratio is
+# the homogeneity."
+#
+# These are every prop the generator placed more than ten times in the world as
+# it stood (counted out of props_b64_deflate, not guessed), each given two more
+# variants for three in total. A variant is the SAME builder with the same
+# palette and the same collision -- a different individual of the same species,
+# not a different species. Two things make them differ: the numeric dimensions
+# are scaled, and the per-prop seed is drawn from the id, so every wobble,
+# speckle and blob in the sprite re-rolls.
+#
+# The set's density is split between its members, so the world holds the same
+# number of trees and three times as many kinds of tree.
+
+VARIANT_SCALE = (0.82, 1.20)      # the two extra variants, as size multipliers
+VARIANT_DIMS = ("h", "w", "r", "n", "spread", "trunk", "crown", "tiers", "th",
+                "flen", "fronds", "cracks", "tips", "moss", "runes", "d", "jog")
+
+VARIED = [
+    "grass_tuft", "scree_stone", "tree_pine", "jungle_fern", "tree_broad",
+    "stone_small", "bush", "flowers_gold", "beach_weed", "dune_grass", "scrub",
+    "flowers_red", "shell", "reed_bed", "driftwood", "crag", "sand_mound",
+    "tree_lone", "tree_dead", "sea_rock", "dry_shrub", "boulder", "snow_drift",
+    "stump", "cactus_round", "palm_shore", "log_fallen", "cactus_tall",
+    "tide_pool", "marsh_reeds", "cairn", "banana_palm", "grass_clump",
+    "ice_shard", "bones", "mesa_rock", "giant_mushroom", "vine_pillar", "fern",
+    "skull", "thistle", "crystal", "palm_oasis", "mushroom_ring", "marker_pole",
+    "bramble", "milestone",
+]
+
+_by_id = {p["id"]: p for p in PROPS}
+for _base_id in VARIED:
+    _base = _by_id[_base_id]
+    _base["density"] /= (1 + len(VARIANT_SCALE))
+    for _k, _f in enumerate(VARIANT_SCALE):
+        _params = dict(_base["params"])
+        for _key in VARIANT_DIMS:
+            if isinstance(_params.get(_key), int) and not isinstance(_params[_key], bool):
+                _params[_key] = max(1, int(round(_params[_key] * _f)))
+        PROPS.append(_p("%s_v%d" % (_base_id, _k + 2), _base["build"],
+                        _base["biome"], _base["density"], solid=_base["solid"],
+                        foot=tuple(_base["foot"]), shadow=_base["shadow"],
+                        outline=_base["outline"], **_params))
+        PROP_ORDER.append(PROPS[-1]["id"])
 
 PROP_BY_ID = {p["id"]: p for p in PROPS}
 PROP_COLS = 8
@@ -2661,6 +3472,53 @@ def cliff_demo(tiles, sprites, cliffs, w=12, h=12, zoom=3):
     return img.resize((img.size[0] * zoom, img.size[1] * zoom), Image.NEAREST)
 
 
+def interior_demo(tiles, sprites, zoom=3):
+    """The house, drawn the way the game will draw it.
+
+    Not a decorative preview: this is the frame every judgement about the wall
+    set has to be made in, because a wall is only right or wrong in a room. It
+    exercises the whole of §2 and §5 at once -- cap and face, four floors, one
+    per room, doorways that are gaps in a wall rather than a tile with a door
+    painted on it, and the evidence-of-use props that are the difference between
+    a furnished room and an inhabited one.
+
+    The layout is a stand-in for the real one, which lives in
+    tools/make_world.py's house_plan(); it is close enough to judge the art by
+    and it is not what ships."""
+    plan = [
+        "WWWWWWWWWWWWWWWWWWW",
+        "WppppppWttttttttttW",
+        "WprrrrpWttttttttttW",
+        "WprrrrpWttttttttttW",
+        "Wpppppp.ttttttttttW",
+        "WppppppWttttttttttW",
+        "WWW.WWWWWWWWW.WWWWW",
+        "WbbbbbbbbbbbbbbbbbW",
+        "WbbbbbbbbbbbbbbbbbW",
+        "WbbbbbbbbbbbbbbbbbW",
+        "WWWWWWWWWDWWWWWWWWW",
+        "ggggggggpggggggggg",
+    ]
+    key = {"W": "wall_timber", "p": "floor_plank", "r": "floor_rug",
+           "t": "floor_tile", "b": "floor_boards", ".": "floor_boards",
+           "D": "door", "g": "grass_short"}
+    w = max(len(row) for row in plan)
+    grid = [[key[row[x]] if x < len(row) else "grass_short" for x in range(w)]
+            for row in plan]
+    props = [
+        (2, 2, "bed"), (5, 1, "chest"), (1, 5, "boots"), (4, 5, "book_open"),
+        (6, 1, "window_lit"), (13, 0, "window_lit"),
+        (9, 1, "stove"), (12, 1, "counter"), (15, 1, "cup"),
+        (17, 2, "shelf_open"), (12, 4, "table"), (11, 5, "chair"),
+        (13, 4, "chair_pulled"), (14, 4, "candle"),
+        (2, 8, "bookshelf"), (16, 8, "plant_pot"), (8, 9, "boots"),
+        (5, 9, "floor_lamp"), (10, 8, "chair"),
+    ]
+    placed = [(x, y, sprites[pid]) for (x, y, pid) in props if pid in sprites]
+    img = render_patch(grid, tiles, seed=3, props=placed, zoom=1)
+    return img.resize((img.size[0] * zoom, img.size[1] * zoom), Image.NEAREST)
+
+
 def contact_sheet(built, scale=4, cols=5):
     """A labelled 4x preview of the base fills. Each cell shows the tile
     repeated 2x2 -- a lone tile hides exactly the seam you want to check --
@@ -2871,12 +3729,21 @@ def manifest(overlay_rows, cliff_rows, prop_rows):
             "anchor": [PROP_AX, PROP_AY],
             "layout": "slot i (0-based) at (64*(i%8), 96*(i//8)); plane value = i+1",
             "draw": "dst = (cell.x*32 + 16 - 32, cell.y*32 + 32 - 96)",
+            "light": {
+                "_": ("optional per-prop entry: where light comes from. Nothing "
+                      "in the tileset draws it -- see _p() for the contract."),
+                "radius": "tiles, float",
+                "color": "hex, the colour at the source",
+                "flicker": "0.0-1.0, 0 is steady",
+            },
             "list": [
-                {"id": pid, "index": i, "plane": i + 1,
-                 "biome": PROP_BY_ID[pid]["biome"],
-                 "density": PROP_BY_ID[pid]["density"],
-                 "solid": PROP_BY_ID[pid]["solid"],
-                 "foot": PROP_BY_ID[pid]["foot"]}
+                dict({"id": pid, "index": i, "plane": i + 1,
+                      "biome": PROP_BY_ID[pid]["biome"],
+                      "density": PROP_BY_ID[pid]["density"],
+                      "solid": PROP_BY_ID[pid]["solid"],
+                      "foot": PROP_BY_ID[pid]["foot"]},
+                     **({"light": PROP_BY_ID[pid]["light"]}
+                        if "light" in PROP_BY_ID[pid] else {}))
                 for i, pid in enumerate(PROP_ORDER)],
         },
         "shadow": {"rgb": list(SHADOW), "alpha": SHADOW_A},
@@ -2926,6 +3793,7 @@ def main():
     save(prop_sheet(pr_sprites), "_props_x2.png")
     comps = build_compositions(ov_tiles, pr_sprites)
     comps["cliffs"] = cliff_demo(ov_tiles, pr_sprites, _cl)
+    comps["interior"] = interior_demo(ov_tiles, pr_sprites)
     for name, img in comps.items():
         save(img, "_comp_%s.png" % name)
 
@@ -2980,6 +3848,15 @@ def main():
         print("  %-17s %4.0f %4.0f %4.0f %4.0f %4.0f   %4.1f"
               % (label, s["min"], s["p1"], s["p50"], s["p99"], s["max"], s["mean"]))
     print("  (was: one shipped frame 11 / 34 / 53 / 81 / 122 -- a 47-point band)\n")
+
+    lit = [p for p in PROPS if "light" in p]
+    print("declared light sources (art declares WHERE; the lighting pass draws it)")
+    print("  %-14s %8s  %-9s %s" % ("prop", "radius", "colour", "flicker"))
+    for p_ in lit:
+        L = p_["light"]
+        print("  %-14s %6.1f t  %-9s %.2f"
+              % (p_["id"], L["radius"], L["color"], L["flicker"]))
+    print("  %d of %d props emit\n" % (len(lit), len(PROPS)))
 
     print("prop density by biome (instances per walkable cell of that biome)")
     print("  target 0.12-0.20, i.e. 7-11 props in a 57-cell screen (§2.3)")

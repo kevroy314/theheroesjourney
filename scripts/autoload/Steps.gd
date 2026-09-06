@@ -262,7 +262,8 @@ func budget() -> int:
 
 
 func spend(n: int = 1) -> bool:
-	_burn_debt += float(n) * burn
+	var charge := float(n) * step_cost()
+	_burn_debt += charge
 	var whole := int(floor(_burn_debt))
 	if whole <= 0:
 		budget_changed.emit()
@@ -270,12 +271,30 @@ func spend(n: int = 1) -> bool:
 	if budget() < whole:
 		# Refuse the whole move rather than half-charging for it: a step you were
 		# not allowed to take must not cost anything.
-		_burn_debt -= float(n) * burn
+		_burn_debt -= charge
 		return false
 	_burn_debt -= float(whole)
 	spent += whole
 	budget_changed.emit()
 	return true
+
+
+## What one tile of walking actually costs right now.
+##
+## `burn` is what the run has done to you; `steps.cost_mult` is what the rule
+## engine has to say about it, which is where a buff gets in. The Boon of the
+## White Room is a modifier that *sets* this to zero, so walking indoors is free
+## without a single branch here knowing what a white room is — and a trinket
+## that made walking cheaper would work the same way, for free.
+func step_cost() -> float:
+	return maxf(0.0, burn * Rules.value("steps.cost_mult", {}, 1.0))
+
+
+## Seconds to cross one tile. Coffee bends this down and the crash bends it back
+## up; the renderer should ask rather than hold a constant, or a buff on movement
+## speed has nowhere to land.
+func step_time() -> float:
+	return maxf(0.02, Rules.value("walk.step_time", {}, 0.17))
 
 
 ## Set by finishing — or failing to finish — an anomaly.

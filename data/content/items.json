@@ -73,6 +73,14 @@
       "desc": "When the loop resets, wake where you were standing instead of in town. Once.",
       "use": "resume_run",
       "where": "auto"
+    },
+    {
+      "id": "finder",
+      "name": "The Finder",
+      "cost": 60,
+      "desc": "A flat disc that twitches toward the nearest hole still open. It exaggerates at distance and it stops lying when it is close.",
+      "use": "finder",
+      "where": "run"
     }
   ]
 }

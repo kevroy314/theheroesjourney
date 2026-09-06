@@ -631,6 +631,11 @@ func wipe() -> void:
 	selected_theme = ""
 	selected_ruleset = ""
 	stats = {"runs": 0, "clears": 0, "tasks": 0, "scaled": 0, "grit_earned": 0, "resolve_earned": 0}
+	# Objectives and seen conversations keep their own files, the way History
+	# does, because both change a handful of times a run and Meta rewrites its
+	# whole blob on nearly every action. A wipe has to reach them explicitly.
+	Objectives.wipe()
+	Dialogue.wipe()
 	_ensure_defaults()
 	ensure_palace()
 	save_game()

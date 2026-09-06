@@ -59,3 +59,6 @@ world/*.autosave
 
 # Screenshots from other games, for aesthetic reference only. Never committed.
 AESTHETIC-SEEDS/
+
+# Local scratch, never committed.
+.scratch/

@@ -16,10 +16,19 @@ var rng := RandomNumberGenerator.new()
 ## pay" and "what does the Tonic do".
 var outcomes := HJOutcomes.new(self)
 var items := HJItems.new(self)
+## The first thirty minutes. Every beat in here fires once in the lifetime of a
+## save; keeping them together is what stops `if Meta.loops == 0` appearing in
+## the movement code.
+var tutorial := HJTutorial.new(self)
+var interactables := HJInteractables.new(self)
 
 
 func boot() -> void:
 	Palette.ensure_loaded()
+	# A buff is a Rules source, so the set of sources has to be rebuilt whenever
+	# one starts or ends — including the ones that ended while the app was shut.
+	if not Buffs.changed.is_connected(_on_buffs_changed):
+		Buffs.changed.connect(_on_buffs_changed)
 	rebuild_rules()
 	load_run()
 	if run != null and not run.finished:
@@ -76,12 +85,23 @@ func changed() -> void:
 func rebuild_rules() -> void:
 	Rules.clear()
 	Rules.add_source("meta", {"modifiers": Meta.active_modifiers()})
+	# Buffs are sources like any other, named so Rules.explain() can say which
+	# one moved a number. They apply outside a run as well: the White Room is a
+	# buff on the player, not on the run.
+	for source in Buffs.sources():
+		Rules.add_source(String(source["name"]), source["data"])
 	if run == null:
 		Rules.add_source("ruleset", Content.ruleset(Meta.selected_ruleset))
 		return
 	Rules.add_source("ruleset", Content.ruleset(run.ruleset_id))
 	for id in run.trinkets:
 		Rules.add_source("trinket:" + String(id), Content.trinkets.get(id, {}))
+
+
+func _on_buffs_changed() -> void:
+	rebuild_rules()
+	Steps.budget_changed.emit()
+	Events.run_changed.emit()
 
 
 # --- run lifecycle -------------------------------------------------------------
@@ -110,7 +130,9 @@ func start_run(run_seed: int = 0) -> void:
 
 	# New run, new legs. The stipend exists so the first room is reachable
 	# without having walked anywhere yet — you should never open the game to a
-	# world you cannot move in.
+	# world you cannot move in. Buffs go with the legs: yesterday's coffee is
+	# not this morning's.
+	Buffs.clear_all()
 	Steps.reset_run()
 	Steps.grant(int(Rules.value("steps.starting_grant", run.ctx())))
 	apply_effects(Rules.hook("on_run_start", run.ctx()))
@@ -121,6 +143,7 @@ func start_run(run_seed: int = 0) -> void:
 	run.zone = 0
 	run.deadline_unix = HJClock.now() + HJClock.hours_to_seconds(
 		maxf(1.0, 24.0 + Rules.value("area.deadline_bonus_hours", run.ctx(), 0.0)))
+	tutorial.on_run_start()
 	Notify.sync()
 	changed()
 	goto("overworld")
@@ -188,6 +211,7 @@ func end_run(outcome: String) -> void:
 	})
 
 	Notify.sync()
+	Buffs.clear_all()
 	clear_saved_run()
 	goto("summary")
 
@@ -457,6 +481,27 @@ func use_item(id: String) -> bool:
 	return items.use(id)
 
 
+# --- interactables -------------------------------------------------------------
+# The world has objects you can act on. Screens ask what is within reach of the
+# cell the player is standing on and render the answer; the work is
+# HJInteractables'.
+
+## Everything actionable from `cell`, priced and told whether it can be afforded.
+func interactables_near(cell: Vector2i) -> Array:
+	return interactables.near(cell)
+
+
+## Act on one, by the `key` that came back from interactables_near.
+func interact(key: String) -> bool:
+	return interactables.act(key)
+
+
+## Does the run remember this? Tags are set by node `grants` and by the `tag`
+## effect, and this is how a screen asks whether the front door is open.
+func has_tag(tag: String) -> bool:
+	return run != null and run.tags.has(tag)
+
+
 # --- pause ---------------------------------------------------------------------
 
 func set_paused(value: bool) -> void:
@@ -470,6 +515,9 @@ func set_paused(value: bool) -> void:
 	else:
 		var elapsed := HJClock.now() - Meta.pause_started
 		Meta.paused = false
+		# Nothing counted while paused, and that has to include the buff you paid
+		# for — otherwise a paused night quietly eats four hours of breakfast.
+		Buffs.shift(elapsed)
 		if has_active_run() and elapsed > 0:
 			run.deadline_unix += elapsed
 			Notify.sync()
@@ -500,6 +548,19 @@ func apply_effects(effects: Array) -> void:
 				run.deadline_unix += HJClock.hours_to_seconds(amount)
 			"log":
 				say(String(effect.get("text", "")), String(effect.get("kind", "info")))
+			"buff":
+				# Buffs are data, so anything that can fire an effect can grant
+				# one: a ruleset hook, a trinket, an interactable in the world.
+				Buffs.apply(String(effect.get("buff", "")), silent)
+			"tag":
+				# A tag is the run remembering something happened. The front door
+				# being open is a tag, which is why the gate needs no new field:
+				# `has_tag` already reads them, and so can any screen.
+				var tag := String(effect.get("tag", ""))
+				if tag != "" and not run.tags.has(tag):
+					run.tags.append(tag)
+				if not silent and String(effect.get("text", "")) != "":
+					say(String(effect.get("text", "")), String(effect.get("kind", "good")))
 
 
 # --- persistence ---------------------------------------------------------------

@@ -33,7 +33,9 @@
       "grit",
       "item",
       "deadline",
-      "log"
+      "log",
+      "buff",
+      "tag"
     ],
     "spite_effects": [
       "grit",
@@ -53,7 +55,8 @@
       "full_scale",
       "guarantee_kind_spite",
       "reveal_echo",
-      "resume_run"
+      "resume_run",
+      "finder"
     ],
     "item_where": [
       "home",
@@ -88,7 +91,8 @@
       "summary",
       "codex",
       "wheel",
-      "inventory"
+      "inventory",
+      "dialogue"
     ],
     "node_types": [
       "task",
@@ -127,7 +131,26 @@
     ],
     "_dynamic_key_fields": "Data fields whose *value* is a Rules key resolved at runtime rather than written as a literal in the source. Game.gd rolls loot with Rules.value(String(entry['scaled_by'])), so a key that only ever appears in a scaled_by field is genuinely read even though no literal call names it. validate_data.py cross-checks this list against the non-literal Rules.value() call sites it finds, so adding a second dynamic reader without listing it here is itself an error.",
     "dynamic_key_fields": [
-      "scaled_by"
+      "scaled_by",
+      "cost_key"
+    ],
+    "interactable_reach": [
+      "on",
+      "adjacent"
+    ],
+    "_comment_story": "Effects a dialogue line, a dialogue reply or an objective reward may carry. Objectives.apply_effects is the one implementation, and it hands 'grit', 'deadline' and the unnamed 'item' straight to Game.apply_effects rather than paying them a second way. Not yet reconciled against the source the way hook_effects is -- add `reconcile(report, schema, arms(objectives_gd, \"apply_effects\"), \"story_effects\", \"Objectives.apply_effects\")` to tools/validate_data.py to close that gap.",
+    "story_effects": [
+      "grit",
+      "deadline",
+      "resolve",
+      "item",
+      "tag",
+      "objective",
+      "log"
+    ],
+    "_comment_goals": "Completion conditions Objectives.progress() implements. Objectives.problems() checks the loaded data against this list at runtime.",
+    "objective_goals": [
+      "anomalies_in_ring"
     ]
   },
   "types": {
@@ -674,6 +697,251 @@
       "refs": {
         "scaled_by": "config_keys"
       }
+    },
+    "buffs": {
+      "_comment": "A buff is a set of modifiers with an expiry and an icon, resolved through Rules like every other source. `hours` is a wall-clock timer; `break_on` lists events another system calls Buffs.trigger() with, and a buff with neither runs until something breaks it. `then` applies a second buff the moment this one ends, which is how coffee pays for itself. Not in `runtime`: Content.gd does not merge this key yet, so only the file-side tool checks these records \u2014 four lines in Content.load_all would fix that.",
+      "files": {
+        "dir": "content",
+        "paths": [
+          "buffs[]"
+        ]
+      },
+      "runtime": [
+        "buffs[]"
+      ],
+      "required": [
+        "id",
+        "name",
+        "desc",
+        "icon"
+      ],
+      "optional": [
+        "hours",
+        "break_on",
+        "then",
+        "modifiers",
+        "apply_text",
+        "expire_text"
+      ],
+      "refs": {
+        "then": "buffs"
+      }
+    },
+    "interactables": {
+      "_comment": "Something in the world you can stand next to and act on. This is the catalogue \u2014 the verb, the price and what happens. The instances live in data/world/overworld.json as an `interactables` list of { x, y, type, label? } records, which is a shape the Tiled round trip already turns into a draggable object layer. `cost_key` names a config key rather than a number so a trinket can bend the price, and `effect` is one entry of the same vocabulary hooks use, applied by Game.apply_effects.",
+      "files": {
+        "dir": "content",
+        "paths": [
+          "interactables[]"
+        ]
+      },
+      "runtime": [
+        "interactables[]"
+      ],
+      "required": [
+        "id",
+        "name",
+        "verb",
+        "effect"
+      ],
+      "optional": [
+        "blocks_until_tag",
+        "cost_key",
+        "desc",
+        "icon",
+        "once",
+        "reach",
+        "spent_text"
+      ],
+      "enum": {
+        "reach": "interactable_reach"
+      },
+      "refs": {
+        "cost_key": "config_keys"
+      },
+      "effect_vocab": "hook_effects"
+    },
+    "speakers": {
+      "_comment": "Who can talk. `portrait` is a named seam: no art exists yet, and Dialogue.portrait_path() turns it into assets/portraits/<portrait>_<mood>.png the moment some does.",
+      "files": {
+        "dir": "dialogue",
+        "paths": [
+          "speakers[]"
+        ]
+      },
+      "runtime": [
+        "speakers{}"
+      ],
+      "required": [
+        "id",
+        "name",
+        "portrait"
+      ],
+      "optional": [
+        "accent",
+        "desc"
+      ]
+    },
+    "dialogues": {
+      "files": {
+        "dir": "dialogue",
+        "paths": [
+          "dialogues[]"
+        ]
+      },
+      "runtime": [
+        "dialogues{}"
+      ],
+      "required": [
+        "id",
+        "speaker",
+        "start",
+        "nodes"
+      ],
+      "optional": [
+        "once"
+      ],
+      "refs": {
+        "speaker": "speakers"
+      }
+    },
+    "dialogue_nodes": {
+      "_comment": "One beat: a few lines in order, then either `next` or `replies`. Node ids are unique within their own conversation, not across all of them -- every graph is allowed an 'end'. Dialogue.problems() checks that every next/goto/start names a node in its own graph, which is the half of the check this cannot see.",
+      "files": {
+        "dir": "dialogue",
+        "paths": [
+          "dialogues[].nodes[]"
+        ]
+      },
+      "runtime": [
+        "dialogues{}.nodes[]"
+      ],
+      "required": [
+        "id",
+        "lines"
+      ],
+      "optional": [
+        "speaker",
+        "mood",
+        "next",
+        "replies",
+        "effects",
+        "end"
+      ],
+      "refs": {
+        "mood": "spite_alters",
+        "speaker": "speakers"
+      },
+      "unique_ids": false
+    },
+    "dialogue_replies": {
+      "_comment": "What the player says back. `when` is the same condition dictionary a modifier carries, evaluated by Rules.passes -- there is one condition language in this repo and this is it.",
+      "files": {
+        "dir": "dialogue",
+        "paths": [
+          "dialogues[].nodes[].replies[]"
+        ]
+      },
+      "runtime": [
+        "dialogues{}.nodes[].replies[]"
+      ],
+      "required": [
+        "text"
+      ],
+      "optional": [
+        "goto",
+        "when",
+        "effects"
+      ],
+      "unique_ids": false
+    },
+    "objectives": {
+      "_comment": "What you are trying to do. Progress persists across runs; see scripts/autoload/Objectives.gd.",
+      "files": {
+        "dir": "objectives",
+        "paths": [
+          "objectives[]"
+        ]
+      },
+      "runtime": [
+        "objectives{}"
+      ],
+      "required": [
+        "id",
+        "title",
+        "desc",
+        "goal"
+      ],
+      "optional": [
+        "giver",
+        "reward"
+      ],
+      "refs": {
+        "giver": "speakers"
+      }
+    },
+    "objective_goals": {
+      "files": {
+        "dir": "objectives",
+        "paths": [
+          "objectives[].goal"
+        ]
+      },
+      "runtime": [
+        "objectives{}.goal"
+      ],
+      "required": [
+        "type"
+      ],
+      "optional": [
+        "ring"
+      ],
+      "enum": {
+        "type": "objective_goals"
+      },
+      "unique_ids": false
+    },
+    "story_effects": {
+      "files": {
+        "dir": "dialogue",
+        "paths": [
+          "dialogues[].nodes[].effects[]",
+          "dialogues[].nodes[].replies[].effects[]"
+        ],
+        "also": [
+          {
+            "dir": "objectives",
+            "paths": [
+              "objectives[].reward[]"
+            ]
+          }
+        ]
+      },
+      "runtime": [
+        "dialogues{}.nodes[].effects[]",
+        "dialogues{}.nodes[].replies[].effects[]",
+        "objectives{}.reward[]"
+      ],
+      "required": [
+        "type"
+      ],
+      "optional": [
+        "amount",
+        "item",
+        "count",
+        "objective",
+        "tag",
+        "text",
+        "kind",
+        "silent"
+      ],
+      "enum": {
+        "type": "story_effects"
+      },
+      "refs": {
+        "objective": "objectives"
+      },
+      "unique_ids": false
     }
   },
   "world": {
@@ -701,6 +969,19 @@
       "path_dirt",
       "door",
       "bridge"
-    ]
+    ],
+    "_prop_light": "Where light comes from. A prop entry in assets/tiles/tiles.json may carry a `light`, and that is the whole contract between the art side and the lighting pass: the art declares WHERE a source is and what colour it is, and never renders one. Nothing in the tileset reads the key back. A source declared wrong is invisible rather than wrong-looking, which is exactly the failure this file exists to catch, so all three fields are required once the key is present.",
+  "prop_light": {
+   "required": [
+    "radius",
+    "color",
+    "flicker"
+   ],
+   "radius": "float greater than 0, in tiles",
+   "color": "#RRGGBB, the colour at the source; the falloff belongs to the renderer",
+   "flicker": "float 0.0 to 1.0, 0 is a steady lamp"
+  },
+  "_indoors": "Optional. { x, y, w, h } in cells, the footprint of the building the player wakes in, walls included. The Boon of the White Room is free walking inside it and breaks on the first cell outside, and that same crossing unlocks the Hearth and triggers the Spite encounter (Beat 5). Classified by shape as a marker with w and h as editable properties, so it is a rectangle the designer can drag rather than a rule derived from the floor material.",
+  "_interactables": "Optional. A list of { x, y, type, label? } records naming an entry of the interactables catalogue in data/content/. Classified by shape as an object layer, so Tiled can place, drag and retype them with no tooling change. tools/validate_data.py does not yet check that `type` resolves \u2014 the world pass would need one loop, mirroring the anomaly `area` check."
   }
 }

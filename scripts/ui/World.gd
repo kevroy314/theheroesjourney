@@ -55,6 +55,13 @@ var w: int = 0
 var h: int = 0
 var tiles: PackedByteArray = PackedByteArray()
 var regions: Dictionary = {}          ## area id -> Vector2i
+## Rectangles the tutorial treats as "inside". The Boon of the White Room makes
+## walking free indoors and breaks the moment the player crosses out, and that
+## crossing also unlocks the Hearth and puts Spite on the doorstep — so the
+## engine needs a hard answer to "am I still in the house". Deriving it from the
+## floor material would break the first time someone lays a plank floor on a
+## porch; a rectangle the map editor can drag is honest and adjustable.
+var indoors: Array[Rect2i] = []
 var spawn := Vector2i.ZERO
 var loaded := false
 
@@ -98,6 +105,19 @@ func load_world() -> void:
 	props = _plane(parsed, "props_b64_deflate")
 	blocked = _plane(parsed, "blocked_b64_deflate")
 	cliffs = _plane(parsed, "cliffs_b64_deflate")
+	indoors.clear()
+	# Accepts one rect or a list of them, because a floor plan that is not a
+	# rectangle is normal and the alternative is the map lying about itself.
+	var rooms: Variant = parsed.get("indoors", [])
+	for entry in (rooms if rooms is Array else [rooms]):
+		if entry is Dictionary:
+			indoors.append(Rect2i(int(entry.get("x", 0)), int(entry.get("y", 0)),
+				int(entry.get("w", 0)), int(entry.get("h", 0))))
+	interactables = parsed.get("interactables", [])
+	_interactable_at.clear()
+	for entry in interactables:
+		if entry is Dictionary:
+			_interactable_at[Vector2i(int(entry.get("x", 0)), int(entry.get("y", 0)))] = entry
 	anomalies = parsed.get("anomalies", [])
 	_anomaly_at.clear()
 	for a in anomalies:
@@ -183,7 +203,41 @@ func walkable(x: int, y: int) -> bool:
 	var i := y * w + x
 	if i >= 0 and i < blocked.size() and blocked[i] != 0:
 		return false
-	return not solid.has(at(x, y))
+	if not solid.has(at(x, y)):
+		return not _shut(Vector2i(x, y))
+	return false
+
+
+## Is this cell inside a building?
+func is_indoors(cell: Vector2i) -> bool:
+	for r in indoors:
+		if r.has_point(cell):
+			return true
+	return false
+
+
+## Every interactable placed in the world, and the one on a given cell.
+var interactables: Array = []
+var _interactable_at: Dictionary = {}
+
+
+func interactable_at(cell: Vector2i) -> Dictionary:
+	return _interactable_at.get(cell, {})
+
+
+## A door standing in the way because it has not been paid for yet.
+##
+## This is what gates the house: the exit is a Grit purchase, not a reward for
+## finishing an anomaly. Leaving is a thing you buy, which is the whole lesson
+## of Beat 4 — and expressing it as an unwalkable cell rather than a special
+## case in the movement code means every path query already respects it.
+func _shut(cell: Vector2i) -> bool:
+	var entry: Dictionary = _interactable_at.get(cell, {})
+	if entry.is_empty():
+		return false
+	var kind := Content.interactable(String(entry.get("type", "")))
+	var gate := String(kind.get("blocks_until_tag", ""))
+	return gate != "" and not Game.has_tag(gate)
 
 
 ## Every anomaly in the world, and the one on a given cell.

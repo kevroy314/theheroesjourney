@@ -1,0 +1,74 @@
+{
+  "_comment": "The catalogue of things in the world you can act on. This file says what a kind of object *is* \u2014 its verb, its price and what it does. Where the instances stand is world data: `data/world/overworld.json` carries an `interactables` list of { x, y, type, label? } records, which the Tiled round trip turns into a draggable object layer (see docs/MAP-EDITING.md). So the house agent places them and the designer retypes them, and neither needs code. `cost_key` names a config key rather than a literal so a trinket can bend the price; `effect` is one entry of the same effect vocabulary hooks use, applied by Game.apply_effects.",
+  "interactables": [
+    {
+      "id": "front_door",
+      "name": "The front door",
+      "verb": "Open",
+      "desc": "Shut, and it means it. Outside is a purchase.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "cost_key": "interact.door_cost",
+      "once": true,
+      "spent_text": "It is already open.",
+      "effect": {
+        "type": "tag",
+        "tag": "front_door_open",
+        "text": "The lock turns. The morning is out there."
+      },
+      "blocks_until_tag": "front_door_open"
+    },
+    {
+      "id": "stove",
+      "name": "The stove",
+      "verb": "Make coffee",
+      "desc": "Three hours of moving quicker, and then the bill.",
+      "icon": "water",
+      "reach": "adjacent",
+      "cost_key": "interact.coffee_cost",
+      "effect": {
+        "type": "buff",
+        "buff": "coffee"
+      }
+    },
+    {
+      "id": "counter",
+      "name": "The kitchen counter",
+      "verb": "Eat breakfast",
+      "desc": "Four hours of getting more out of everything you do.",
+      "icon": "fuel",
+      "reach": "adjacent",
+      "cost_key": "interact.breakfast_cost",
+      "effect": {
+        "type": "buff",
+        "buff": "breakfast"
+      }
+    },
+    {
+      "id": "dog",
+      "name": "The dog",
+      "verb": "Pet",
+      "desc": "He has been waiting since before you woke up.",
+      "icon": "bond",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "good",
+        "text": "He leans his whole weight into your hand. Nothing is wrong anywhere."
+      }
+    },
+    {
+      "id": "cat",
+      "name": "The cat",
+      "verb": "Pet",
+      "desc": "Available, conditionally.",
+      "icon": "bond",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "good",
+        "text": "Two strokes, and then a look that says that was the two."
+      }
+    }
+  ]
+}

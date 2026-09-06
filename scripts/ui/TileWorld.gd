@@ -13,6 +13,8 @@ signal anomaly_entered(cell: Vector2i)
 signal moved(cell: Vector2i)
 signal blocked                      ## tried to move with nothing left to spend
 
+static var BENCH_US := 0
+static var BENCH_N := 0
 const TILE := 32
 ## 32x48 — one tile wide, a tile and a half tall, which is the genre convention
 ## and the reason the old 24x32 figure read as a bollard rather than a person.
@@ -23,7 +25,6 @@ const TILE := 32
 const FRAME_W := 32
 const FRAME_H := 48
 const ZOOM := 3                     ## the character is ~4mm tall at 1:1 on a phone
-const STEP_TIME := 0.17             ## seconds to cross one tile
 
 ## Column order of the walk cycle. Neutral sits between the two steps on
 ## purpose: 0,1,2 gives a limp, because there is no neutral to pass through.
@@ -54,7 +55,36 @@ var _moving := false
 var _t := 0.0                        ## progress across the current tile, 0..1
 var _cycle := 0                      ## which entry of CYCLE this step is using
 var _held := Vector2i.ZERO           ## direction the player is holding
+## Seconds to cross the tile currently being crossed.
+##
+## Read from Steps at the moment a step *begins* rather than held as a constant,
+## because it is a tuned value now — the coffee buff speeds it up and the crash
+## afterwards slows it down, through `walk.step_time` in config.json. Sampled
+## per step rather than per frame so a buff landing mid-tile does not stretch or
+## snap the stride already in progress; it takes effect on the next tile.
+var _step_time := 0.17
 var _anomalies := AnomalyArt.new()
+
+## The lit world. A child node rather than part of _draw, because a CanvasItem
+## has one material and this pass needs its own — see HJLightOverlay. Null when
+## lighting is switched off, and every call site tolerates that.
+var _light: HJLightOverlay = null
+## The frame's light list, written straight into the arrays the shader wants.
+##
+## Dictionaries would read better and were what this did first. They also
+## allocate ten objects a frame forever, for something whose whole job is to be
+## free — so the emitters are packed in place and the count is carried beside
+## them. xy is the centre in overlay pixels, z the radius in pixels, w the
+## intensity after flicker and daylight.
+var _lpos: PackedVector4Array = PackedVector4Array()
+var _lcol: PackedVector4Array = PackedVector4Array()
+var _lcount := 0
+## Anomaly emitters, resolved once. The world stores them as JSON dictionaries
+## and thirty Variant lookups a frame is thirty too many.
+var _anomaly_lights: Array[Vector4] = []      ## x, y, radius in tiles, unused
+## Lights that belong to no prop: a carried lantern, a scripted window, a spell.
+## key -> { cell: Vector2i, radius: float, colour: Color, flicker: float }.
+var _dynamic: Dictionary = {}
 
 
 func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
@@ -73,6 +103,13 @@ func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
 		var parts := String(key).split(",")
 		if parts.size() == 2:
 			_cleared[Vector2i(int(parts[0]), int(parts[1]))] = true
+	_lpos.resize(HJLighting.MAX_LIGHTS)
+	_lcol.resize(HJLighting.MAX_LIGHTS)
+	for spawn in world.anomalies:
+		var entry: Dictionary = spawn
+		_anomaly_lights.append(Vector4(float(int(entry.get("x", 0))),
+			float(int(entry.get("y", 0))),
+			HJLighting.ANOMALY_RADIUS + 0.5 * float(int(entry.get("tier", 0))), 0.0))
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clip_contents = true
@@ -87,6 +124,15 @@ func _ready() -> void:
 	_props = load("res://assets/tiles/props.png")
 	_cliffs = load("res://assets/tiles/cliffs.png")
 	_player = load("res://assets/sprites/player.png")
+	if HJLighting.enabled:
+		var overlay := HJLightOverlay.new()
+		if overlay.has_shader():
+			_light = overlay
+			add_child(_light)
+			# Once per launch, here rather than lazily in the draw loop: a
+			# one-off pass over the prop plane belongs with the texture loads,
+			# not with the first frame the player sees.
+			HJLighting.index_world(world)
 	set_process(true)
 
 
@@ -105,7 +151,7 @@ func cell() -> Vector2i:
 
 func _process(delta: float) -> void:
 	if _moving:
-		_t += delta / STEP_TIME
+		_t += delta / _step_time
 		if _t < 1.0:
 			queue_redraw()
 			return
@@ -138,6 +184,7 @@ func _try_move(direction: Vector2i) -> void:
 	_cell = target
 	_moving = true
 	_t = 0.0
+	_step_time = Steps.step_time()
 	_cycle = (_cycle + 1) % CYCLE.size()
 
 
@@ -180,6 +227,7 @@ func _draw() -> void:
 
 	_draw_markers(cam, scale)
 	_draw_scenery(cam, first, last)
+	_light_pass(cam, scale, first, last)
 
 
 ## Deterministic per cell, so a tile keeps its variant. A cell that reshuffled
@@ -405,3 +453,128 @@ func _draw_character(cam: Vector2) -> void:
 		Vector2(FRAME_W, FRAME_H) * float(ZOOM))
 	draw_texture_rect_region(_player, dst,
 		Rect2(col * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H))
+
+
+## --- light ---------------------------------------------------------------------
+
+## Add a light that no prop is responsible for: a lantern the player is
+## carrying, a window a script has lit, the flash of something going off.
+##
+## Keyed, so calling it again with the same key moves the light rather than
+## stacking a second one. This is the seam for anything that lights the world
+## dynamically; nothing uses it yet, and the prop path does not go through it.
+func add_light(key: String, cell: Vector2i, radius: float,
+		colour: Color = Color(1.0, 0.78, 0.5), flicker_amount: float = 0.0) -> void:
+	_dynamic[key] = {
+		"cell": cell, "radius": radius, "colour": colour,
+		"flicker": clampf(flicker_amount, 0.0, 1.0),
+	}
+
+
+func remove_light(key: String) -> void:
+	_dynamic.erase(key)
+
+
+## Every emitter that can reach the view, handed to the overlay in local pixels.
+##
+## Culling is the whole job. The world is 256x256 with six thousand props, and
+## at three-times zoom the viewport holds about fifty cells — so this walks the
+## visible rectangle grown by the longest reach in the tileset, which is a few
+## hundred lookups, and never touches the other 65,000 cells.
+func _light_pass(cam: Vector2, scale: float, first: Vector2i, last: Vector2i) -> void:
+	if _light == null:
+		return
+	_lcount = 0
+	var now := float(Time.get_ticks_msec()) * 0.001
+	# Pixels per tile on screen. A radius in the manifest is in tiles, which is
+	# the only unit that stays meaningful if the zoom ever changes.
+	var per_tile := scale
+	# Broad daylight: no lamp is worth gathering, so nothing below runs and the
+	# overlay writes nothing at all.
+	var gain := HJLighting.lamp_gain()
+
+	if gain > 0.002:
+		var margin := HJLighting.margin_tiles()
+		var from := Vector2i(maxi(0, first.x - margin), maxi(0, first.y - margin))
+		var to := Vector2i(mini(world.w - 1, last.x + margin),
+			mini(world.h - 1, last.y + margin))
+		for bucket in HJLighting.buckets_over(from, to):
+			for source in bucket:
+				var entry: Dictionary = source
+				var cell: Vector2i = entry["cell"]
+				_emit(Vector2(cell.x + 0.5, cell.y + 0.5) * float(TILE),
+					float(entry["radius"]), entry["colour"], cam, per_tile,
+					gain * HJLighting.flicker(
+						float(entry["flicker"]), float(entry["phase"]), now))
+
+		# Anomalies. Not props and not in the manifest — the world generator
+		# places them, so their light belongs to the renderer that draws them.
+		# Walked as a flat list: there are thirty in the whole world.
+		if HJLighting.anomaly_glow:
+			for a in _anomaly_lights:
+				var cell := Vector2i(int(a.x), int(a.y))
+				if _cleared.has(cell):
+					continue
+				_emit(Vector2(a.x + 0.5, a.y + 0.5) * float(TILE), a.z,
+					HJLighting.ANOMALY_COLOUR, cam, per_tile,
+					gain * HJLighting.flicker(HJLighting.ANOMALY_FLICKER,
+						HJLighting.phase_for(cell), now))
+
+		for key in _dynamic:
+			var entry: Dictionary = _dynamic[key]
+			var cell: Vector2i = entry["cell"]
+			_emit(Vector2(cell.x + 0.5, cell.y + 0.5) * float(TILE),
+				float(entry["radius"]), entry["colour"], cam, per_tile,
+				gain * HJLighting.flicker(float(entry["flicker"]),
+					HJLighting.phase_for(cell), now))
+
+		# The character's own. Placed off the interpolated position rather than
+		# the cell, so it slides with him instead of jumping a tile at a time.
+		if HJLighting.player_light > 0.0:
+			_emit(_character_px() + Vector2(TILE, TILE) * 0.5,
+				HJLighting.PLAYER_RADIUS, HJLighting.PLAYER_COLOUR, cam, per_tile,
+				gain * HJLighting.player_light)
+
+	_light.submit(_lpos, _lcol, _lcount, size)
+
+
+## One emitter: world pixels to overlay pixels, a cull, and one slot filled.
+##
+## Placed at the centre of the cell the prop stands on rather than at the top of
+## its sprite: the pool on the ground is what the eye reads, and it belongs at
+## the foot of the lamp post, not level with its lantern.
+func _emit(world_px: Vector2, radius_tiles: float, colour: Color,
+		cam: Vector2, per_tile: float, intensity: float) -> void:
+	if radius_tiles <= 0.0 or intensity <= 0.002:
+		return
+	var at := world_px * float(ZOOM) - cam
+	var radius := radius_tiles * per_tile
+	# Off-screen by more than its own reach: gathered by the bucket, discarded
+	# here. Buckets are sixteen tiles square, so most of what one returns is
+	# behind the player.
+	if at.x + radius < 0.0 or at.y + radius < 0.0 \
+			or at.x - radius > size.x or at.y - radius > size.y:
+		return
+
+	var slot := _lcount
+	if slot >= HJLighting.MAX_LIGHTS:
+		# Full. Drop whichever of the twelve is furthest from the middle of the
+		# view, so the lamp the player is standing under always survives — losing
+		# that one to keep a lamp in the corner is the only visible way this
+		# could fail.
+		var centre := size * 0.5
+		var worst := -1
+		var worst_d := at.distance_squared_to(centre)
+		for i in range(HJLighting.MAX_LIGHTS):
+			var d: float = Vector2(_lpos[i].x, _lpos[i].y).distance_squared_to(centre)
+			if d > worst_d:
+				worst_d = d
+				worst = i
+		if worst < 0:
+			return
+		slot = worst
+	else:
+		_lcount += 1
+
+	_lpos[slot] = Vector4(at.x, at.y, radius, intensity)
+	_lcol[slot] = Vector4(colour.r, colour.g, colour.b, 1.0)

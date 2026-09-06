@@ -107,7 +107,15 @@ func build() -> void:
 	# run: you keep what you did, and every tile costs more until you finish one
 	# properly. Outside one, the only exit is still the loop itself.
 	var give_up: Button
-	if Game.has_active_run() and not run.anomaly.is_empty():
+	if Game.tutorial.holds_you_in():
+		# The very first anomaly does not let you leave. Every later one does —
+		# walking out early is priced, not forbidden, and that pricing is the
+		# difficulty curve. But this is where the player finds out what an
+		# anomaly is, and one they backed out of taught them only that the
+		# button works. Shown disabled rather than hidden, so the absence reads
+		# as a rule and not as a missing control.
+		give_up = HJUI.button("No way back out of this one", "quiet", false)
+	elif Game.has_active_run() and not run.anomaly.is_empty():
 		give_up = HJUI.danger("Walk out", "Leave it half-done",
 			func() -> void: Game.leave_anomaly(false))
 	else:

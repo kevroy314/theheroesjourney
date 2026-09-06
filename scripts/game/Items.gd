@@ -90,6 +90,11 @@ func use(id: String) -> bool:
 			Meta.take_item(id)
 			g.outcomes.give_echo()
 			return true
+		"finder":
+			# The one verb that does not consume its item. The Finder is a disc
+			# you read, not a charge you spend, so it is tapped as often as the
+			# player likes and Meta.take_item is deliberately absent.
+			g.say(Objectives.finder_line(), "info")
 		_:
 			return false
 

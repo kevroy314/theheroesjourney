@@ -27,6 +27,8 @@ func _init(title_text: String, subtitle_text: String) -> void:
 	chips.add_child(_streak)
 	chips.add_child(_clock)
 	v.add_child(chips)
+	# Buffs outlive the walk into an anomaly, so the mark has to follow them in.
+	v.add_child(HJUI.BuffStrip.new())
 
 	add_child(v)
 

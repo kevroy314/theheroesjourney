@@ -1,0 +1,54 @@
+{
+  "_comment": "A buff is a set of modifiers with an expiry and an icon. It is not a second way to change a number: every effect here is an ordinary modifier, resolved through Rules alongside rulesets, trinkets, traits and Palace adjacency. Expiry is wall-clock (HJClock.now), so a buff survives the app being killed and expires while it is closed. Two kinds: `hours` is a timer, `break_on` is a condition someone else calls Buffs.trigger() for. `then` chains a second buff on expiry, which is what makes coffee cost something.",
+  "buffs": [
+    {
+      "id": "white_room",
+      "name": "Boon of the White Room",
+      "desc": "Walking costs you nothing while you are inside.",
+      "icon": "light",
+      "break_on": ["outdoors"],
+      "apply_text": "The room lets you move for free. It will not follow you out.",
+      "expire_text": "The Boon of the White Room breaks. Steps cost steps now.",
+      "modifiers": [
+        { "key": "steps.cost_mult", "op": "set", "value": 0.0 }
+      ]
+    },
+    {
+      "id": "coffee",
+      "name": "Coffee",
+      "desc": "Faster on your feet for three hours.",
+      "icon": "move",
+      "hours": 3,
+      "then": "coffee_crash",
+      "apply_text": "Hot, and a little too strong. You feel quicker already.",
+      "expire_text": "The coffee lets go of you.",
+      "modifiers": [
+        { "key": "walk.step_time", "op": "mul", "value": 0.7 }
+      ]
+    },
+    {
+      "id": "coffee_crash",
+      "name": "The crash",
+      "desc": "What the coffee was borrowing against.",
+      "icon": "rest",
+      "hours": 2,
+      "apply_text": "And there it is. Everything is further away than it was.",
+      "expire_text": "The crash passes. You feel like yourself again.",
+      "modifiers": [
+        { "key": "walk.step_time", "op": "mul", "value": 1.35 }
+      ]
+    },
+    {
+      "id": "breakfast",
+      "name": "Breakfast",
+      "desc": "Half again as much Grit for four hours.",
+      "icon": "fuel",
+      "hours": 4,
+      "apply_text": "Eaten standing up, which still counts.",
+      "expire_text": "Breakfast has worn off.",
+      "modifiers": [
+        { "key": "run.grit_mult", "op": "mul", "value": 1.5 }
+      ]
+    }
+  ]
+}

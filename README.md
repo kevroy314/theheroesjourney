@@ -54,6 +54,7 @@ none of it done.
 | [`docs/DATA.md`](docs/DATA.md) | every JSON schema, and how to add content |
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | build, caching, PWA, hosting |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | the visual language: two registers, the persistence rule, marks |
+| [`docs/TESTING-ON-DEVICE.md`](docs/TESTING-ON-DEVICE.md) | the Android emulator from WSL: `emu:*`, state over adb, what it cannot tell you |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | the loop, branch/PR practice, conventions |
 | [`.claude/skills/`](.claude/skills) | agent skills: the traps already hit, written up so nobody hits them twice |
 
