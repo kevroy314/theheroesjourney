@@ -33,20 +33,93 @@ const MANIFEST := "res://assets/tiles/tiles.json"
 const MAX_LIGHTS := 12
 
 
-## --- the clock seam ------------------------------------------------------------
+## --- the clock -------------------------------------------------------------------
 ##
-## 0.0 midnight, 0.25 dawn, 0.5 noon, 0.75 dusk. The game opens in early
-## morning, which is why the default is 0.27 and not 0.5.
+## 0.0 midnight, 0.25 dawn, 0.5 noon, 0.75 dusk.
 ##
-## SEAM FOR #33 (the world clock, which does not exist yet). When it lands it
-## should own this value and write it once per tick:
+## WHY THIS IS NOT STILL A SEAM
 ##
-##     HJLighting.time_of_day = Clock.fraction_of_day()
+## It was a static 0.27 with a note saying #33 would move it one day. That is a
+## defensible way to ship a ramp and an indefensible way to ship a *time of day*:
+## every hour below this line was correct and none of it was ever reached,
+## because nothing in the running game ever wrote the variable. The first
+## complaint about the lighting not being time-of-day dependent was really a
+## complaint about the clock being stopped, and no amount of tuning the ramp
+## would have answered it.
 ##
-## Nothing else should set it. Until then it is a settable property with a
-## sensible default, exactly as issue #49 asks, and the renderer reads it every
-## frame so a debug slider can drive it live.
+## So the value moves on its own now, and it moves in one of three ways:
+##
+##   CLOCK_FIXED   nothing advances it. What the self-test and every screenshot
+##                 harness use, because a picture of an hour has to be of the
+##                 hour it asked for. `set_hour()` selects this.
+##   CLOCK_LOCAL   the player's own wall clock, 1:1. Thematically the right
+##                 answer for an app about how you spend your days, and almost
+##                 certainly what #33 will settle on — but you see exactly one
+##                 hour per session, which is indistinguishable from a stopped
+##                 clock over five minutes of play.
+##   CLOCK_CYCLE   a compressed day, *anchored to the real local hour at
+##                 startup*. Opens matching your wall clock and then visibly
+##                 moves. This is the default, and it is the stopgap: it is the
+##                 only setting under which a player who is not looking for the
+##                 feature still sees it.
+##
+## When #33 lands it should set `clock_mode = CLOCK_FIXED` once and write
+## `time_of_day` every tick; nothing else here has to change.
+enum { CLOCK_FIXED, CLOCK_LOCAL, CLOCK_CYCLE }
+
+static var clock_mode: int = CLOCK_CYCLE
+
+## One in-game day in real seconds, for CLOCK_CYCLE. Twenty-four minutes is a
+## minute an hour: a three-minute walk crosses three hours, which is enough to
+## watch a shaft swing across a floor and not enough to strobe.
+static var cycle_seconds: float = 1440.0
+
 static var time_of_day: float = 0.27
+
+## The clock is sampled at most this often. Three accessors read the hour every
+## frame and they must all agree within that frame, or the ambient cache thrashes
+## three times a frame for a value that moved by a millionth.
+const CLOCK_TICK_MS := 100
+
+static var _clock_read_at: int = -CLOCK_TICK_MS
+static var _cycle_origin: float = -1.0
+
+
+## The hour the player's own clock says it is, 0..1.
+static func local_hour() -> float:
+	var t := Time.get_time_dict_from_system()
+	return (float(t["hour"]) + float(t["minute"]) / 60.0
+		+ float(t["second"]) / 3600.0) / 24.0
+
+
+## Pin the hour and stop it moving. The one call a harness, a debug slider or a
+## cutscene should make — assigning `time_of_day` while a cycle is running is a
+## write the next frame silently undoes.
+static func set_hour(fraction: float) -> void:
+	clock_mode = CLOCK_FIXED
+	time_of_day = fposmod(fraction, 1.0)
+
+
+## Advance the hour if anything is driving it. Called from the accessors rather
+## than from a _process somewhere, so this file stays a RefCounted with no node
+## to own it and a build that never draws the world never asks the OS the time.
+static func _advance() -> void:
+	if clock_mode == CLOCK_FIXED:
+		return
+	var now := Time.get_ticks_msec()
+	if now - _clock_read_at < CLOCK_TICK_MS:
+		return
+	_clock_read_at = now
+	if clock_mode == CLOCK_LOCAL:
+		time_of_day = local_hour()
+		return
+	if _cycle_origin < 0.0:
+		# Anchored, not started from the default. Opening the game at nine in the
+		# evening and being handed early morning is the same wrongness as a
+		# stopped clock, only harder to notice.
+		_cycle_origin = local_hour() - float(now) * 0.001 / maxf(cycle_seconds, 1.0)
+	time_of_day = fposmod(
+		_cycle_origin + float(now) * 0.001 / maxf(cycle_seconds, 1.0), 1.0)
 
 ## Off switches, both for the "it must degrade" clause and for a settings menu
 ## later. With `enabled = false` the overlay is not even created.
@@ -129,6 +202,10 @@ const AMBIENT := [
 ## brightness knob; everything else about a lamp comes from its own entry.
 const GLOW := 0.34
 
+## What a lamp is worth at the moment the sky first needs it, against 1.0 in a
+## dead-black hour. See _settle().
+const LAMP_DUSK := 0.62
+
 
 ## What a lamp is worth at this hour.
 ##
@@ -157,6 +234,7 @@ static var _cache_gain: float = 0.0
 
 
 static func _resample() -> void:
+	_advance()
 	if is_equal_approx(_cache_at, time_of_day) and _cache_indoors == indoors:
 		return
 	_cache_at = time_of_day
@@ -183,7 +261,19 @@ static func _settle(mix: float, colour: Color) -> void:
 	if indoors:
 		_cache_mix = maxf(mix, INTERIOR_MIX)
 		_cache_colour = colour.lerp(INTERIOR_COLOUR, 0.75)
-	_cache_gain = smoothstep(0.0, 0.34, _cache_mix)
+	# Two terms, because one could not say both things.
+	#
+	# The first is the switch: a lamp is worth nothing at noon and the pass is a
+	# no-op there, which is what the old single smoothstep(0, 0.34) bought.
+	#
+	# The second is the one it was missing. That curve reached 1.0 at mix 0.34 and
+	# stayed there for the entire dark half of the day, so a lit window at dusk and
+	# the same window at midnight were the same window — and they are not. At dusk
+	# it is competing with the sky and at midnight it is the only thing in the
+	# room. LAMP_DUSK is what a lamp is worth while there is still a sky to lose
+	# to; it reaches full only once the sky is gone.
+	_cache_gain = smoothstep(0.0, 0.20, _cache_mix) * lerpf(
+		LAMP_DUSK, 1.0, smoothstep(0.20, 0.78, _cache_mix))
 
 
 ## How much of the ambient replaces the art right now, 0..1.
@@ -504,6 +594,7 @@ const SHAFT_COLOUR := Color(1.0, 0.906, 0.761)     ## #FFE7C2, first light
 ## Where the sun is in its arc: 0 at sunrise, 1 at sunset, pinned at the ends
 ## through the night so nothing downstream has to special-case darkness.
 static func sun_arc() -> float:
+	_advance()
 	return clampf((fposmod(time_of_day, 1.0) - 0.25) / 0.5, 0.0, 1.0)
 
 
@@ -512,21 +603,36 @@ static func sun_height() -> float:
 	return sin(PI * sun_arc())
 
 
+## What a lit window is worth at noon, against 1.0 at the golden hour.
+##
+## This was 0.0 and the argument for it was good and the result was wrong. A sun
+## at the zenith does not come through a window *sideways* — true — so the curve
+## fell to nothing well before noon, which meant that for the eight hours of the
+## day a player is most likely to be playing, a room with four windows had no
+## light coming through any of them. The whole of "time of day dependent"
+## reduced, in practice, to two short windows the stopped clock never reached.
+##
+## A real room at midday does have a bright patch under the window; it is short
+## and steep rather than long and raking, and `sun_reach()` already says so by
+## itself. So the hold is what stays, and the *shape* is what changes.
+const MIDDAY_HOLD := 0.55
+
+
 ## What a shaft is worth at this hour.
 ##
 ## The mirror of `lamp_gain()`, and deliberately the opposite shape. A lamp is
 ## worth nothing when the sun is up; a shaft is worth nothing when the sun is
-## *down* — and also nothing when it is overhead, because a sun at the zenith
-## does not come through a window sideways, it comes through a skylight. So the
-## curve rises just after sunrise, peaks while the sun is low, and is gone well
-## before noon. It comes back before dusk on its own, from the same arc, which
-## is why there is no separate evening term: an evening shaft through a west
-## window is the same phenomenon seen from the other end of the day.
+## *down*, and least when it is overhead. The curve rises just after sunrise,
+## peaks while the sun is low, sags to MIDDAY_HOLD across the middle of the day,
+## and comes back before dusk on its own from the same arc — which is why there
+## is no separate evening term: an evening shaft through a west window is the
+## same phenomenon seen from the other end of the day.
 static func shaft_gain() -> float:
 	if not shafts:
 		return 0.0
 	var e := sun_height()
-	return smoothstep(0.02, 0.14, e) * (1.0 - smoothstep(0.30, 0.62, e))
+	return smoothstep(0.02, 0.14, e) * lerpf(1.0, MIDDAY_HOLD,
+		smoothstep(0.30, 0.72, e))
 
 
 ## Which way the light travels across the ground, as a unit vector in screen
@@ -544,6 +650,152 @@ static func sun_reach() -> float:
 ## The quantised bearing the traces were last run against.
 static func sun_stamp() -> float:
 	return round(lerpf(SUN_FROM, SUN_TO, sun_arc()) / TRACE_QUANTUM)
+
+
+## --- the moon -------------------------------------------------------------------
+##
+## WHY THE MOON IS A SECOND BODY AND NOT A BLUE SUN
+##
+## The cheap version of night light is to keep the sun's arc, tint it blue and
+## turn it down. It does not read. Three things are wrong with it and each one is
+## visible in a single frame:
+##
+##   * the bearing. Tinting the sun's shaft blue puts the moon wherever the sun
+##     is, so at midnight — the hour a moonbeam matters most — there is no sun in
+##     the arc at all and the beam simply is not drawn. The moon has to have its
+##     own arc across its own half of the day, and then a bearing at any given
+##     hour that is nothing like the sun's, for free, because it is a different
+##     body on a different clock.
+##   * the edge. Sunlight through a mullioned window draws the mullions. Moon
+##     light is a twentieth as bright landing on a surface that is already almost
+##     black, and the eye reads no frame in it at all — just a pale wash on the
+##     floor by the window. So the panes are switched off, the wedge is widened,
+##     and the across-profile loses its plateau entirely (see `soft` in
+##     world_light.gdshader). That last one is the whole tell: a sun shaft has a
+##     bright core with soft shoulders, a moon shaft is soft all the way through.
+##   * the colour. Not the warm pane colour the prop declares, cooled — the
+##     prop's tint is a fact about *its glass in daylight*. Night gets its own
+##     colour outright.
+##
+## Everything below is the same three-way split the sun uses: the world owns the
+## body, the prop owns the aperture, the map owns the geometry. The trace code,
+## the bucket index and the shader loop are shared and know nothing about which
+## body is in the sky.
+
+## Off switch of its own, so "the shafts are wrong" and "the night is wrong" can
+## be bisected separately.
+static var moonlight: bool = true
+
+## How bright a full moon is against the golden hour. A twentieth is roughly the
+## honest figure; a twentieth is also invisible. 0.26 is what reads as moonlight
+## on an ambient this dark without turning the room grey.
+const MOON_LEVEL := 0.26
+
+## Cold, and not fully saturated — a moonlit floor is desaturated, not blue.
+const MOON_COLOUR := Color(0.63, 0.74, 1.0)
+
+## The beam, against the sun's declared optics for the same aperture.
+const MOON_WIDEN := 2.1        ## half-width at the mouth
+const MOON_SPREAD := 1.8       ## and how fast it opens further
+const MOON_REACH := 0.78       ## it does not carry as far before it is lost
+## A dim, diffuse source collimates harder toward the aperture's own normal —
+## and it is also what stops a moonbeam skimming a wall it can never light.
+const MOON_REVEAL := 0.82
+
+## The night half of the day, 0 at moonrise and 1 at moonset. Deliberately the
+## same shape as `sun_arc()` half a day out of phase, so the two bodies hand over
+## exactly at the horizons and neither is ever in the sky with the other.
+static func moon_arc() -> float:
+	_advance()
+	return clampf(fposmod(time_of_day - 0.75, 1.0) / 0.5, 0.0, 1.0)
+
+
+static func moon_height() -> float:
+	return sin(PI * moon_arc())
+
+
+static func moon_gain() -> float:
+	if not (shafts and moonlight):
+		return 0.0
+	return smoothstep(0.02, 0.20, moon_height()) * MOON_LEVEL
+
+
+static func moon_travel() -> Vector2:
+	var a := deg_to_rad(lerpf(SUN_FROM, SUN_TO, moon_arc()))
+	return Vector2(cos(a), sin(a))
+
+
+static func moon_reach() -> float:
+	return lerpf(REACH_LOW, REACH_HIGH, moon_height()) * MOON_REACH
+
+
+## Offset past every stamp the sun can produce, so the hour the sky changes hands
+## invalidates every trace in the world exactly once. Without it a beam traced
+## against a 90-degree sun would be reused for a 90-degree moon whose reveal term
+## and reach are different.
+const MOON_STAMP_BASE := 1000.0
+
+static func moon_stamp() -> float:
+	return MOON_STAMP_BASE + round(lerpf(SUN_FROM, SUN_TO, moon_arc()) / TRACE_QUANTUM)
+
+
+## --- whichever body is up --------------------------------------------------------
+##
+## The renderer asks the sky, not the sun. One of these is live at a time and
+## both are zero for the few minutes either side of a horizon, which is a real
+## thing that happens at dawn and is worth not papering over.
+enum { SKY_NONE, SKY_SUN, SKY_MOON }
+
+
+static func sky_body() -> int:
+	if shaft_gain() > 0.002:
+		return SKY_SUN
+	if moon_gain() > 0.002:
+		return SKY_MOON
+	return SKY_NONE
+
+
+static func sky_gain() -> float:
+	var body := sky_body()
+	if body == SKY_SUN:
+		return shaft_gain()
+	return moon_gain() if body == SKY_MOON else 0.0
+
+
+static func sky_travel() -> Vector2:
+	return moon_travel() if sky_body() == SKY_MOON else sun_travel()
+
+
+static func sky_reach() -> float:
+	return moon_reach() if sky_body() == SKY_MOON else sun_reach()
+
+
+static func sky_stamp() -> float:
+	return moon_stamp() if sky_body() == SKY_MOON else sun_stamp()
+
+
+static func sky_reveal() -> float:
+	return MOON_REVEAL if sky_body() == SKY_MOON else SUN_REVEAL
+
+
+## The optics the active body imposes on an aperture's declared ones, as
+## multipliers plus the two things it overrides outright.
+##
+##   widen   half-width at the mouth
+##   spread  half-width gained per tile
+##   bars    0 keeps the aperture's own mullions, 1 erases them
+##   soft    0 a cored beam, 1 a wash with no core at all
+##   tint    Color.TRANSPARENT means "keep the aperture's own"
+static func sky_optics() -> Dictionary:
+	if sky_body() == SKY_MOON:
+		return {
+			"widen": MOON_WIDEN, "spread": MOON_SPREAD, "bars": 1.0,
+			"soft": 1.0, "tint": MOON_COLOUR,
+		}
+	return {
+		"widen": 1.0, "spread": 1.0, "bars": 0.0,
+		"soft": 0.0, "tint": Color.TRANSPARENT,
+	}
 
 
 ## --- apertures -----------------------------------------------------------------

@@ -31,6 +31,10 @@ const SCREENS := {
 const FRAME_WIDTH := 720.0
 
 ## How tall a band the toast column is allowed to fill before it starts trimming.
+## What the movement pad and the action button occupy at the bottom of the play
+## screen: the pad is about 260px and `_act` another 84, plus its margin. A
+## toast anchored below this covers the control the player is reaching for.
+const CONTROLS_BAND := 360.0
 const TOAST_BAND := 240.0
 ## How much of the width the offset column takes. Wide enough for a sentence at
 ## FS_SMALL, narrow enough that the right-hand end of whatever it is covering —
@@ -113,12 +117,20 @@ func _place_toasts() -> void:
 	toasts.grow_horizontal = Control.GROW_DIRECTION_END
 	match Meta.ui_toast_pos:
 		"bottom":
+			# Above the controls, not at the screen edge.
+			#
+			# The bottom of the play screen is the action button and the movement
+			# pad — roughly 350px of them — so anchoring to the very bottom put
+			# the toast on top of the primary control and, because the unlock
+			# toast opts back into mouse events, let it eat the tap meant for it.
+			# "Bottom" means the bottom of the *world view*: the lowest place a
+			# notification can sit and still be out of the way of a thumb.
 			toasts.anchor_top = 1.0
 			toasts.anchor_bottom = 1.0
-			toasts.offset_top = -TOAST_BAND
-			toasts.offset_bottom = -16.0
-			# END on both, so the newest line is the one closest to the bottom
-			# edge and older ones ride up out of the way.
+			toasts.offset_top = -(TOAST_BAND + CONTROLS_BAND)
+			toasts.offset_bottom = -CONTROLS_BAND
+			# The newest line sits lowest, closest to where the eye already is,
+			# and older ones ride up out of the way.
 			toasts.grow_vertical = Control.GROW_DIRECTION_BEGIN
 			toasts.alignment = BoxContainer.ALIGNMENT_END
 		"top_left":

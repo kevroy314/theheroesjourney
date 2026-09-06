@@ -6,84 +6,218 @@
   "intro": "Nothing in here is furniture. The hole has your outline in it, roughly, the way a chair remembers someone. It is waiting for the rest.",
   "outro": "It has what it came for. You are on the record now, in a place that does not keep records.",
   "nodes": [
-    { "id": "name", "type": "choice", "label": "Your name",
+    {
+      "id": "name",
+      "type": "choice",
+      "label": "Your name",
       "prompt": "Do you remember your name?",
       "text": "It is a fair question, and you are having to think about it.",
       "remember": "name",
       "grit": 4,
       "options": [
-        { "input": "text", "text": "That one", "grants": ["named"] },
-        { "text": "I do not remember", "grants": ["nameless"] }
+        {
+          "input": "text",
+          "text": "That one",
+          "grants": [
+            "named"
+          ]
+        },
+        {
+          "text": "I do not remember",
+          "grants": [
+            "nameless"
+          ]
+        }
       ],
-      "next": ["muscle"] },
-
-    { "id": "muscle", "type": "choice", "label": "Your strength",
+      "next": [
+        "muscle"
+      ]
+    },
+    {
+      "id": "muscle",
+      "type": "choice",
+      "label": "Your strength",
       "prompt": "I am",
       "text": "Answer for the body you have today, not the one you had, and not the one you meant to have.",
       "remember": "strength",
       "grit": 4,
       "options": [
-        { "text": "weak of muscle", "grants": ["self_weak"] },
-        { "text": "strong of muscle", "grants": ["self_strong"] },
-        { "text": "unsure of my strength", "grants": ["self_unsure"] }
+        {
+          "text": "weak of muscle",
+          "grants": [
+            "self_weak"
+          ]
+        },
+        {
+          "text": "strong of muscle",
+          "grants": [
+            "self_strong"
+          ]
+        },
+        {
+          "text": "unsure of my strength",
+          "grants": [
+            "self_unsure"
+          ]
+        }
       ],
-      "next": ["nourish"] },
-
-    { "id": "nourish", "type": "choice", "label": "What you eat",
+      "next": [
+        "nourish"
+      ]
+    },
+    {
+      "id": "nourish",
+      "type": "choice",
+      "label": "What you eat",
       "prompt": "I am",
       "text": "It does not want a number. It would not know what to do with one.",
       "remember": "nourishment",
       "grit": 4,
       "options": [
-        { "text": "overnourished", "grants": ["self_overfed"] },
-        { "text": "undernourished", "grants": ["self_underfed"] },
-        { "text": "a sweet tooth", "grants": ["self_sweet"] }
+        {
+          "text": "overnourished",
+          "grants": [
+            "self_overfed"
+          ]
+        },
+        {
+          "text": "undernourished",
+          "grants": [
+            "self_underfed"
+          ]
+        },
+        {
+          "text": "a sweet tooth",
+          "grants": [
+            "self_sweet"
+          ]
+        }
       ],
-      "next": ["rested"] },
-
-    { "id": "rested", "type": "choice", "label": "Your sleep",
+      "next": [
+        "rested"
+      ]
+    },
+    {
+      "id": "rested",
+      "type": "choice",
+      "label": "Your sleep",
       "prompt": "I am",
       "text": "Whatever you say here, it is not going to argue with you.",
       "remember": "rest",
       "grit": 4,
       "options": [
-        { "text": "rested", "grants": ["self_rested"] },
-        { "text": "running on empty", "grants": ["self_spent"] },
-        { "text": "awake at the wrong hours", "grants": ["self_nocturnal"] }
+        {
+          "text": "rested",
+          "grants": [
+            "self_rested"
+          ]
+        },
+        {
+          "text": "running on empty",
+          "grants": [
+            "self_spent"
+          ]
+        },
+        {
+          "text": "awake at the wrong hours",
+          "grants": [
+            "self_nocturnal"
+          ]
+        }
       ],
-      "next": ["reach"] },
-
-    { "id": "reach", "type": "choice", "label": "Other people",
+      "next": [
+        "reach"
+      ]
+    },
+    {
+      "id": "reach",
+      "type": "choice",
+      "label": "Other people",
       "prompt": "I",
       "text": "Last one. Then it will want something done, and it will have picked what.",
       "remember": "bonds",
       "grit": 4,
       "options": [
-        { "text": "reach out", "grants": ["self_reaches"] },
-        { "text": "wait to be asked", "grants": ["self_waits"] },
-        { "text": "have let it go quiet", "grants": ["self_quiet"] }
+        {
+          "text": "reach out",
+          "grants": [
+            "self_reaches"
+          ]
+        },
+        {
+          "text": "wait to be asked",
+          "grants": [
+            "self_waits"
+          ]
+        },
+        {
+          "text": "have let it go quiet",
+          "grants": [
+            "self_quiet"
+          ]
+        }
       ],
       "select_next": true,
-      "next": ["act_eat", "act_bed", "act_message"] },
-
-    { "id": "act_eat", "type": "task", "label": "Eat Something",
+      "next": [
+        "act_eat",
+        "act_bed",
+        "act_message"
+      ]
+    },
+    {
+      "id": "act_eat",
+      "type": "task",
+      "label": "Eat Something",
       "text": "You said undernourished, so this is what it asks for. One thing that grew, or one thing with protein in it. Not a plan.",
-      "when": { "has_tag": "self_underfed" },
-      "task": { "movement": "$choose:fuel", "units": 1 },
-      "grit": 14, "next": ["out"] },
-
-    { "id": "act_bed", "type": "task", "label": "Be In Bed On Time",
+      "when": {
+        "has_tag": "self_underfed"
+      },
+      "task": {
+        "movement": "$choose:fuel",
+        "units": 1
+      },
+      "grit": 14,
+      "next": [
+        "out"
+      ]
+    },
+    {
+      "id": "act_bed",
+      "type": "task",
+      "label": "Be In Bed On Time",
       "text": "You said running on empty. It is not asking you to sleep, which you cannot promise. It is asking you to be horizontal at the hour you already decided on.",
-      "when": { "has_tag": "self_spent" },
-      "task": { "movement": "bedtime", "units": 1 },
-      "grit": 14, "next": ["out"] },
-
-    { "id": "act_message", "type": "task", "label": "Message Someone",
+      "when": {
+        "has_tag": "self_spent"
+      },
+      "task": {
+        "movement": "bedtime",
+        "units": 1
+      },
+      "grit": 14,
+      "next": [
+        "out"
+      ]
+    },
+    {
+      "id": "act_message",
+      "type": "task",
+      "label": "Message Someone",
       "text": "One person. You already know which one, and you knew before you finished reading this. It does not have to be about anything.",
-      "task": { "movement": "message", "units": 1 },
-      "grit": 14, "next": ["out"] },
-
-    { "id": "out", "type": "threshold", "label": "The Way Back",
-      "text": "The pressure lets go all at once. You are standing in your own house holding something you did not have five minutes ago." }
-  ]
+      "task": {
+        "movement": "message",
+        "units": 1
+      },
+      "grit": 14,
+      "next": [
+        "out"
+      ]
+    },
+    {
+      "id": "out",
+      "type": "threshold",
+      "label": "The Way Back",
+      "text": "The pressure lets go all at once. You are standing in your own house holding something you did not have five minutes ago."
+    }
+  ],
+  "place": "Home"
 }

@@ -269,6 +269,7 @@
       "optional": [
         "intro",
         "outro",
+        "place",
         "slots",
         "truth"
       ],

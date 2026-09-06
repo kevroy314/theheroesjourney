@@ -604,14 +604,21 @@ func _draw_critter(view: Dictionary, cam: Vector2) -> void:
 	var tex := _critter_sheet(String(view["sprite"]))
 	if tex == null:
 		return
+	# Frame size comes from the view, not from a constant. The animals are 32x32
+	# and a person is 32x48, and reading a 48-tall sheet at a 32 stride lands
+	# every row but the first inside the frame above it — which is why Spite was
+	# a talk prompt with nothing standing behind it.
+	var fw := int(view.get("fw", CRITTER))
+	var fh := int(view.get("fh", CRITTER))
 	var at := Vector2(view["from"] as Vector2i).lerp(
 		Vector2(view["cell"] as Vector2i), float(view["t"]))
-	var origin := (at * float(TILE) + Vector2(0.0, float(TILE - CRITTER))) \
-		* float(ZOOM) - cam
+	# Standing on the cell's bottom edge, so a taller figure grows upward out of
+	# the ground rather than sinking into it. Same rule as the character.
+	var origin := (at * float(TILE) + Vector2(float(TILE - fw) * 0.5,
+		float(TILE - fh))) * float(ZOOM) - cam
 	draw_texture_rect_region(tex,
-		Rect2(origin, Vector2(CRITTER, CRITTER) * float(ZOOM)),
-		Rect2(int(view["col"]) * CRITTER, int(view["row"]) * CRITTER,
-			CRITTER, CRITTER))
+		Rect2(origin, Vector2(fw, fh) * float(ZOOM)),
+		Rect2(int(view["col"]) * fw, int(view["row"]) * fh, fw, fh))
 
 
 func _draw_character(cam: Vector2) -> void:

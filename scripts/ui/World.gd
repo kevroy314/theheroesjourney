@@ -232,7 +232,13 @@ func place_name(cell: Vector2i) -> String:
 	# than admitting the map has nothing to say about here.
 	if best_d > 24:
 		return "Outside"
-	return String(Content.area(best).get("name", best))
+	# `place`, not `name`. A region id doubles as an area id, and an area's name
+	# belongs to the *memory* you walk into — `waking_room` is called "The
+	# Asking" — so borrowing it told a player standing on their own doorstep
+	# that they were in the anomaly they had not entered. `place` is what the
+	# spot is called when you are merely near it.
+	var area := Content.area(best)
+	return String(area.get("place", area.get("name", best)))
 
 
 ## Is this cell inside a building?
