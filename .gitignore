@@ -56,3 +56,6 @@ server/data/
 # copy of that work. Commit those. See docs/MAP-EDITING.md.
 world/*.tiled-session
 world/*.autosave
+
+# Screenshots from other games, for aesthetic reference only. Never committed.
+AESTHETIC-SEEDS/
