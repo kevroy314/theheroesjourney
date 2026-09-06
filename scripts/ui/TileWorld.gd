@@ -178,6 +178,42 @@ func cell() -> Vector2i:
 	return _cell
 
 
+## Where the top-left of the view sits, in world pixels.
+##
+## The character sits in the middle, except near the edges of the map where the
+## view stops rather than showing void. Extracted from _draw because tap-to-walk
+## needs the same rule to turn a touch into a cell, and it was mirroring it —
+## and mid-stride the camera is up to a whole tile from the cell the character
+## legally occupies, which is enough to send a tap one cell wide.
+func camera_px() -> Vector2:
+	var scale := float(TILE * ZOOM)
+	var view := size
+	var extent := Vector2(world.w, world.h) * scale
+	var focus := (_character_px() + Vector2(TILE, TILE) * 0.5) * float(ZOOM)
+	var cam := focus - view * 0.5
+	cam.x = clampf(cam.x, 0.0, maxf(0.0, extent.x - view.x))
+	cam.y = clampf(cam.y, 0.0, maxf(0.0, extent.y - view.y))
+	if extent.x < view.x:
+		cam.x = -(view.x - extent.x) * 0.5
+	if extent.y < view.y:
+		cam.y = -(view.y - extent.y) * 0.5
+	return cam
+
+
+## The cell under a point in this control's own coordinates.
+##
+## Exists because tap-to-walk needs it and was mirroring the camera rule to get
+## it — and mid-stride the camera is up to a whole tile from the cell the
+## character legally occupies, which is enough to send a tap one cell wide. The
+## rule lives here, where the camera does.
+func cell_at_point(local: Vector2) -> Vector2i:
+	var per_tile := float(TILE * ZOOM)
+	var cam := camera_px()
+	return Vector2i(
+		int(floor((local.x + cam.x) / per_tile)),
+		int(floor((local.y + cam.y) / per_tile)))
+
+
 func _process(delta: float) -> void:
 	if _moving:
 		_t += delta / _step_time
@@ -208,7 +244,15 @@ func _process(delta: float) -> void:
 
 
 func _try_move(direction: Vector2i) -> void:
+	# FACINGS has four entries, so a diagonal heading falls through to the
+	# default — which is the *south* row, and a character walking north-east was
+	# drawn facing the camera. Keep facing on the dominant cardinal instead. The
+	# eight-way pad was writing `_facing` from the screen to work around this,
+	# which is a screen reaching into a renderer's private field.
 	_facing = direction
+	if not FACINGS.has(direction):
+		_facing = (Vector2i(signi(direction.x), 0) if absi(direction.x) >= absi(direction.y)
+			else Vector2i(0, signi(direction.y)))
 	var target := _cell + direction
 	if not world.walkable(target.x, target.y):
 		return
@@ -239,17 +283,7 @@ func _draw() -> void:
 	_mnow = float(Time.get_ticks_msec()) * 0.001
 	_mgain = HJMotion.gain()
 
-	# Camera: the character sits in the middle of the view, except near the edges
-	# of the map, where the view stops rather than showing void.
-	var extent := Vector2(world.w, world.h) * scale
-	var focus := (_character_px() + Vector2(TILE, TILE) * 0.5) * float(ZOOM)
-	var cam := focus - size * 0.5
-	cam.x = clampf(cam.x, 0.0, maxf(0.0, extent.x - size.x))
-	cam.y = clampf(cam.y, 0.0, maxf(0.0, extent.y - size.y))
-	if extent.x < size.x:
-		cam.x = -(size.x - extent.x) * 0.5
-	if extent.y < size.y:
-		cam.y = -(size.y - extent.y) * 0.5
+	var cam := camera_px()
 
 	# Only the cells actually on screen. Drawing the whole map would be fine at
 	# this size and wrong at any other.
@@ -763,7 +797,11 @@ func _light_pass(cam: Vector2, scale: float, first: Vector2i, last: Vector2i) ->
 				HJLighting.PLAYER_RADIUS, HJLighting.PLAYER_COLOUR, cam, per_tile,
 				gain * HJLighting.player_light, 0.0, 0.0, now)
 
-	_light.submit(_lpos, _lcol, _lcount, size)
+	# cam and per_tile passed explicitly. Without them the overlay had to
+	# recover the projection by reflection — reading TILE and ZOOM out of this
+	# script's own constant map and recomputing the camera rule — which was a
+	# second copy of that rule living in a file that must not import this one.
+	_light.submit(_lpos, _lcol, _lcount, size, cam, per_tile)
 
 
 ## One emitter: world pixels to overlay pixels, a cull, and one slot filled.

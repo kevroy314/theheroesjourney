@@ -67,11 +67,19 @@ var timers_on: bool = true
 var hold_confirm: bool = false
 
 # --- how the interface behaves ------------------------------------------------
-## Where a toast lands. The top strip is where the run header, the step budget
-## and the buff pills already live, so a notification there covers the numbers
-## it is usually talking about.
-## One of: "bottom" | "top_left" | "top".
-var ui_toast_pos: String = "bottom"
+## Where a toast lands. One of: "bottom" | "top_left" | "top".
+##
+## "top" was the original and covers the run header, the step budget and the
+## buff pills — the numbers a notification is usually talking about. I moved the
+## default to "bottom" and was talked out of it by a screenshot: the bottom band
+## is the action button and the movement pad, and the unlock toast is a TapCard
+## that opts back into mouse events, so down there it does not merely obscure
+## the primary action, it *eats the tap meant for it*.
+##
+## So: "top_left", which is narrow and offset. It clips the left of the header
+## for two seconds and touches no control at all. Covering information you can
+## re-read costs less than covering a control you are reaching for.
+var ui_toast_pos: String = "top_left"
 ## How walking is driven. One of: "dpad" | "pad4" | "pad8" | "tap_path".
 var ui_move_control: String = "dpad"
 var pause_started: int = 0

@@ -3106,8 +3106,14 @@ BUILDERS = {
 # means nothing is there. Appending is safe, reordering rewrites every world.
 
 def _p(pid, build, biome, density, solid=False, foot=(1, 1), shadow=True,
-       outline=True, light=None, sway=None, **params):
-    """`light` and `sway` are the two fields here that no code in this file reads.
+       outline=True, light=None, sway=None, shaft=None, **params):
+    """`light`, `sway` and `shaft` are the fields here that no code in this file
+    reads. Each is a declaration the art makes and the renderer honours, and
+    each must be declared HERE rather than only in the generated manifest --
+    this file rebuilds tiles.json from scratch, so a key that lives only in the
+    output disappears on the next `npm run tiles`. That has now happened twice:
+    once to 74 `sway` rows, and once to `window_lit`'s `shaft`, three times in a
+    single session before anyone noticed.
 
     THE MOTION CONTRACT. A prop entry in assets/tiles/tiles.json may carry
 
@@ -3153,6 +3159,8 @@ def _p(pid, build, biome, density, solid=False, foot=(1, 1), shadow=True,
         entry["light"] = dict(light)
     if sway is not None:
         entry["sway"] = dict(sway)
+    if shaft is not None:
+        entry["shaft"] = dict(shaft)
     return entry
 
 
@@ -3272,7 +3280,12 @@ PROPS = [
     _p("shelf_open", "furniture", "placed", 0.0, solid=True, kind="shelf_open"),
     _p("chair_pulled", "furniture", "placed", 0.0, solid=True, kind="chair_pulled"),
     _p("window_lit", "structure", "placed", 0.0, shadow=False, kind="window",
-       light=dict(radius=5.0, color="#FFD9A0", flicker=0.0)),
+       light=dict(radius=5.0, color="#FFD9A0", flicker=0.0),
+       # bars=2 is not a guess: the sprite below draws one vertical mullion
+       # across a pane spanning -10..10, so the aperture is two panes and the
+       # beam is two bands.
+       shaft=dict(length=9.0, width=0.34, spread=0.1, bars=2,
+                  color="#FFEFD2", intensity=0.95)),
     _p("candle", "clutter", "placed", 0.0, shadow=False, kind="candle",
        light=dict(radius=2.5, color="#FFC880", flicker=0.45), sway=dict(amount=0.9, speed=2.8, mode='breathe')),
     _p("cup", "clutter", "placed", 0.0, shadow=False, kind="cup"),
@@ -3427,7 +3440,8 @@ for _base_id in VARIED:
                         _base["biome"], _base["density"], solid=_base["solid"],
                         foot=tuple(_base["foot"]), shadow=_base["shadow"],
                         outline=_base["outline"], light=_base.get("light"),
-                        sway=_base.get("sway"), **_params))
+                        sway=_base.get("sway"), shaft=_base.get("shaft"),
+                        **_params))
         PROP_ORDER.append(PROPS[-1]["id"])
 
 PROP_BY_ID = {p["id"]: p for p in PROPS}
@@ -4084,7 +4098,9 @@ def manifest(overlay_rows, cliff_rows, prop_rows):
                      **({"light": PROP_BY_ID[pid]["light"]}
                         if "light" in PROP_BY_ID[pid] else {}),
                      **({"sway": PROP_BY_ID[pid]["sway"]}
-                        if "sway" in PROP_BY_ID[pid] else {}))
+                        if "sway" in PROP_BY_ID[pid] else {}),
+                     **({"shaft": PROP_BY_ID[pid]["shaft"]}
+                        if "shaft" in PROP_BY_ID[pid] else {}))
                 for i, pid in enumerate(PROP_ORDER)],
         },
         "shadow": {"rgb": list(SHADOW), "alpha": SHADOW_A},

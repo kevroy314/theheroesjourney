@@ -91,41 +91,18 @@ func _finish(_at: Vector2) -> void:
 
 ## Which tile is under a point on this sheet.
 ##
-## This mirrors the camera in HJTileWorld._draw, which is not exposed — the
-## renderer computes it per frame as a local. Duplicated rather than reached
-## for because the alternative is a screen editing the renderer; if a third
-## caller ever wants it, HJTileWorld should grow `cell_at_point()` and this
-## should call it.
+## Both of these used to mirror HJTileWorld's camera, because the renderer
+## computed it per frame as a local and exposed nothing. It has the accessors
+## now, so the rule lives in one place — which matters more than it sounds:
+## mid-stride the camera is up to a whole tile from the cell the character
+## legally occupies, and a whole tile is 96 screen pixels, enough to send a tap
+## one cell wide of where it was aimed.
 func cell_at(point: Vector2) -> Vector2i:
-	var scale := float(HJTileWorld.TILE * HJTileWorld.ZOOM)
-	var at := (point + _camera()) / scale
-	return Vector2i(int(floor(at.x)), int(floor(at.y)))
+	return _world.cell_at_point(point)
 
 
 func _camera() -> Vector2:
-	var world: HJWorld = _world.world
-	var scale := float(HJTileWorld.TILE * HJTileWorld.ZOOM)
-	var extent := Vector2(float(world.w), float(world.h)) * scale
-	var half := float(HJTileWorld.TILE) * 0.5
-	var focus := (_character_px() + Vector2(half, half)) * float(HJTileWorld.ZOOM)
-	var cam := focus - size * 0.5
-	cam.x = clampf(cam.x, 0.0, maxf(0.0, extent.x - size.x))
-	cam.y = clampf(cam.y, 0.0, maxf(0.0, extent.y - size.y))
-	if extent.x < size.x:
-		cam.x = -(size.x - extent.x) * 0.5
-	if extent.y < size.y:
-		cam.y = -(size.y - extent.y) * 0.5
-	return cam
-
-
-## Interpolated, not snapped. Mid-stride the camera is up to a whole tile away
-## from the tile the character legally occupies, and a whole tile here is 96
-## screen pixels — enough to send a tap one cell wide of where it was aimed.
-func _character_px() -> Vector2:
-	var tile := float(HJTileWorld.TILE)
-	var a := Vector2(_world._from) * tile
-	var b := Vector2(_world.cell()) * tile
-	return a.lerp(b, _world._t) if _world._moving else b
+	return _world.camera_px()
 
 
 func _draw() -> void:

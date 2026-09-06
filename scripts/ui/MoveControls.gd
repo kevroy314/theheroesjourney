@@ -284,23 +284,6 @@ func _process(delta: float) -> void:
 			_cancel_path()
 			_status.text = "The way is shut."
 			return
-	_fix_diagonal_facing()
-
-
-## The sprite sheet has four rows and HJTileWorld.FACINGS has four entries, so a
-## diagonal heading falls through to the default — which is the *south* row, and
-## a character walking north-east while facing the camera looks broken.
-##
-## Nudged from out here rather than fixed at the source because the renderer is
-## not this agent's to change; the real fix is for _try_move to keep facing on
-## the cardinal it is nearest to. Horizontal wins because the side-on sprite
-## reads as motion and the front-on one reads as standing.
-func _fix_diagonal_facing() -> void:
-	if _mode != "pad8" or not is_instance_valid(_world):
-		return
-	var facing: Vector2i = _world._facing
-	if facing.x != 0 and facing.y != 0:
-		_world._facing = Vector2i(facing.x, 0)
 
 
 # --- the status line ----------------------------------------------------------
