@@ -165,6 +165,189 @@
         "type": "dialogue",
         "dialogue": "cobb_shop"
       }
+    },
+    {
+      "id": "door_mill",
+      "name": "The mill door",
+      "verb": "Go in",
+      "desc": "Warm flour dust, and the floor humming under it.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "Inside it is all one working room, and the whole floor is humming."
+      }
+    },
+    {
+      "id": "door_commonhouse",
+      "name": "The commonhouse door",
+      "verb": "Go in",
+      "desc": "Wax, cold stone, and a room built for more people than are in it.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "The screens passage first, then the hall, and every chair in it is empty."
+      }
+    },
+    {
+      "id": "door_innkeeper",
+      "name": "The Wayhouse door",
+      "verb": "Go in",
+      "desc": "Beer, woodsmoke, and one room to let above the tap.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "Somebody has been in the taproom this morning and pushed the chair back."
+      }
+    },
+    {
+      "id": "door_busybodies",
+      "name": "The Ollards' door",
+      "verb": "Go in",
+      "desc": "The chair by the window is still warm.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "The chair at the window is angled at the square. Of course it is."
+      }
+    },
+    {
+      "id": "door_store",
+      "name": "Cobb's door",
+      "verb": "Go in",
+      "desc": "Sacking, tallow, and whatever he has not sold this month.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "The counter runs the width of the light, and the back room smells of Cobb."
+      }
+    },
+    {
+      "id": "door_tavern",
+      "name": "The Blind Ewe",
+      "verb": "Go in",
+      "desc": "Ale, hearth-smoke, and a floor that has been swept once this week.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "The fire is in and the snug is cold. It was a yard once; you can tell."
+      }
+    },
+    {
+      "id": "door_tavernkeep",
+      "name": "Tobin's door",
+      "verb": "Go in",
+      "desc": "A house belonging to a man who works twenty feet away.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "One room to cook in, one to sleep in, and nothing at all on the walls."
+      }
+    },
+    {
+      "id": "door_tinkerer",
+      "name": "The tinker's door",
+      "verb": "Go in",
+      "desc": "Hot metal, oil, and two benches in the middle of the light.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "The forge is banked. Both benches are covered and neither is tidy."
+      }
+    },
+    {
+      "id": "door_mayor",
+      "name": "The mayor's door",
+      "verb": "Go in",
+      "desc": "Polish, paper, and a house that expects to be looked at.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "You are received in the parlour. The study door is the one that stays shut."
+      }
+    },
+    {
+      "id": "door_empty_house",
+      "name": "The empty house",
+      "verb": "Go in",
+      "desc": "Nobody has lived here since the winter, and the door still opens.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "One chair in the middle of the floor, facing nothing. Bram keeps the key."
+      }
+    },
+    {
+      "id": "door_farmhouse",
+      "name": "The farmhouse door",
+      "verb": "Go in",
+      "desc": "Bread, milk and mud, in that order.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "The range is lit and the long table is laid for more than are coming."
+      }
+    },
+    {
+      "id": "door_neighbour_w",
+      "name": "The west door",
+      "verb": "Go in",
+      "desc": "Your neighbour's, and the door is never locked.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "One room, one bed, one fire. It is the same house as yours, made smaller."
+      }
+    },
+    {
+      "id": "door_neighbour_e",
+      "name": "The east door",
+      "verb": "Go in",
+      "desc": "Your other neighbour's, and the washing is still out.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "One room, one bed, one fire, and the kettle is on the wrong side."
+      }
+    },
+    {
+      "id": "door_across",
+      "name": "The shut house",
+      "verb": "Try the door",
+      "desc": "Bolted from the inside, and nobody has answered it since the winter.",
+      "icon": "threshold",
+      "reach": "adjacent",
+      "effect": {
+        "type": "log",
+        "kind": "info",
+        "text": "Bolted from the inside. Whoever did that is still in there, or was when they did it."
+      },
+      "blocks_until_tag": "shut_house_open"
     }
   ]
 }

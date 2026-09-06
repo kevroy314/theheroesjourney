@@ -124,6 +124,57 @@ REGIONS = [
     ("summit", 90.0, 112.0),
 ]
 
+## The vale's bounding box, inclusive: x0, y0, x1, y1. It is what main() proves
+## the town is sealed inside, and it is also the shape the town CLAIMS as a
+## place -- see REGION_RECTS.
+VALE_BOX = (68, 86, 170, 192)
+
+## A REGION MAY CLAIM A RECTANGLE AS WELL AS A POINT.
+##
+## `the_town` was one anchor at (128, 128) and HJWorld.place_id() gave up beyond
+## 24 tiles of Manhattan distance, so most of the town -- the tavern, the mill,
+## the mayor's, the whole hamlet on the west bank -- reported itself as
+## "Outside" and every conversation held there was drawn against the wrong
+## backdrop plate. Widening the radius would have been the wrong fix twice over:
+## a circle is not the shape of a valley, and a bigger circle round the town
+## swallows the house.
+##
+## So a region may carry a rect, and place_id() prefers the SMALLEST rect that
+## contains the cell before falling back to the nearest anchor. Smallest, so
+## rects can nest: the house's own plot sits inside the vale and keeps its own
+## name, which is what stops a player standing on their own doorstep being told
+## they are in town.
+##
+## Emitted as a nested `rect` on the region's own entry in the world file, so
+## there is one list of regions and not two. The Tiled round trip carries it for
+## free -- a region is already an {x, y, ...} record and object_from_cell turns
+## a structured value into a JSON property it knows to decode on the way back.
+##
+## Anchors a rect is allowed to swallow, and the rect that swallows them.
+##
+## One entry, and it is the tutorial's: `waking_room` is the hole in reality in
+## the hall, so it is INSIDE the house by construction and answering "the_house"
+## for it is right rather than a mistake. Both areas call the place "Home", so
+## nothing the player reads changes. An absorption that changed what the player
+## was told would belong in neither this list nor the world.
+ABSORBED = {"waking_room": "the_house"}
+
+## (area id, x, y, w, h)
+##
+## The town's rect is deliberately NOT `VALE_BOX`, which is the deliberately generous box the seal
+## is proved against and takes in the tall grass on the far bank. This is the
+## built envelope: from the east bank of the Wend where the four cottages stand,
+## up to the field fence, down past the mayor's garden, and out to the thorn the
+## fort gate is cut through. A cell inside it is somewhere a townsperson would
+## say you were in town.
+REGION_RECTS = [
+    ("the_town", 78, 94, 93, 87),
+    # The house and the ground round it: the footprint, the doorstep, the cell
+    # Spite stands on and the yard the second anomaly lands in. Deliberately
+    # short of both neighbours' walls, because next door is next door.
+    ("the_house", 81, 128, 31, 27),
+]
+
 
 def theme_colors():
     data = json.load(open(THEME))
@@ -795,6 +846,16 @@ BUILDINGS = [
 ## way no amount of footprint variation can. It is the cheapest piece of history
 ## in the town and it costs four lines.
 ##
+## BOTH OF THESE ARE CURRENTLY INERT, and saying so is cheaper than leaving
+## somebody to find out. The tavern and the farmhouse are the two buildings the
+## extension mechanism was written for and both are now enterable, so their roof
+## is a cutaway floor and there is no second roof left to lay. The sentence the
+## rectangle used to say is said by the interior instead: the tavern's snug is
+## flagged where its common room is boarded and the old outside wall is still
+## standing between them, and the farmhouse's dairy is cold stone under the same
+## seam. The pass is kept because it is four lines and the next building that
+## grew and stays shut will want it.
+##
 ## (building id, x, y, w, h, roof)
 EXTENSIONS = [
     ("tavern", 143, 146, 4, 9, "roof_pantile"),
@@ -813,6 +874,524 @@ OUTBUILDINGS = [
     (155, 142, 3, 3, "roof_slate"),       # the store's stock shed
 ]
 
+
+
+# --- the insides of the town's buildings ---------------------------------------
+#
+# "The town only has 3 accessible buildings as far as I can tell" -- and the
+# three that felt accessible were only the ones with somebody standing in the
+# doorway. Every building in BUILDINGS was a solid block of roof with a painted
+# `door` tile in the wall, which is a picture of a door rather than a door.
+#
+# An interior in this game is NOT a separate scene. It is a carved, furnished,
+# walkable region of the same overworld grid, listed in the world file's
+# `indoors` so the engine knows the roof is between you and the sky. `house_plan`
+# is the worked example and everything below follows it:
+#
+#   * the geometry is stated ONCE, here, and every other pass reads it. Nothing
+#     recomputes a wall position -- that is what put a chair inside a wall the
+#     first time the house was built;
+#   * a room reads as having a purpose or it reads as storage, so every room
+#     below has an anchor and a floor of its own. A change of material is what
+#     tells the player they have gone somewhere before they have seen a stick of
+#     the furniture;
+#   * case goods go against walls and only tables float;
+#   * one clear tile -- 36 in, one walkway -- in front of every doorway on both
+#     sides, and nothing solid on a landing cell;
+#   * and none of it is trusted. `furnish_buildings` raises rather than dropping
+#     a piece, and main() flood-fills every one of these rooms twice: once to
+#     prove you can reach every cell of it from the bed, and once with its own
+#     door treated as solid to prove the only way in is the door.
+#
+# THE ROOF COMES OFF. A building the player can walk into is drawn as a cutaway,
+# exactly as the house is: floor and wall courses, no roof tile. So an enterable
+# building loses its ridge and its chimney stacks, because there is no longer a
+# roof for them to stand on -- see `facade_props`, which asks. The buildings that
+# stay shut keep theirs, and so do all nine outbuildings, which is what stops the
+# parish reading as fourteen open floor plans.
+#
+# THE TAVERN'S SEAM SURVIVES THE ROOF. EXTENSIONS said "this building grew" with
+# a rectangle of a second roof material, and with the roof gone that sentence has
+# nowhere to be written. It is written on the FLOOR instead: the tavern's snug is
+# flagged where the common room is boarded and the old outside wall is still
+# standing between them as an internal wall, which says the same thing louder.
+#
+# Interior coordinates (i, j) run from the cell inside the north-west corner, so
+# a layout below reads as a floor plan rather than as a list of world cells:
+# i is 0 .. w - 3 and j is 0 .. h - 3 for a building w x h. `interior_plan`
+# resolves them and refuses anything that falls outside the walls.
+#
+#   floors     ((i0, j0, i1, j1), material) painted in order, later wins. The
+#              first entry is the whole room; the ones after it are the rooms
+#              inside it.
+#   walls      (i0, j0, i1, j1) runs, painted in the building's OWN wall
+#              material -- shared construction is what makes it one town.
+#   doorways   cells punched back out of those runs. A doorway is a GAP, not a
+#              `door` tile: the wall's overlay set draws its face into the
+#              opening, which reads as a lintel. A `door` tile inside a building
+#              would be a second front door.
+#   furniture  (catalogue id, i, j), placed by hand and checked on placement.
+#   place      what the run header calls the room. Emitted into `indoors` as
+#              `place`, which HJWorld.place_name() returns instead of "Home".
+#   door       the interactable kind for the front door, from
+#              data/content/interactables.json.
+#
+# ONE TILE IS ABOUT THREE FEET, from the front door: one cell, and a real door is
+# 36 in. Every clearance below is quoted against that ruler.
+INTERIORS = {
+    # THE MILL. 8 x 8 of stone floor -- 24 x 24 ft -- because a mill floor is a
+    # working surface that gets wet. The north two rows are boarded: that is the
+    # staging the sacks come down onto off the hoist, and the one gap in the
+    # north run at (4, 0) is where they land. The toll office is walled off in
+    # the south-east corner, which is where a miller sits to take his tenth
+    # without leaving the floor.
+    "mill": dict(
+        place="The Wend Mill",
+        door="door_mill",
+        floors=[((0, 0, 7, 7), "floor_stone"), ((0, 0, 7, 1), "floor_plank")],
+        walls=[(5, 5, 7, 5), (5, 6, 5, 7)],
+        doorways=[(5, 6)],
+        furniture=[
+            # the meal bins and the sack staging along the north wall, with the
+            # hoist's drop at (4, 0) deliberately left clear
+            ("crate", 0, 0), ("crate", 1, 0), ("barrel", 2, 0), ("barrel", 3, 0),
+            ("crate", 5, 0), ("barrel", 6, 0), ("crate", 7, 0),
+            # case goods on the walls, both sides
+            ("shelf_open", 0, 2), ("barrel", 0, 3), ("crate", 0, 4),
+            ("bench", 0, 6),
+            ("counter", 7, 1), ("counter", 7, 2), ("chest", 7, 3),
+            ("shelf_open", 7, 4),
+            # the weighing table, the only thing allowed to float, with a chair
+            # each side and the cup somebody left on the floor beside it
+            ("table", 3, 3), ("chair", 2, 3), ("chair", 4, 3), ("cup", 4, 2),
+            ("floor_lamp", 1, 7), ("boots", 2, 7),
+            # the toll office: a counter, the chest it goes in, one candle
+            ("counter", 7, 6), ("chest", 7, 7), ("candle", 6, 7),
+        ],
+    ),
+    # THE COMMONHOUSE. The parish hall, and the biggest room in the vale at
+    # 11 x 8 -- 33 x 24 ft. It is entered through a SCREENS PASSAGE: a stone
+    # vestibule the width of the building with the hall beyond it, so you come in
+    # at the low end and turn, which is how every real hall of this shape works
+    # and which stops the front door looking straight down the meeting table.
+    # The committee room in the north-east corner is the one lockable room, and
+    # the parish chest lives in it.
+    "commonhouse": dict(
+        place="The Commonhouse",
+        door="door_commonhouse",
+        floors=[((0, 0, 10, 10), "floor_boards"),
+                ((7, 0, 10, 3), "floor_tile"),
+                ((0, 9, 10, 10), "floor_stone")],
+        walls=[(0, 8, 10, 8), (6, 0, 6, 4), (7, 4, 10, 4)],
+        doorways=[(2, 8), (8, 8), (6, 3)],
+        furniture=[
+            # -- the hall ------------------------------------------------------
+            ("bookshelf", 0, 0), ("chest", 1, 0), ("shelf_open", 2, 0),
+            ("shelf_open", 3, 0), ("chest", 4, 0), ("plant_pot", 5, 0),
+            ("bench", 0, 2), ("bench", 0, 3), ("chest", 0, 5),
+            ("floor_lamp", 0, 7),
+            # the meeting table, with the head of it against the north end and
+            # one chair pushed back from the foot -- the cell it was pulled out
+            # of, (3, 4), is left empty on purpose. A chair_pulled against a full
+            # table says nothing; the gap is the whole trick.
+            ("table", 3, 3), ("chair", 2, 2), ("chair", 2, 3),
+            ("chair", 4, 2), ("chair", 4, 3), ("chair_pulled", 3, 5),
+            ("cup", 4, 5), ("book_open", 1, 4),
+            # the serving side, against the east wall
+            ("counter", 10, 5), ("counter", 10, 6), ("barrel", 10, 7),
+            ("bench", 5, 7), ("crate", 9, 7),
+            # -- the committee room, and the parish chest ----------------------
+            ("bookshelf", 7, 0), ("chest", 8, 0), ("shelf_open", 10, 0),
+            ("table", 9, 1), ("chest", 10, 1), ("chair", 9, 2),
+            ("candle", 10, 3), ("book_open", 8, 2),
+            # -- the screens passage -------------------------------------------
+            ("bench", 0, 9), ("bench", 10, 9), ("boots", 4, 10),
+            ("plant_pot", 0, 10), ("crate", 10, 10),
+        ],
+    ),
+    # THE WAYHOUSE. A taproom you can sit four in and one room to let, which is
+    # what a village inn on a road this size actually is. The let room is two
+    # cells wide -- 6 x 18 ft -- which is a bed, a chest and enough floor to
+    # stand up in, and that is the truthful size of a rented room.
+    "innkeeper": dict(
+        place="The Wayhouse",
+        door="door_innkeeper",
+        floors=[((0, 0, 6, 5), "floor_boards"), ((5, 0, 6, 5), "floor_plank")],
+        walls=[(4, 0, 4, 5)],
+        doorways=[(4, 2)],
+        furniture=[
+            # -- the taproom ---------------------------------------------------
+            # The bar and the cellar barrel are on the north wall and the table
+            # sits in the middle of the floor, so column 3 stays clear from the
+            # front door all the way to the doorway of the let room: one clear
+            # tile on both sides of it, which is the 36 in walkway.
+            ("counter", 0, 0), ("counter", 1, 0), ("barrel", 2, 0),
+            ("floor_lamp", 3, 0), ("shelf_open", 0, 1),
+            ("table", 2, 3), ("chair", 1, 3), ("chair", 3, 3),
+            # and the chair somebody pushed back, with (2, 4) left empty
+            ("chair_pulled", 2, 5), ("bench", 0, 5),
+            ("cup", 1, 1), ("bottle", 3, 1), ("boots", 1, 4),
+            # -- the room to let -----------------------------------------------
+            ("bed", 6, 1), ("chest", 5, 0), ("chest", 6, 2),
+            ("shelf_open", 6, 4), ("candle", 5, 1), ("boots", 5, 5),
+        ],
+    ),
+    # THE OLLARDS'. Mrs Ollard "was at the window a moment ago and is now,
+    # somehow, out here", and the room is the evidence: the front parlour faces
+    # EAST onto the market square, her chair is in the north-east corner under
+    # the window, and there is a clear line from it to the door she came out of.
+    # The kitchen is two rows at the back and unheated but for the range.
+    "busybodies": dict(
+        place="The Ollards' Front Room",
+        door="door_busybodies",
+        floors=[((0, 0, 4, 5), "floor_plank"), ((0, 4, 4, 5), "floor_tile")],
+        walls=[(0, 3, 4, 3)],
+        doorways=[(1, 3)],
+        furniture=[
+            # -- the front room, and the chair at the window -------------------
+            # Her chair is in the north-east corner with the square through the
+            # window in front of it and a clear run to the door she comes out of
+            # -- which is the whole of what the catalogue says about her.
+            ("chair", 4, 0),
+            ("bookshelf", 0, 0), ("chest", 0, 1), ("plant_pot", 0, 2),
+            ("table", 2, 2), ("chair", 3, 2), ("floor_lamp", 3, 0),
+            ("cup", 3, 1), ("book_open", 1, 1),
+            # -- the kitchen ---------------------------------------------------
+            # (1, 4) is the landing of the only doorway and stays clear, so the
+            # range run starts one cell along.
+            ("shelf_open", 0, 4), ("stove", 2, 4), ("counter", 3, 4),
+            ("counter", 4, 4), ("bench", 0, 5), ("crate", 4, 5),
+            ("bottle", 1, 5),
+        ],
+    ),
+    # COBB'S. Shopfront and the back room he sleeps in, which is the shape the
+    # catalogue already gives him: "He sleeps in the back and it shows". The
+    # counter run is along the north where the light is, the middle of the shop
+    # is left empty because that is where the customers stand, and the wares are
+    # on the walls.
+    "store": dict(
+        place="Cobb's Stores",
+        door="door_store",
+        floors=[((0, 0, 8, 5), "floor_boards"), ((7, 0, 8, 5), "floor_plank")],
+        walls=[(6, 0, 6, 5)],
+        doorways=[(6, 4)],
+        furniture=[
+            # -- the shop ------------------------------------------------------
+            ("shelf_open", 0, 0), ("shelf_open", 1, 0), ("counter", 2, 0),
+            ("counter", 3, 0), ("counter", 4, 0), ("counter", 5, 0),
+            ("crate", 0, 4), ("barrel", 0, 5),
+            ("barrel", 1, 5), ("crate", 2, 5), ("crate", 3, 5), ("barrel", 4, 5),
+            ("shelf_open", 5, 1), ("shelf_open", 5, 2), ("chest", 5, 3),
+            ("table", 2, 3), ("floor_lamp", 5, 5),
+            ("cup", 4, 2), ("bottle", 1, 1), ("book_open", 4, 4),
+            # -- the back room he sleeps in ------------------------------------
+            ("chest", 7, 0), ("bed", 8, 1), ("chest", 8, 2),
+            ("shelf_open", 8, 3), ("barrel", 7, 5), ("crate", 8, 5),
+            ("candle", 7, 1), ("boots", 7, 3), ("bottle", 8, 4),
+        ],
+    ),
+    # THE BLIND EWE. Timber-framed, thatched, and extended east once -- and the
+    # seam is the internal wall at i = 6, which is the pub's old outside wall
+    # with a doorway knocked through it. Common room on boards, snug on flags,
+    # because the snug was a yard before it was a room. The bar is the L in the
+    # north-west corner, which is where Tobin stands when he is not out the front
+    # wiping something that is already clean.
+    "tavern": dict(
+        place="The Blind Ewe",
+        door="door_tavern",
+        floors=[((0, 0, 9, 6), "floor_boards"), ((7, 0, 9, 6), "floor_stone")],
+        walls=[(6, 0, 6, 6)],
+        doorways=[(6, 4)],
+        furniture=[
+            # -- the bar, in the corner you see from the door ------------------
+            ("counter", 0, 0), ("counter", 1, 0), ("counter", 2, 0),
+            ("counter", 0, 1), ("counter", 0, 2),
+            ("barrel", 0, 3), ("barrel", 0, 4),
+            # the fire, and the only warm light in the room
+            ("stove", 0, 5),
+            # -- the tables ----------------------------------------------------
+            ("table", 2, 3), ("chair", 1, 2), ("chair", 1, 3), ("chair", 3, 2),
+            # pushed back from the foot of the table, with (2, 4) -- the cell it
+            # was pulled out of -- left empty. Row 4 stays open right across the
+            # room, which is the route from the door to the fire and the snug.
+            ("chair_pulled", 2, 5),
+            ("table", 4, 6), ("chair", 3, 6), ("chair", 5, 5),
+            ("shelf_open", 5, 0), ("chest", 5, 1),
+            ("bench", 0, 6), ("crate", 5, 6),
+            ("bottle", 4, 1), ("cup", 1, 5), ("boots", 3, 0),
+            # -- the snug ------------------------------------------------------
+            ("shelf_open", 7, 0), ("shelf_open", 9, 0),
+            ("table", 8, 1), ("chair", 7, 1), ("chair", 9, 1),
+            ("chest", 7, 3), ("floor_lamp", 9, 3),
+            ("barrel", 9, 5), ("crate", 9, 6), ("bench", 7, 6),
+            ("candle", 8, 5),
+        ],
+    ),
+    # TOBIN'S. The tavernkeep's own cottage, and it is small on purpose: a man
+    # who works twenty feet away does not need a hall. Two rooms, 5 x 3 and
+    # 5 x 2, and the bed is against the internal wall so it has a solid head and
+    # is not in the column of the door.
+    "tavernkeep": dict(
+        place="Tobin's Cottage",
+        door="door_tavernkeep",
+        floors=[((0, 0, 4, 5), "floor_boards"), ((0, 4, 4, 5), "floor_plank")],
+        walls=[(0, 3, 4, 3)],
+        doorways=[(3, 3)],
+        furniture=[
+            # -- the room he lives in ------------------------------------------
+            ("counter", 0, 0), ("stove", 0, 1), ("counter", 0, 2),
+            ("shelf_open", 4, 0), ("chest", 4, 1),
+            ("table", 1, 2), ("chair", 2, 2), ("bench", 4, 2),
+            ("cup", 3, 1), ("bottle", 1, 0),
+            # -- the room he sleeps in -----------------------------------------
+            ("bed", 0, 5), ("chest", 4, 4), ("shelf_open", 4, 5),
+            ("candle", 1, 4), ("boots", 2, 5),
+        ],
+    ),
+    # THE TINKER'S. A workshop first: stone floor, two benches out in the middle
+    # of it where the light is, a forge against the back wall, and the parts on
+    # every wall there is. He lives in the two rows behind it, which is what the
+    # back of a shop is for.
+    "tinkerer": dict(
+        place="The Tinker's Shop",
+        door="door_tinkerer",
+        floors=[((0, 0, 8, 6), "floor_stone"), ((0, 5, 8, 6), "floor_boards")],
+        walls=[(0, 4, 8, 4)],
+        doorways=[(4, 4)],
+        furniture=[
+            # -- the workshop --------------------------------------------------
+            ("counter", 0, 0), ("counter", 1, 0), ("shelf_open", 2, 0),
+            ("shelf_open", 6, 0), ("counter", 7, 0), ("counter", 8, 0),
+            ("shelf_open", 0, 1), ("chest", 0, 2), ("barrel", 0, 3),
+            ("bookshelf", 8, 1), ("chest", 8, 2), ("crate", 8, 3),
+            # the two benches, with column 4 left clear between them: it is the
+            # route from the shop door straight through to the room he lives in,
+            # and the stool has been pushed back into the corner at (7, 3) with
+            # the working side of the bench at (6, 2) left empty behind it
+            ("table", 3, 2), ("table", 5, 2), ("chair_pulled", 7, 3),
+            # the forge, with the back wall behind it
+            ("stove", 1, 3),
+            ("cup", 6, 2), ("bottle", 6, 1),
+            # -- the room he lives in ------------------------------------------
+            ("bed", 0, 6), ("chest", 1, 6), ("bench", 2, 6),
+            ("bookshelf", 5, 6), ("chest", 6, 6), ("shelf_open", 7, 6),
+            ("counter", 8, 5), ("counter", 8, 6),
+            ("floor_lamp", 4, 6), ("candle", 1, 5), ("boots", 3, 6),
+        ],
+    ),
+    # THE MAYOR'S. The only house in the parish with a fence in front of it, and
+    # the only one with three rooms and a corridor's worth of manners: a parlour
+    # you are received in, a study you are not, and the kitchen behind. The rug
+    # in the parlour is what makes the table and its chairs read as one group
+    # rather than four objects -- it has to reach under the front of every piece.
+    "mayor": dict(
+        place="The Mayor's Parlour",
+        door="door_mayor",
+        floors=[((0, 0, 9, 7), "floor_boards"),
+                ((0, 0, 5, 3), "floor_plank"),
+                ((0, 5, 5, 7), "floor_tile"),
+                # The rug runs one row PAST the chairs, at j = 3, because a rug
+                # entirely under the furniture is a rug nobody can see: it has
+                # to reach under the front of every piece and then show.
+                ((1, 1, 3, 3), "floor_rug")],
+        walls=[(6, 0, 6, 7), (0, 4, 5, 4)],
+        doorways=[(6, 3), (2, 4)],
+        furniture=[
+            # -- the parlour ---------------------------------------------------
+            # The table and its four chairs sit on the rug, which is what makes
+            # them read as one group rather than five objects, and columns 4 and
+            # 5 are left entirely clear: that is the corridor from the front door
+            # to the study doorway and to the kitchen, and no chair stands in it.
+            ("bookshelf", 0, 0), ("chest", 1, 0), ("bookshelf", 2, 0),
+            ("bookshelf", 3, 0), ("floor_lamp", 4, 0),
+            ("chest", 0, 1), ("bench", 0, 2), ("chest", 0, 3),
+            ("table", 2, 2), ("chair", 1, 1), ("chair", 3, 1),
+            ("chair", 1, 2), ("chair", 3, 2),
+            ("book_open", 4, 2), ("cup", 5, 3),
+            # -- the kitchen ---------------------------------------------------
+            # (2, 5) is the landing of the parlour doorway and stays clear, which
+            # is why the range run has a gap in the middle of it.
+            ("counter", 0, 5), ("stove", 1, 5), ("counter", 3, 5),
+            ("counter", 4, 5), ("shelf_open", 5, 5),
+            ("barrel", 0, 7), ("crate", 1, 7), ("bench", 3, 7),
+            ("table", 5, 7), ("chair", 4, 7), ("chair", 4, 6),
+            ("bottle", 0, 6), ("cup", 2, 7),
+            # -- the study -----------------------------------------------------
+            ("bookshelf", 7, 0), ("bookshelf", 8, 0), ("bookshelf", 9, 0),
+            ("bookshelf", 7, 1), ("bookshelf", 7, 2),
+            ("chair", 8, 1), ("counter", 9, 1), ("chest", 9, 2),
+            ("bookshelf", 9, 4), ("chest", 9, 5),
+            ("bench", 7, 5), ("chest", 7, 6),
+            ("floor_lamp", 7, 7), ("candle", 9, 7), ("book_open", 8, 3),
+        ],
+    ),
+    # THE EMPTY HOUSE. Bram's, and the whole point of it is that nobody lives
+    # here: one chair in the middle of a floor facing nothing, one candle, no
+    # lamp, and a cold store at the back full of what he has been carrying home.
+    # An absence is the cheapest characterisation there is, and it is the same
+    # device as the bramble across the path outside.
+    "empty_house": dict(
+        place="The Empty House",
+        door="door_empty_house",
+        floors=[((0, 0, 6, 6), "floor_boards"), ((0, 5, 6, 6), "floor_stone")],
+        walls=[(0, 4, 6, 4)],
+        doorways=[(5, 4)],
+        furniture=[
+            # -- the room somebody used to sit in ------------------------------
+            ("chair", 1, 2),
+            ("chest", 0, 0), ("crate", 6, 0), ("barrel", 0, 2), ("crate", 0, 3),
+            ("bench", 6, 3), ("candle", 5, 1), ("book_open", 4, 2),
+            ("boots", 2, 1),
+            # -- the cold store, and what Bram has been bringing in ------------
+            ("barrel", 0, 5), ("crate", 1, 5), ("crate", 0, 6),
+            ("barrel", 6, 6), ("shelf_open", 6, 5), ("bottle", 3, 6),
+        ],
+    ),
+    # WENDFIELD FARM. The one building in the parish that is a place of work and
+    # a home in the same walls: a farm kitchen with the range and the long table,
+    # and behind it the dairy -- the lean-to that EXTENSIONS used to say had been
+    # added, floored in cold stone because that is what a dairy is for.
+    "farmhouse": dict(
+        place="Wendfield Farm",
+        door="door_farmhouse",
+        floors=[((0, 0, 8, 6), "floor_boards"),
+                ((0, 0, 8, 3), "floor_tile"),
+                ((0, 5, 8, 6), "floor_stone")],
+        walls=[(0, 4, 8, 4)],
+        doorways=[(2, 4), (6, 4)],
+        furniture=[
+            # -- the farm kitchen ----------------------------------------------
+            ("shelf_open", 0, 0), ("stove", 1, 0), ("counter", 2, 0),
+            ("counter", 3, 0), ("counter", 4, 0), ("bookshelf", 5, 0),
+            ("chest", 6, 0), ("barrel", 7, 0),
+            ("bench", 0, 2), ("chest", 0, 3),
+            # the long table everybody eats at, with one seat pushed back and
+            # (5, 2) left empty
+            ("table", 4, 2), ("chair", 3, 1), ("chair", 5, 1), ("chair", 3, 2),
+            ("chair_pulled", 5, 3),
+            ("cup", 2, 1), ("bottle", 6, 1), ("boots", 1, 3),
+            # -- the dairy -----------------------------------------------------
+            ("counter", 0, 5), ("counter", 1, 5), ("barrel", 3, 5),
+            ("crate", 4, 5), ("counter", 5, 5), ("shelf_open", 7, 5),
+            ("chest", 8, 5),
+            ("barrel", 0, 6), ("crate", 1, 6), ("crate", 8, 6),
+            ("cup", 4, 6), ("candle", 7, 6),
+        ],
+    ),
+    # NEXT DOOR, WEST. Four cells by five -- 12 x 15 ft -- which is one room with
+    # a bed in it, and that is an honest cottage rather than a small house. The
+    # range is on the north wall, the bed's head is against it, and the table is
+    # the only thing floating.
+    "neighbour_w": dict(
+        place="Next Door, West",
+        door="door_neighbour_w",
+        floors=[((0, 0, 3, 4), "floor_boards"), ((0, 0, 1, 1), "floor_plank")],
+        walls=[],
+        doorways=[],
+        furniture=[
+            ("bed", 0, 1), ("counter", 1, 0), ("stove", 2, 0),
+            ("shelf_open", 3, 0), ("chest", 3, 1),
+            ("table", 2, 3), ("chair", 1, 3),
+            ("candle", 1, 1), ("boots", 1, 4), ("cup", 3, 2),
+        ],
+    ),
+    # NEXT DOOR, EAST. The same cottage one cell wider and with the bed on the
+    # other side, because two houses built by the same parish should read as the
+    # same building lived in by different people -- shared construction, and the
+    # difference is the arrangement.
+    "neighbour_e": dict(
+        place="Next Door, East",
+        door="door_neighbour_e",
+        floors=[((0, 0, 4, 4), "floor_boards"), ((3, 0, 4, 2), "floor_plank")],
+        walls=[],
+        doorways=[],
+        furniture=[
+            ("bed", 4, 1), ("stove", 0, 0), ("counter", 1, 0), ("counter", 2, 0),
+            ("shelf_open", 0, 1), ("chest", 0, 2),
+            ("table", 2, 2), ("chair", 1, 2), ("chair", 1, 1),
+            ("bench", 0, 4), ("crate", 4, 4),
+            ("candle", 3, 1), ("book_open", 3, 3), ("boots", 1, 4),
+        ],
+    ),
+}
+
+## And the buildings that stay shut, with the sentence the door says when you
+## try it. A shut door with a line of text is far better than a wall, because it
+## tells the player the building IS a building -- the failure being fixed here is
+## that fourteen of them read as scenery. Anything not furnished above belongs in
+## this list rather than being left silent.
+##
+## `door_across` declares `blocks_until_tag` in the catalogue, so
+## HJWorld.walkable() returns false on the cell and every path query respects it
+## with no special case -- the same mechanism as the front door and the fort
+## gate, one radius out.
+SHUT_DOORS = {
+    "across": "door_across",
+}
+
+
+def interior_plan(b):
+    """One building's interior, resolved from the (i, j) floor plan into cells.
+
+    Returns None for a building with no interior, which is how every other pass
+    asks whether the roof comes off. Everything is checked against the wall
+    rectangle here rather than where it is used, because a coordinate one cell
+    out is a piece of furniture inside a wall and the whole reason `house_plan`
+    exists is that the house computed one twice and got it wrong the second time.
+    """
+    spec = INTERIORS.get(b["id"])
+    if spec is None:
+        return None
+    ix, iy = b["x"] + 1, b["y"] + 1
+    iw, ih = b["w"] - 2, b["h"] - 2
+
+    def cell(i, j):
+        if not (0 <= i < iw and 0 <= j < ih):
+            raise SystemExit(
+                "%s: (%d,%d) is outside the interior, which is %dx%d"
+                % (b["id"], i, j, iw, ih))
+        return (ix + i, iy + j)
+
+    floors = {}
+    for (i0, j0, i1, j1), material in spec["floors"]:
+        for j in range(j0, j1 + 1):
+            for i in range(i0, i1 + 1):
+                floors[cell(i, j)] = material
+    if len(floors) != iw * ih:
+        raise SystemExit(
+            "%s: %d of %d interior cells have no floor. The first entry of "
+            "`floors` has to cover the whole room; the ones after it are the "
+            "rooms inside it." % (b["id"], iw * ih - len(floors), iw * ih))
+
+    walls = set()
+    for (i0, j0, i1, j1) in spec["walls"]:
+        for j in range(j0, j1 + 1):
+            for i in range(i0, i1 + 1):
+                walls.add(cell(i, j))
+    doorways = [cell(i, j) for (i, j) in spec["doorways"]]
+    for c in doorways:
+        if c not in walls:
+            raise SystemExit(
+                "%s: the doorway at %s is not in a wall, so it is a hole in a "
+                "room rather than a door between two." % (b["id"], c))
+    walls -= set(doorways)
+
+    # The cell you land on when you come in through the front door, derived from
+    # the door rather than declared beside it -- a hand-written landing is a
+    # second statement of where the door is and the two drift.
+    landing = [(b["door"][0] + dx, b["door"][1] + dy)
+               for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0))
+               if ix <= b["door"][0] + dx < ix + iw
+               and iy <= b["door"][1] + dy < iy + ih]
+    if len(landing) != 1:
+        raise SystemExit("%s: the door at %s has %d cells inside it"
+                         % (b["id"], b["door"], len(landing)))
+
+    return dict(id=b["id"], place=spec["place"], door=spec["door"],
+                x=ix, y=iy, w=iw, h=ih, floors=floors, walls=walls,
+                doorways=doorways, landing=landing[0],
+                furniture=[(name, cell(i, j)) for (name, i, j) in spec["furniture"]],
+                inside={cell(i, j) for j in range(ih) for i in range(iw)})
 
 def vale_plan():
     """Everything above, resolved into cells. One source, read by every pass.
@@ -1041,6 +1620,28 @@ def stamp_town(world, plan):
         for (x, y) in b["ring"]:
             world.put(x, y, T[b["wall"]])
         world.put(b["door"][0], b["door"][1], T["door"])
+
+        # AND THEN THE ROOF COMES OFF THE ONES YOU CAN WALK INTO.
+        #
+        # An interior in this game is a cutaway of the same grid, not a scene of
+        # its own -- see INTERIORS -- so opening a building means replacing the
+        # roof tiles inside its wall course with floors, standing the internal
+        # walls up in the building's OWN material, and punching the doorways
+        # back out of them as gaps. It is done here, inside the pass that is
+        # called twice, so that a road, a scatter or anything else that runs
+        # later cannot reopen a wall or repaint a floor: the second stamp puts
+        # the whole building back exactly as the plan says it is.
+        inside = interior_plan(b)
+        if inside is None:
+            continue
+        for (x, y), material in inside["floors"].items():
+            world.put(x, y, T[material])
+        for (x, y) in inside["walls"]:
+            world.put(x, y, T[b["wall"]])
+        for (x, y) in inside["doorways"]:
+            # A doorway is a GAP with the room's own floor under it. A `door`
+            # tile in an internal wall would be a second front door.
+            world.put(x, y, T[inside["floors"][(x, y)]])
 
     for (x, y) in plan["bridges"]:
         if world.at(x, y) == T["water"]:
@@ -1612,7 +2213,16 @@ def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
             if beside_road(x, y) and world.at(x, y) != T["path_dirt"]:
                 options = options + by_biome.get("path_dirt", [])
 
-            if not options or (x, y) not in reach:
+            # `keep_clear` is asked here, before a single draw is taken,
+            # rather than only inside free(). It has to be: the town's thirteen
+            # interiors are floor now, they are reachable, and every one of
+            # their cells would otherwise offer the square's scatter set a
+            # dice roll it can only ever lose -- seven hundred draws consumed to
+            # place nothing, moving every anomaly downstream of them for no
+            # reason anybody chose. free() still checks the whole FOOTPRINT
+            # against the same set, because a prop two cells tall anchored
+            # outside a room can still reach into one.
+            if not options or (x, y) not in reach or (x, y) in keep_clear:
                 continue
             for prop in options:
                 if rng.random() >= prop["density"]:
@@ -1699,6 +2309,87 @@ def furnish_house(world, plane, plan):
         if plan[label] in solid_here:
             raise SystemExit("the %s cell has furniture standing on it" % label)
     return solid_here
+
+
+
+def furnish_buildings(world, plane, plan):
+    """Put the town's interiors in, and refuse to lose a stick of them.
+
+    The same contract as `furnish_house`, `stock_town` and `dress_facades`, and
+    the same reason: a `placed` prop has no density, so the validator's "this
+    prop never appears" warning is blind to it and a bed that quietly failed to
+    land would be an empty room nobody could explain. Every failure below is a
+    build failure, not a `continue`.
+
+    It reads its geometry out of `interior_plan` rather than working a wall
+    position out for itself, which is the rule the house had to learn twice: the
+    old `furnish_house` recomputed the internal wall, got it wrong, and dropped
+    every piece that landed on one without saying so.
+    """
+    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
+    interior = {p["id"]: p for p in manifest["props"]["list"]
+                if p["biome"] == "placed"}
+    problems = []
+    placed = 0
+    rooms = 0
+    for b in plan["buildings"]:
+        spec = interior_plan(b)
+        if spec is None:
+            continue
+        rooms += 1
+        for (name, (x, y)) in spec["furniture"]:
+            prop = interior.get(name)
+            if prop is None:
+                problems.append("%s: %s is not in the catalogue" % (b["id"], name))
+                continue
+            if plane[y][x]:
+                problems.append("%s: %s at (%d,%d) lands on another prop"
+                                % (b["id"], name, x, y))
+                continue
+            # Furniture stands on a floor. Anything else -- a chair on a wall, a
+            # dresser on the doorstep -- is the plan and the stamp having drifted
+            # apart, which is precisely the class of error that once put an NPC
+            # inside his own front wall.
+            material = ORDER[world.at(x, y)]
+            if not world.walkable(x, y):
+                problems.append("%s: %s at (%d,%d) lands on %s, which is not floor"
+                                % (b["id"], name, x, y, material))
+                continue
+            if (x, y) == spec["landing"]:
+                # One clear tile -- 36 in, one walkway -- on the inside of the
+                # front door, so you arrive somewhere rather than into a barrel.
+                problems.append("%s: %s at (%d,%d) is standing on the cell you "
+                                "land on when you come in" % (b["id"], name, x, y))
+                continue
+            plane[y][x] = prop["plane"]
+            placed += 1
+
+        # ONE CLEAR TILE ON BOTH SIDES OF EVERY INTERNAL DOORWAY -- 36 in, one
+        # walkway, the ruler house_plan sets. Checked rather than promised,
+        # because the failure it catches is not a stranded cell (the flood fill
+        # would find that) but a room you can only enter by squeezing past a
+        # dresser standing in the opening. Both neighbours along the doorway's
+        # own axis, and which axis that is comes from the wall it is cut into.
+        solid_here = set()
+        for (name, (x, y)) in spec["furniture"]:
+            prop = interior.get(name)
+            if prop is None or not prop["solid"]:
+                continue
+            for fy in range(prop["foot"][1]):
+                for fx in range(prop["foot"][0]):
+                    solid_here.add((x + fx, y - fy))
+        for (dx, dy) in spec["doorways"]:
+            axes = [[(dx - 1, dy), (dx + 1, dy)], [(dx, dy - 1), (dx, dy + 1)]]
+            if not any(all(c not in spec["walls"] and c not in solid_here
+                           for c in pair) for pair in axes):
+                problems.append(
+                    "%s: the doorway at (%d,%d) has no clear tile on both "
+                    "sides of it" % (b["id"], dx, dy))
+
+    if problems:
+        raise SystemExit("the town's interiors are wrong:\n  "
+                         + "\n  ".join(problems))
+    return placed, rooms
 
 
 def terrace(elev, levels=5):
@@ -2011,18 +2702,26 @@ def facade_props(plan):
         # One row, worked out once, and the stacks are punched out of the ridge
         # run rather than laid on top of it -- one prop per cell means the two
         # cannot both have the cell and the chimney is the one that wins.
-        ry = b["y"] + max(2, b["h"] // 2)
-        stacks = [b["x"] + max(1, b["w"] // 3)]
-        if b["w"] >= 10:
-            # Anything ten cells or more across gets two, one over each end. A
-            # hall with one hearth in the middle of it is a hall with one room.
-            stacks = [b["x"] + 2, b["x"] + b["w"] - 3]
-        for sx in stacks:
-            out.append((CHIMNEY, sx, ry, "roof"))
-        for rx in range(b["x"] + 1, b["x"] + b["w"] - 1):
-            if rx in stacks:
-                continue
-            out.append((RIDGE, rx, ry, "roof"))
+        #
+        # ...ON A BUILDING THAT STILL HAS A ROOF. A building the player can walk
+        # into is drawn as a cutaway, so its roof tiles are floors now and a
+        # ridge laid on one would be a lead cap running across somebody's
+        # kitchen. Asked of the plan rather than listed here, so opening a
+        # building is one entry in INTERIORS and not two.
+        if interior_plan(b) is None:
+            ry = b["y"] + max(2, b["h"] // 2)
+            stacks = [b["x"] + max(1, b["w"] // 3)]
+            if b["w"] >= 10:
+                # Anything ten cells or more across gets two, one over each end.
+                # A hall with one hearth in the middle of it is a hall with one
+                # room.
+                stacks = [b["x"] + 2, b["x"] + b["w"] - 3]
+            for sx in stacks:
+                out.append((CHIMNEY, sx, ry, "roof"))
+            for rx in range(b["x"] + 1, b["x"] + b["w"] - 1):
+                if rx in stacks:
+                    continue
+                out.append((RIDGE, rx, ry, "roof"))
 
         # AND THE DAMP AT THE FOOT OF IT. On the ground cell south of the south
         # wall, which is the cell the wall's vertical face is painted on -- see
@@ -2450,9 +3149,18 @@ def main():
     house_cells = {(x, y)
                    for y in range(plan["y0"], plan["y0"] + plan["h"])
                    for x in range(plan["x0"], plan["x0"] + plan["w"])}
+    # ...AND SO IS THE INSIDE OF EVERY BUILDING IN TOWN, for exactly the same
+    # reason one radius out. Thirteen of the fourteen have had their roofs taken
+    # off and their floors laid, so they are walkable, reachable, and made of the
+    # same `floor_stone` as the market square -- which means the square's scatter
+    # set (grit in the joints, leaves against the kerb) would happily blow into
+    # the mayor's study. `vale["built"]` is every footprint including the four
+    # walls, so it also keeps the scatter off the buildings that stay shut, which
+    # were only ever safe because their roofs were solid.
     scatter_props(world, elev, rng, reach, props,
-                  keep_clear=doorsteps | house_cells)
+                  keep_clear=doorsteps | house_cells | vale["built"])
     furnish_house(world, props, plan)
+    interior_count, interior_rooms = furnish_buildings(world, props, vale)
 
     # The collision plane is *derived* from the finished prop plane rather than
     # accumulated while scattering, and it is derived by the same function the
@@ -2560,8 +3268,14 @@ def main():
     # A procedural hole in the kitchen would make Beat 2 unfindable and Beat 4
     # unreachable, so the house footprint is off limits to everything but its
     # own named anomaly.
+    # And nothing procedural inside anybody else's house either. A hole in
+    # reality in the middle of the tavern would be a tier-2 anomaly the player
+    # walks into while looking for the barman, and the town's buildings are
+    # walkable now, so the footprints have to be said out loud rather than being
+    # protected by the accident of a solid roof.
     anomalies = name_anomalies(
-        cells, place_anomalies(world, rng, reach, forbid=house_keep_out))
+        cells, place_anomalies(world, rng, reach,
+                               forbid=house_keep_out | vale["built"]))
 
     # THE HOUSE MUST BE SEALED. HJWorld.walkable() returns false on the front
     # door cell until the player has paid the Grit to open it, so that one cell
@@ -2588,6 +3302,58 @@ def main():
             "the house is not sealed: with the front door shut, %d cells "
             "outside it are still reachable from the bed, starting at %s"
             % (len(leaked), leaked[0]))
+
+    # AND EVERY OTHER INTERIOR IN THE VALE, TWICE, FOR THE SAME TWO REASONS.
+    #
+    # The complaint this whole pass answers is "the town only has 3 accessible
+    # buildings", and the honest way to know a building is accessible is not to
+    # look at it -- a picture cannot tell you that a barrel closed the only route
+    # to the back room. So each opened building gets the pair of fills the house
+    # gets:
+    #
+    #   REACHABLE  every walkable cell of it is in the fill from the bed. Not
+    #              "the door is walkable": a pocket behind a dresser is a cell
+    #              the player can see, walk at and never stand on, and a
+    #              hand-placed layout is exactly where that happens because you
+    #              are reasoning about a picture and the collision plane is
+    #              reasoning about bytes.
+    #   SEALED     with that building's own front door treated as solid, nothing
+    #              outside its walls is reachable from inside it. The hole would
+    #              never be in the plan; it would be something a later pass did,
+    #              which is precisely what happened when the road carver drove
+    #              seven columns of dirt through the house's east wall.
+    interiors = [spec for spec in (interior_plan(b) for b in vale["buildings"])
+                 if spec is not None]
+    unreachable, unsealed = [], []
+    for spec in interiors:
+        walls = {(x, y)
+                 for y in range(spec["y"] - 1, spec["y"] + spec["h"] + 1)
+                 for x in range(spec["x"] - 1, spec["x"] + spec["w"] + 1)}
+        missed = sorted(c for c in spec["inside"]
+                        if world.walkable(c[0], c[1]) and c not in reach)
+        if missed:
+            unreachable.append("%s: %d cell(s) starting at %s"
+                               % (spec["id"], len(missed), missed[0]))
+        door = next(b["door"] for b in vale["buildings"] if b["id"] == spec["id"])
+        barred_house = World(world.tiles, elev)
+        barred_house.blocked = blocked | {door}
+        within = reachable(barred_house, spec["landing"])
+        escaped = sorted(c for c in within if c not in walls)
+        if escaped:
+            unsealed.append("%s: %d cell(s) starting at %s"
+                            % (spec["id"], len(escaped), escaped[0]))
+    if unreachable:
+        raise SystemExit(
+            "%d building(s) have interior cells nobody can walk to: %s. Every "
+            "walkable cell inside has to be reachable from the bed -- a pocket "
+            "behind a dresser is a cell the player can see, walk at, and never "
+            "stand on." % (len(unreachable), "; ".join(unreachable)))
+    if unsealed:
+        raise SystemExit(
+            "%d building(s) leak: %s. With its own front door shut, nothing "
+            "outside a building's walls may be reachable from inside it, or the "
+            "wall has a hole in it that no picture would show."
+            % (len(unsealed), "; ".join(unsealed)))
 
     stranded = [n for n, c in cells.items() if c not in reach]
 
@@ -2620,7 +3386,6 @@ def main():
     # crossable at any kitty-corner pinch, so a seal proved four-way is not
     # proved. The Wend is five cells wide and the thorn three for that reason.
     gate = vale["gate"]
-    VALE_BOX = (68, 86, 170, 192)                 # x0, y0, x1, y1, inclusive
     OUTSIDE_ANCHORS = ("tall_grass", "long_road", "foothills",
                        "observatory", "summit")
 
@@ -2716,6 +3481,30 @@ def main():
                      {"x": FORT_GATE[0], "y": FORT_GATE[1],
                       "type": "leaf_gate", "label": "The barricade"}]
 
+    # EVERY BUILDING GETS A DOOR YOU CAN ACT ON, and that is true of the ones
+    # you cannot go into as well.
+    #
+    # A painted `door` tile in a wall is a picture of a door; what made three
+    # buildings feel accessible and eleven feel like scenery was that three
+    # happened to have somebody standing in front of them. An interactable on
+    # every door cell is the fix, and it does two jobs. On a building that is
+    # open it is the sentence you get on the way in -- what the room smells of
+    # before you have seen it. On a building that is shut it is the whole of the
+    # building's presence: "bolted from the inside" tells the player this is a
+    # house somebody lives in, where a wall tells them nothing at all. Both are
+    # one entry in data/content/interactables.json, and a shut one declares
+    # `blocks_until_tag` there, which is what makes HJWorld.walkable() refuse the
+    # cell -- the same mechanism as the front door and the fort gate.
+    for b in vale["buildings"]:
+        spec = interior_plan(b)
+        kind = spec["door"] if spec is not None else SHUT_DOORS.get(b["id"])
+        if kind is None:
+            raise SystemExit(
+                "%s has no door interactable and no interior. A building the "
+                "player can neither enter nor be told about is the defect this "
+                "pass exists to remove." % b["id"])
+        interactables.append({"x": b["door"][0], "y": b["door"][1], "type": kind})
+
     # The townsfolk, each outside the door of the building they belong to, or in
     # the case of Bird, beside the barricade her sister is standing in. Placed
     # here rather than in the plan because who lives where is a fact about the
@@ -2794,6 +3583,50 @@ def main():
         raise SystemExit("interactables are in the wrong place:\n  "
                          + "\n  ".join(drawn_over))
 
+    region_rects = {}
+    for (name, rx, ry, rw, rh) in REGION_RECTS:
+        if name not in cells:
+            raise SystemExit("REGION_RECTS names %s, which is not a region" % name)
+        if not (rx <= cells[name][0] < rx + rw and ry <= cells[name][1] < ry + rh):
+            # An anchor outside its own rect means the two disagree about where
+            # the place is, and place_id() would answer one thing while
+            # place_nodes() put the chapter's nodes somewhere else entirely.
+            raise SystemExit(
+                "the %s anchor at %s is outside its own rect (%d,%d %dx%d)"
+                % (name, cells[name], rx, ry, rw, rh))
+        region_rects[name] = {"x": rx, "y": ry, "w": rw, "h": rh}
+
+    # A RECT MAY NOT QUIETLY SWALLOW ANOTHER PLACE.
+    #
+    # Nesting is the point -- the house's plot sits inside the town's and the
+    # smaller claim wins, which is what keeps a player on their own doorstep at
+    # home. What is not the point is a rect eating a region nobody meant it to:
+    # the first draft of the town's rect was VALE_BOX, the deliberately generous
+    # box the SEAL is proved against, and it took in the tall grass on the far
+    # bank of the Wend. That anchor would have gone on existing and gone on
+    # placing its chapter's nodes while nobody standing on it was ever told its
+    # name again -- a silent loss, and the only kind worth a check.
+    #
+    # So the rule is the engine's own rule, asked here: resolve every anchor the
+    # way HJWorld.place_id() will, and require the answer to be the region itself
+    # or an absorption somebody wrote down on purpose.
+    swallowed = {}
+    for other, cell in cells.items():
+        best, best_area = other, 1 << 30
+        for (name, rx, ry, rw, rh) in REGION_RECTS:
+            if (rx <= cell[0] < rx + rw and ry <= cell[1] < ry + rh
+                    and rw * rh < best_area):
+                best, best_area = name, rw * rh
+        if best != other and ABSORBED.get(other) != best:
+            swallowed[other] = (best, cell)
+    if swallowed:
+        raise SystemExit(
+            "%d region anchor(s) fall inside somebody else's rect: %s. Add the "
+            "pair to ABSORBED if that is what you meant, or move the rect."
+            % (len(swallowed), "; ".join(
+                "%s at %s answers %s" % (k, v[1], v[0])
+                for k, v in sorted(swallowed.items()))))
+
     payload = {
         "_comment": "Generated by tools/make_world.py. Do not hand-edit; edit in "
                     "Tiled and import, or regenerate. Tile ids index ORDER in "
@@ -2813,7 +3646,12 @@ def main():
             [blocked_plane[y * W:(y + 1) * W] for y in range(H)]),
         "cliffs_b64_deflate": encode_plane(cliffs),
         "terrace_levels": 5,
-        "regions": {n: {"x": c[0], "y": c[1]} for n, c in cells.items()},
+        # A region is an anchor, and some of them are also a rectangle -- see
+        # REGION_RECTS. The rect rides on the same record so there is one list
+        # of regions and not two, and so the round trip needs no new shape.
+        "regions": {n: ({"x": c[0], "y": c[1], "rect": region_rects[n]}
+                        if n in region_rects else {"x": c[0], "y": c[1]})
+                    for n, c in cells.items()},
         "anomalies": anomalies,
         # Things you can act on. `type` names an entry in
         # data/content/interactables.json; this file only says where they are.
@@ -2824,13 +3662,23 @@ def main():
         "interactables": interactables,
         # Where "inside" is, for the Boon of the White Room and for the three
         # things that fire when the player crosses the threshold (Beat 5). One
-        # rectangle covers it because the house is one rectangle: the whole
-        # footprint including its walls and the front door cell, so the boon
-        # breaks on the first cell of ground OUTSIDE the building rather than in
-        # the doorway. Deriving it from the floor material would break the first
-        # time somebody floors a porch.
-        "indoors": {"x": plan["x0"], "y": plan["y0"],
-                    "w": plan["w"], "h": plan["h"]},
+        # rectangle per building, the whole footprint including its walls and its
+        # door cell, so the boon breaks on the first cell of ground OUTSIDE a
+        # building rather than in the doorway. Deriving it from the floor
+        # material would break the first time somebody floors a porch.
+        #
+        # A LIST, AND EVERY ENTRY BUT THE FIRST IS NAMED. HJWorld.place_name()
+        # returns an entry's `place` instead of "Home", and until it did there
+        # was no way to add the tavern here at all: the run header would have
+        # introduced it as the player's own house, which is exactly why thirteen
+        # buildings were left as solid blocks. The house itself carries no name
+        # on purpose -- an unnamed rect still means home, and home is where it
+        # is.
+        "indoors": [{"x": plan["x0"], "y": plan["y0"],
+                     "w": plan["w"], "h": plan["h"]}]
+                   + [{"x": b["x"], "y": b["y"], "w": b["w"], "h": b["h"],
+                       "place": interior_plan(b)["place"]}
+                      for b in vale["buildings"] if interior_plan(b) is not None],
         "spawn": {"x": spawn[0], "y": spawn[1]},
     }
     path = os.path.join(DATA_OUT, "overworld.json")
@@ -2870,6 +3718,10 @@ def main():
     print("  %d town props placed by hand, %d facade pieces on the buildings "
           "(windows, signs, ridges, stacks and stains)"
           % (town_prop_count, dressed))
+    print("  %d of %d buildings open onto a furnished interior (%d pieces of "
+          "furniture, %d shut with a door that says why)"
+          % (interior_rooms, len(vale["buildings"]), interior_count,
+             len(vale["buildings"]) - interior_rooms))
     print("  the fort gate is at %s and %d anomalies are inside the vale"
           % (vale["gate"], len(in_vale)))
     print("  %d cells of paving in one connected surface"

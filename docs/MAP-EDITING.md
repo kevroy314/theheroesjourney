@@ -94,12 +94,13 @@ Layers come out in this order, and every name except `base`, `edits` and
 | --- | --- | --- | --- | --- |
 | 1 | `base` | tile | **no** — locked | The generated terrain. Overwritten in full by the next export. |
 | 2 | `edits` | tile | **yes** | Your overrides. A tile here wins over `base`; an empty cell means "leave the generated tile alone". |
-| 3 | `regions` | object | yes | Region anchors, as point objects named by region id. |
+| 3 | `regions` | object | yes | Region anchors, as point objects named by region id. Some carry a `rect` as well — see below. |
 | 4 | `anomalies` | object | yes | Where the holes in reality are, with their tier and the area each opens. |
 | 5 | `interactables` | object | yes | The door, the stove, the counter, the animals — points naming a catalogue entry. |
 | 6 | `props` | object | **yes** | Every tree, barrel and bed in the world, as tile objects you can drag, retype, delete and add. **7,587** of them. |
 | 7 | `cliffs` | object | **yes** | Every cell of every terrace edge, as tile objects. Presence is all you say; the left/middle/right pieces are worked out for you. |
-| 8 | `markers` | object | yes | Every key the world file carries as a single `{x, y, …}`: `centre`, `spawn` and `indoors`. |
+| 8 | `indoors` | object | yes | One point per building the player can walk into, carrying the footprint as `w`/`h` and the name the run header shows as `place`. |
+| 9 | `markers` | object | yes | Every key the world file carries as a single `{x, y, …}`: `centre` and `spawn`. |
 | — | *others* | object | yes | One layer per collection the world model grows. Add a whole new object layer and it becomes a new top-level key. |
 
 `base` is locked in the editor because a lock is the honest representation of
@@ -123,17 +124,26 @@ the layer name. And a mistyped `type` is not caught here — the import writes i
 happily and the affordance silently never appears in game. `npm run check` is
 what catches it.
 
-### `indoors` is a rectangle wearing a point
+### `indoors` is a list of rectangles wearing points
 
-`indoors` is `{ x, y, w, h }` — the footprint of the building the player wakes
-in, walls included, and the thing the Boon of the White Room is scoped to. But
-the exporter classifies by shape, and its question is only "is this a dict with
-a numeric `x` and `y`", so `indoors` lands in `markers` as a **point**, at the
-top-left cell, with its extent demoted to two integer properties.
+`indoors` is a **list** of `{ x, y, w, h, place? }` — one per building the player
+can walk into, walls and door cell included. It is what the Boon of the White
+Room is scoped to, what `HJWorld.is_indoors` answers, and what suppresses the
+sun and the sky wash in `Lighting.gd`. `place` is the name the run header shows;
+an entry with no `place` means "Home", which is why the player's own house
+carries none and the other thirteen do.
 
-**So you cannot resize it by dragging.** Converting the point to a rectangle and
-pulling a corner changes Tiled's own width and height, which the import does not
-read. Edit the `w` and `h` properties instead.
+It used to be a single `{x, y, w, h}` and therefore a **marker**, because the
+exporter classifies by shape and its only question is "is this a dict with a
+numeric `x` and `y`". As a list of the same records it is a collection instead,
+so it gets a layer of its own — but each object is still a **point** at the
+rectangle's top-left, with the extent as two integer properties.
+
+**So you still cannot resize one by dragging.** Converting a point to a
+rectangle and pulling a corner changes Tiled's own width and height, which the
+import does not read. Edit the `w` and `h` properties instead. And because
+`indoors` is a list, it is reconciled on the exporter's numbering — see the note
+on list collections below before you reorder or delete one.
 
 Neither `indoors` nor `interactables` is in the schema's `world.required` list,
 so deleting one loses it with no validator complaint — unlike `spawn` or
@@ -477,10 +487,18 @@ into: the width, the height, the compressed tile grid, a collection of
 `y` (→ a marker), a one-byte-per-cell plane (→ an object layer, or derived), or
 something opaque (→ carried verbatim in `hj_schema` and written straight back).
 
-That marker rule is deliberately loose, and `indoors` is where the looseness
-shows: a `{x, y, w, h}` rectangle satisfies it, so it becomes a point with two
-extra properties rather than a shape you can drag a corner of. Cheap and
-correct, and worth knowing before you try to resize the house.
+That rule is deliberately loose, and `indoors` is where the looseness shows: a
+`{x, y, w, h}` rectangle satisfies the marker test, so an entry becomes a point
+with two extra properties rather than a shape you can drag a corner of. Cheap
+and correct, and worth knowing before you try to resize a building.
+
+A **structured** value inside such a record is carried too, as JSON in a string
+property with its key listed in `hj_json`, and decoded again on the way back in.
+`regions` uses it: a region is `{ x, y }` and may also carry a `rect` of
+`{ x, y, w, h }` saying how far the place reaches. `HJWorld.place_id()` prefers
+the smallest rect containing the cell and falls back to the nearest anchor, so a
+valley can be a place without a circle round its middle claiming the mountain
+too. Two regions carry one today: `the_town` and `the_house`.
 
 The planes are the one exception, and only half an exception. *Which* plane is
 the props plane is a fact about the art, not about the value — every plane in the
@@ -490,8 +508,9 @@ the atlas geometry, the cell size and the catalogue of what each byte means, is
 read out of `assets/tiles/tiles.json` at run time.
 An elevation field, difficulty rings, anomaly spawn points and the
 interactables list all passed through this without a code change: anomalies and
-interactables land as object layers you can drag, `indoors` joined `markers`,
-and elevation rides along untouched. That is the claim this design makes, and it
+interactables land as object layers you can drag, `indoors` grew from a marker
+into a layer of its own the day it stopped being one building, a region grew a
+nested `rect` with no new shape, and elevation rides along untouched. That is the claim this design makes, and it
 is the evidence for it.
 
 ### What will actually break, and when
