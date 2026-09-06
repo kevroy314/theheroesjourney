@@ -370,7 +370,7 @@ static func reload_all() -> void:
 	Buffs.load_state()                      ## settles anything that expired meanwhile
 	Discovery.use_path(Discovery.path)
 	_invalidate_critters()
-	Steps._load_baseline()
+	Steps.forget_baseline()
 
 	var run: HJRun = Game.run
 	var theme := Meta.selected_theme if run == null else run.theme_id
@@ -398,8 +398,11 @@ static func reload_all() -> void:
 ## id. Those belong to the phone rather than to the character, the same argument
 ## that keeps debug.json out of a backup.
 static func hard_reset() -> void:
-	Game.run = null
-	HJRunStore.erase()
+	# Game.forget_run() rather than nulling the field and erasing the file by
+	# hand: it also clears the summary and the pending event, which otherwise
+	# survive a reset and put the player straight back on a screen belonging to
+	# a run that no longer exists.
+	Game.forget_run()
 	Buffs.clear_all()                       ## clears memory and deletes the file
 	_reset_critters()
 
@@ -442,22 +445,13 @@ static func reset_character() -> String:
 ## `_check_run()` wipes the live set whenever it sees the seed move and would
 ## otherwise throw away what it had just loaded.
 static func _invalidate_critters() -> void:
-	Critters._live.clear()
-	Critters._trail.clear()
-	Critters._spawned = false
-	Critters._dirty = false
-	Critters._save_in = 0.0
 	var run: HJRun = Game.run
-	var seed_now := 0 if run == null else int(run.seed)
-	Critters._run_seed = seed_now
-	Critters._seed_seen = seed_now
-	Critters.changed.emit()
+	Critters.reload(0 if run == null else int(run.seed))
 
 
 static func _reset_critters() -> void:
 	Critters.clear_all()                    ## clears memory and deletes the file
-	Critters._run_seed = 0
-	Critters._seed_seen = 0
+	Critters.reload(0)
 
 
 ## `_load_baseline()` returns early when there is no file, leaving the old
@@ -467,9 +461,7 @@ static func _reset_critters() -> void:
 ## negative.
 static func _reset_steps() -> void:
 	Steps.walked = 0
-	Steps._carried = 0
-	Steps._baseline = -1
-	Steps._elapsed = 0
+	Steps.forget_baseline()
 	Steps.reset_run()
 
 

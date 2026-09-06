@@ -77,7 +77,7 @@ func _ready() -> void:
 	g.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	g.size = Vector2(w, h)
 	g.world = world
-	g.stand = Vector2i(96, 140)
+	g.stand = Vector2i(96, 141)
 	g.tiles = load("res://assets/tiles/tileset.png")
 	g.props = load("res://assets/tiles/props.png")
 	sub.add_child(g)

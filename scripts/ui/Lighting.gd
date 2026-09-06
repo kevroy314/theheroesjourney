@@ -57,7 +57,13 @@ static var enabled: bool = true
 ## not part of the world". Off makes the world exactly as bright as before.
 static var anomaly_glow: bool = true
 const ANOMALY_COLOUR := Color(0.45, 0.32, 0.95)
-const ANOMALY_RADIUS := 2.4      ## tiles, at tier 0; grows half a tile per tier
+## Tiles, at tier 0; grows 0.7 per tier, so 3.2 to 5.0 across the five.
+##
+## Was 2.4 and +0.5, sized when a portal was a 17-29px decal. The portal is now
+## 60-104px of mouth plus a stain reaching 1.33 tiles at tier 0 and 2.31 at tier
+## 4 — so most of the old pool fell *inside* the hole and the light stopped
+## reading as something the portal was doing to the ground around it.
+const ANOMALY_RADIUS := 3.2
 const ANOMALY_FLICKER := 0.30
 
 ## A legibility floor, not a lantern.

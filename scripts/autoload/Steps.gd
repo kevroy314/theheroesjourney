@@ -111,6 +111,21 @@ var _permission := false
 const SAVE_PATH := "user://steps.cfg"
 
 
+## Forget the pedometer baseline and re-read it from disk.
+##
+## Public because a restore or a character reset writes `steps.cfg` underneath
+## us, and this autoload holds the baseline in memory — so without being told,
+## the next hardware reading is diffed against a number from the save that was
+## just replaced, and the player is credited with every step since the backup
+## was taken. Callers were reaching into `_baseline` and `_carried` directly to
+## work around its absence.
+func forget_baseline() -> void:
+	_baseline = -1
+	_elapsed = 0
+	_carried = 0
+	_load_baseline()
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_load_baseline()

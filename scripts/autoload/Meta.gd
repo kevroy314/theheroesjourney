@@ -642,6 +642,15 @@ func load_game() -> void:
 	refresh_streak()
 
 
+## Reset **this** store, and the three that were wired to it before there were
+## nine of them.
+##
+## Deliberately not renamed to something narrower, because every existing caller
+## means "start again" — but it is not a whole-game reset and never was. It does
+## not touch history, buffs, critters or the pedometer baseline, which is how a
+## save could come out of "Wipe save" with the interesting half deleted and the
+## rest standing. `HJSaveIO.hard_reset()` is the one that reaches all nine, and
+## the Danger Zone calls that.
 func wipe() -> void:
 	resolve = 0
 	levels = {}

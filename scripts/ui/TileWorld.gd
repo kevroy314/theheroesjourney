@@ -129,7 +129,7 @@ func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
 		var at := Vector2i(int(entry.get("x", 0)), int(entry.get("y", 0)))
 		var tier := int(entry.get("tier", 0))
 		_anomaly_lights.append(Vector4(float(at.x), float(at.y),
-			HJLighting.ANOMALY_RADIUS + 0.5 * float(tier),
+			HJLighting.ANOMALY_RADIUS + 0.7 * float(tier),
 			HJLighting.phase_for(at)))
 		if not _anomaly_rows.has(at.y):
 			_anomaly_rows[at.y] = []

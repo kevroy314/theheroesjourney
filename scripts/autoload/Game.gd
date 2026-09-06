@@ -626,8 +626,28 @@ func load_run() -> void:
 	rebuild_rules()
 
 
+## Erase the saved run *file*, keeping whatever is in memory.
+##
+## `end_run` calls this immediately after building the summary, so it must not
+## touch `run` — the summary screen reads the finished run, and nulling it here
+## blanks the screen the player is about to be shown. That is what happened when
+## these two operations were briefly one.
 func clear_saved_run() -> void:
 	HJRunStore.erase()
+
+
+## Forget the run entirely: the file *and* the memory.
+##
+## What "wipe my save" actually means. `clear_saved_run` alone erased the file
+## and left the run in memory, so the title screen went on offering "Carry on"
+## from a run that had been deleted and the next `changed()` wrote the file
+## straight back. A wipe the game immediately undoes is worse than none, because
+## the player watched it happen.
+func forget_run() -> void:
+	clear_saved_run()
+	run = null
+	summary = {}
+	event = {}
 
 
 # --- anomalies -----------------------------------------------------------------

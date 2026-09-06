@@ -148,6 +148,7 @@ func _gather_shafts(view: Vector2, given: Vector2, given_scale: float) -> void:
 		return
 	var scale := given_scale if given_scale > 0.0 else _scale()
 	if scale <= 0.0:
+		_complain()
 		return
 	var cam := given if given.x < INF else _camera(view, scale)
 	if cam.x >= INF:
@@ -292,11 +293,8 @@ func _scale() -> float:
 ## where the character is, how big the view is, how big the map is.
 func _camera(view: Vector2, scale: float) -> Vector2:
 	var parent := get_parent()
-	if parent == null or not parent.has_method("_character_px") or _tile <= 0.0:
-		if not _warned:
-			_warned = true
-			push_warning("HJLightOverlay: no camera from the renderer — "
-				+ "light shafts are off. Pass `cam` and `scale` to submit().")
+	if parent == null or not parent.has_method("_character_px"):
+		_complain()
 		return Vector2.INF
 	var world := HJWorld.shared()
 	if world == null or not world.loaded:
@@ -312,6 +310,16 @@ func _camera(view: Vector2, scale: float) -> Vector2:
 	if extent.y < view.y:
 		cam.y = -(view.y - extent.y) * 0.5
 	return cam
+
+
+## Said once, not once a frame. Losing the shafts is worth a line in the log;
+## sixty lines a second is worth nothing.
+func _complain() -> void:
+	if _warned:
+		return
+	_warned = true
+	push_warning("HJLightOverlay: the renderer offers no projection — light "
+		+ "shafts are off. Pass `cam` and `scale` to submit().")
 
 
 ## How many shafts the last frame packed. For harnesses and the debug overlay;

@@ -241,8 +241,35 @@ func use_species(list: Array) -> void:
 	_live.clear()
 
 
+## Point the store somewhere else, and forget what came out of the old one.
+##
+## This used to assign `path` and nothing else, which is not a redirect — it is
+## a store reading from one file and writing to another. Every other store here
+## reloads on redirect, and the self-test relies on that: pointing at a scratch
+## file while keeping the player's animals in memory means the first save writes
+## the harness's state into the scratch and the player's cat is still standing
+## in the room.
 func use_path(new_path: String) -> void:
 	path = new_path
+	reload()
+
+
+## Drop everything in memory and re-read on next use. Public because a restore
+## or a reset writes the file underneath us and something has to say so.
+##
+## `adopt_seed` is the run the reloaded state belongs to. Pass the restored
+## run's seed after a restore: `_check_run()` wipes the live set whenever it
+## sees the seed move, so leaving this at zero would throw away exactly what was
+## just loaded. Pass zero for a reset, where there is nothing to keep.
+func reload(adopt_seed: int = 0) -> void:
+	_live.clear()
+	_trail.clear()
+	_spawned = false
+	_dirty = false
+	_save_in = 0.0
+	_run_seed = adopt_seed
+	_seed_seen = adopt_seed
+	changed.emit()
 
 
 func use_world(w: HJWorld) -> void:
