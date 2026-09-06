@@ -27,6 +27,7 @@ const BACKUP := "user://selftest_backup.json"
 const OBJECTIVES_SCRATCH := "user://objectives_selftest.json"
 const DIALOGUE_SCRATCH := "user://dialogue_selftest.json"
 const BUFFS_SCRATCH := "user://buffs_selftest.json"
+const DISCOVERY_SCRATCH := "user://discovery_selftest.json"
 
 ## Held for the length of a run, so two harnesses cannot overlap.
 ##
@@ -87,6 +88,10 @@ static func run_all(host: Node) -> int:
 	Objectives.use_path(OBJECTIVES_SCRATCH)
 	Dialogue.use_path(DIALOGUE_SCRATCH)
 	Buffs.use_path(BUFFS_SCRATCH)
+	# Six runs of walking would otherwise carve the harness's route into the
+	# player's own fog, which is the whole thing History's comment warns about.
+	_discard_scratch(DISCOVERY_SCRATCH, Discovery.PATH)
+	Discovery.use_path(DISCOVERY_SCRATCH)
 
 	var saved_meta := _snapshot()
 	var backup := FileAccess.open(BACKUP, FileAccess.WRITE)
@@ -171,6 +176,8 @@ static func run_all(host: Node) -> int:
 	Buffs.clear_all()
 	_discard_scratch(Buffs.path, Buffs.SAVE_PATH)
 	Buffs.use_path(Buffs.SAVE_PATH)
+	_discard_scratch(DISCOVERY_SCRATCH, Discovery.PATH)
+	Discovery.use_path(Discovery.PATH)
 
 	_restore(saved_meta)
 	# The run finished, so the on-disk copy has done its job. Leaving it would

@@ -1,0 +1,137 @@
+{
+  "_comment": "Animals that move. A critter is a named state machine over the tile grid, and everything about how it behaves — which states exist, what each one does, the distances it keeps and what moves it between them — is in this file. scripts/game/Critters.gd implements four goals (hold, approach, retreat, wander) and a handful of transition conditions, and knows nothing about dogs or cats. Placement is world data: an interactables record in data/world/overworld.json whose catalogue entry carries a `critter` key spawns one of these where it stands, and acting on it fires the named event. Numbers are here rather than in GDScript because the point of the exercise is that the next animal is a data file. The escort in #78 — \"follow, but stop if the player gets too far, and fail after N tiles apart\" — is three states and four transitions in this same shape and needs no new code; scripts/game/CritterSim.gd builds and runs exactly that as a proof.",
+  "config": {
+    "critter.tick_seconds": 0.17,
+    "critter.fidget_seconds": 3.4,
+    "critter.path_budget": 240
+  },
+  "critters": [
+    {
+      "id": "dog",
+      "name": "the dog",
+      "sprite": "dog",
+      "start": "waiting",
+      "_comment": "Follow, with lag. `trail: 2` aims him at the cell you stood on two moves ago rather than the one you are on, which is the whole difference between a companion and a mirror — a follower that occupies your previous cell exactly reads as a rendering bug. `keep: 1` means he stops when he is beside that cell, so his real distance from you sits around two or three. `recover: 10` is the escape hatch: ten move attempts that get no closer and he gives up on the path and reappears at the edge of his band, which is what stops a dog wedged behind a chair from being lost for the rest of the run.",
+      "states": {
+        "waiting": {
+          "goal": "hold"
+        },
+        "following": {
+          "goal": "approach",
+          "target": "player",
+          "keep": 1,
+          "trail": 2,
+          "pace": 1.0,
+          "recover": 10,
+          "say": "He gets up. He is coming with you."
+        }
+      },
+      "transitions": [
+        {
+          "from": "waiting",
+          "on": "petted",
+          "to": "following"
+        },
+        {
+          "from": "following",
+          "on": "petted",
+          "to": "waiting"
+        }
+      ]
+    },
+    {
+      "id": "cat",
+      "name": "the cat",
+      "sprite": "cat",
+      "start": "dozing",
+      "_comment": "Flee, then stalk, then hold. The thresholds are deliberately different in each direction and that asymmetry is the whole design: it breaks off at 2, runs to 6, comes back in to 4 and only sets off again at 5, so the resting band is 3 to 4 and there is no distance at which two rules disagree. Matching the numbers — approach to 4, flee below 4 — would produce an animal that vibrates on the boundary, which is the failure this shape exists to avoid. `stray_gte` on the bolt is for a cat that runs out of house before it runs out of nerve: cornered, it stops and watches from wherever it got to rather than scrabbling at the wall. One asymmetry is deliberate and is the answer to a contradiction in the issue: `dozing` does NOT break on proximity. A cat that flees the moment you come within two cells is a cat with an unreachable Pet verb, because Pet needs you adjacent. So the wariness is something you teach it. Before that it only mooches -- a slow `wander` on a two-cell leash from where it was placed, which is what stops a sleeping animal from being a prop.",
+      "states": {
+        "dozing": {
+          "goal": "wander",
+          "target": "home",
+          "keep": 2,
+          "pace": 3.2,
+          "restless": 0.25
+        },
+        "bolting": {
+          "goal": "retreat",
+          "target": "player",
+          "keep": 6,
+          "pace": 0.7,
+          "say": "It is already three tiles away."
+        },
+        "skulking": {
+          "goal": "hold"
+        },
+        "stalking": {
+          "goal": "approach",
+          "target": "player",
+          "keep": 4,
+          "pace": 2.2
+        },
+        "watching": {
+          "goal": "hold",
+          "say": "It has stopped, at a distance it picked."
+        }
+      },
+      "transitions": [
+        {
+          "from": [
+            "dozing",
+            "skulking",
+            "stalking",
+            "watching"
+          ],
+          "on": "petted",
+          "to": "bolting"
+        },
+        {
+          "from": [
+            "skulking",
+            "stalking",
+            "watching"
+          ],
+          "when": {
+            "dist_lte": 2
+          },
+          "to": "bolting"
+        },
+        {
+          "from": "bolting",
+          "when": {
+            "dist_gte": 6
+          },
+          "to": "skulking"
+        },
+        {
+          "from": "bolting",
+          "when": {
+            "stray_gte": 6
+          },
+          "to": "skulking"
+        },
+        {
+          "from": "skulking",
+          "when": {
+            "held_gte": 2.5
+          },
+          "to": "stalking"
+        },
+        {
+          "from": "stalking",
+          "when": {
+            "dist_lte": 4
+          },
+          "to": "watching"
+        },
+        {
+          "from": "watching",
+          "when": {
+            "dist_gte": 5
+          },
+          "to": "stalking"
+        }
+      ]
+    }
+  ]
+}

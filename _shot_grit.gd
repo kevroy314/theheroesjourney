@@ -124,5 +124,24 @@ func _go() -> void:
 		await _frames(6)
 		await _shot("20-clock-reset")
 
+	# A census: every task node in every area template, and the mark it resolves
+	# to. Anything landing on the generic "task" square is a node the player gets
+	# no warning about.
+	var tally: Dictionary = {}
+	var vague: Array = []
+	for area_id in Content.areas.keys():
+		var template: Dictionary = Content.areas[area_id]
+		for node_id in template.get("nodes", {}).keys():
+			var n: Dictionary = template["nodes"][node_id]
+			if String(n.get("type", "")) != "task":
+				continue
+			var mark := HJNodeInfo.mark_of(n, "task")
+			tally[mark] = int(tally.get(mark, 0)) + 1
+			if mark == "task":
+				vague.append("%s/%s:%s" % [area_id, node_id,
+					n.get("task", {}).get("movement", "?")])
+	print("axis marks ", tally)
+	print("no axis    ", vague)
+
 	print("user dir ", OS.get_user_data_dir())
 	get_tree().quit(0)

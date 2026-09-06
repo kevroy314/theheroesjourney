@@ -111,8 +111,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var run: HJRun = Game.run
 	if run == null:
-		if _flush_at > 0.0:
-			_flush_if_due()
+		_flush_if_due()
 		return
 	var key := "%d-%d" % [run.seed, run.started_unix]
 	if key != _run_key:

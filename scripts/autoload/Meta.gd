@@ -648,6 +648,7 @@ func wipe() -> void:
 	# whole blob on nearly every action. A wipe has to reach them explicitly.
 	Objectives.wipe()
 	Dialogue.wipe()
+	Discovery.wipe()
 	_ensure_defaults()
 	ensure_palace()
 	save_game()

@@ -822,7 +822,7 @@
       }
     },
     "interactables": {
-      "_comment": "Something in the world you can stand next to and act on. This is the catalogue — the verb, the price and what happens. The instances live in data/world/overworld.json as an `interactables` list of { x, y, type, label? } records, which is a shape the Tiled round trip already turns into a draggable object layer. `cost_key` names a config key rather than a number so a trinket can bend the price, and `effect` is one entry of the same vocabulary hooks use, applied by Game.apply_effects. A `critter` names a species in data/content/critters.json: the placement spawns that animal there, reach follows it as it walks, and `critter_event` (default \"petted\") is what acting on it fires at the state machine. That one key is why petting the dog and petting the cat do opposite things with no branch anywhere in the code.",
+      "_comment": "Something in the world you can stand next to and act on. This is the catalogue — the verb, the price and what happens. The instances live in data/world/overworld.json as an `interactables` list of { x, y, type, label? } records, which is a shape the Tiled round trip already turns into a draggable object layer. `cost_key` names a config key rather than a number so a trinket can bend the price, and `effect` is one entry of the same vocabulary hooks use, applied by Game.apply_effects. A `critter` names a species in data/content/critters.json: the placement spawns that animal there, reach follows it as it walks, and `critter_event` (default \"petted\") is what acting on it fires at the state machine. That one key is why petting the dog and petting the cat do opposite things with no branch anywhere in the code. It is checked by critter_pass() in tools/validate_data.py rather than by `refs`: Content.gd builds its id sets from `runtime` paths and does not merge a `critters` key, so a `refs` entry here would resolve against an empty set and reject every placement on a player's device.",
       "files": {
         "dir": "content",
         "paths": [
@@ -854,8 +854,7 @@
         "critter_event": "critter_events"
       },
       "refs": {
-        "cost_key": "config_keys",
-        "critter": "critters"
+        "cost_key": "config_keys"
       },
       "effect_vocab": "hook_effects"
     },

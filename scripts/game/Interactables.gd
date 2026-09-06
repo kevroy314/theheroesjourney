@@ -17,6 +17,13 @@ extends RefCounted
 ## trinket can bend it — same treatment as run.clear_bonus. The effect is one
 ## entry of the vocabulary hooks already use, so Game.apply_effects is the only
 ## place that knows how to make something happen.
+##
+## A catalogue entry may also carry a `critter`, naming a species in
+## data/content/critters.json. That one key is the whole seam between this
+## system and the animals: the placement spawns one where it stands, acting on
+## it fires the `petted` event at it, and reach is measured against wherever the
+## animal has walked to rather than against the rug it got up from. Retyping the
+## dog as a cat in Tiled is therefore a data edit with no code in it.
 
 ## The world file is read for its `interactables` list alone. HJWorld parses the
 ## same file for its tile planes; the duplicate parse is one-off and lazy, and
@@ -85,15 +92,27 @@ func near(cell: Vector2i) -> Array:
 		var kind := definition(String(placement.get("type", "")))
 		if kind.is_empty():
 			continue
-		if not _in_reach(kind, _cell_of(placement), cell):
+		if not _in_reach(kind, live_cell(placement, kind), cell):
 			continue
 		out.append(describe(placement, kind))
 	return out
 
 
+## Where the thing actually is. For everything nailed down that is the cell it
+## was placed on; for an animal it is wherever the animal is now, so the Pet
+## prompt follows the dog across the room instead of staying on the floor he was
+## lying on. Falls back to the placement whenever the critter system has nothing
+## live under that key, which is what happens outside a run.
+func live_cell(placement: Dictionary, def: Dictionary) -> Vector2i:
+	if String(def.get("critter", "")) == "":
+		return _cell_of(placement)
+	var at: Vector2i = Critters.cell_of(key_of(placement))
+	return at if at.x >= 0 else _cell_of(placement)
+
+
 func describe(placement: Dictionary, def: Dictionary) -> Dictionary:
-	var cell := _cell_of(placement)
-	var key := _key_of(placement)
+	var cell := live_cell(placement, def)
+	var key := key_of(placement)
 	var price := cost(def)
 	var spent := _is_spent(def, key)
 	var grit := 0
@@ -139,7 +158,16 @@ func cost(def: Dictionary) -> int:
 
 ## Act on one. Returns false having changed nothing, the same contract HJItems
 ## keeps, so a screen cannot charge for a no-op.
-func act(key: String) -> bool:
+##
+## `from` is where the player is standing, and defaults to the run's own answer.
+## The reach test lives *here*, not only in near(), because the guarantee has to
+## sit with the thing being guarded: near() is the only caller today, but a key
+## is an ordinary string that can be held past the moment it was handed out, and
+## the front door is the gate the whole tutorial turns on. "Openable from
+## anywhere with a stale key" is not a gate. There is no legitimate caller that
+## needs to act at range; if one ever appears it wants an explicit parameter
+## saying so, not this check deleted.
+func act(key: String, from: Vector2i = Vector2i(-1, -1)) -> bool:
 	if not g.has_active_run():
 		return false
 	var placement := _find(key)
@@ -147,6 +175,14 @@ func act(key: String) -> bool:
 		return false
 	var def := definition(String(placement.get("type", "")))
 	if def.is_empty():
+		return false
+
+	var here := from
+	if here.x < 0:
+		here = g.run.world_pos
+	# Same code path as near(), not a second copy of the rule.
+	if here.x < 0 or not _in_reach(def, live_cell(placement, def), here):
+		g.say("You are not near %s." % _the(placement, def), "warn")
 		return false
 
 	var view := describe(placement, def)
@@ -167,8 +203,18 @@ func act(key: String) -> bool:
 		if not g.run.tags.has(spent_tag):
 			g.run.tags.append(spent_tag)
 	g.apply_effects([def.get("effect", {})])
+	# An animal reacts to being acted on, and the two animals react in opposite
+	# directions. Neither this file nor Game knows that: the verb is data, the
+	# species is data, and what petting does is a row in the species' transition
+	# table. Fired after the effect so the flavour line comes before the change.
+	if String(def.get("critter", "")) != "":
+		Critters.event(key, String(def.get("critter_event", "petted")))
 	g.changed()
 	return true
+
+
+static func _the(placement: Dictionary, def: Dictionary) -> String:
+	return String(placement.get("label", def.get("name", "it")))
 
 
 # --- internals -----------------------------------------------------------------
@@ -189,14 +235,14 @@ func _is_spent(def: Dictionary, key: String) -> bool:
 
 func _find(key: String) -> Dictionary:
 	for entry in placements():
-		if entry is Dictionary and _key_of(entry) == key:
+		if entry is Dictionary and key_of(entry) == key:
 			return entry
 	return {}
 
 
 ## Identity of one placed object: its kind and where it stands. Two stoves in
 ## one house are two different things to have used.
-static func _key_of(placement: Dictionary) -> String:
+static func key_of(placement: Dictionary) -> String:
 	return "%s@%d,%d" % [String(placement.get("type", "")),
 		int(placement.get("x", 0)), int(placement.get("y", 0))]
 

@@ -545,6 +545,23 @@ def modifier_pass(report, docs, schema, readable_keys, config_keys):
 def critter_pass(report, docs, schema):
     vocab = schema["vocabulary"]
     sprites = os.path.join(ROOT, "assets", "sprites")
+
+    known = set()
+    for rel, doc in docs_in(docs, "content"):
+        for critter in doc.get("critters", []):
+            if isinstance(critter, dict) and "id" in critter:
+                known.add(critter["id"])
+    # Not a schema `refs` entry, deliberately: Content.gd builds its id sets
+    # from `runtime` paths and does not merge a `critters` key, so declaring the
+    # reference in the schema would make the in-game validator reject every
+    # placement on a player's device. Checked here, where the files are.
+    for rel, doc in docs_in(docs, "content"):
+        for entry in doc.get("interactables", []):
+            name = entry.get("critter") if isinstance(entry, dict) else None
+            if name is not None and name not in known:
+                report.error("%s [interactables %s]" % (rel, entry.get("id")),
+                             "critter '%s' names no critter in data/content" % name)
+
     for rel, doc in docs_in(docs, "content"):
         for critter in doc.get("critters", []):
             if not isinstance(critter, dict):

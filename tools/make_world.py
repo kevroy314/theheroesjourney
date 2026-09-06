@@ -1150,7 +1150,11 @@ def encode_elevation(elev):
 
 
 def draw_map(world, cells, anomalies, px=3):
-    """The drawn map: the same grid, rendered as something you would pin up."""
+    """The drawn map: the same grid, rendered as something you would pin up.
+
+    `anomalies` is accepted and ignored -- see the note further down about why
+    they are no longer painted in.
+    """
     colour = {
         T["water"]: mix(C["accent_2"], C["bg"], 0.62),
         T["sand"]: mix(mix(C["bg"], C["accent"], 0.30), C["muted"], 0.26),
@@ -1200,13 +1204,15 @@ def draw_map(world, cells, anomalies, px=3):
                 for i in range(px):
                     out[x * px + i, y * px + j] = c
 
-    for a in anomalies:
-        for ring in (3, 4):
-            for step in range(0, 360, 6):
-                ax = int(a["x"] * px + px // 2 + math.cos(math.radians(step)) * ring)
-                ay = int(a["y"] * px + px // 2 + math.sin(math.radians(step)) * ring)
-                if 0 <= ax < W * px and 0 <= ay < H * px:
-                    out[ax, ay] = C["danger"]
+    # Anomalies are deliberately NOT painted here.
+    #
+    # They used to be, and it put them on the map twice: baked into this image
+    # at the positions this generation happened to choose, and drawn live by
+    # WorldMapScreen from the discovery layer. Harmless while they never move,
+    # and wrong the moment they do (#73) -- a region the player remembers from
+    # last run would show this run's anomalies straight through the fog,
+    # contradicting the memory it is supposed to be showing. The overlay owns
+    # them; the painting owns the land.
     for name, (cx, cy) in cells.items():
         r = 9 if name in ("summit", "the_town") else 6
         for step in range(0, 360, 4):

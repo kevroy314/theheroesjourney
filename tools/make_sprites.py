@@ -1011,17 +1011,46 @@ def blob(cx, y0, widths, k=1):
 
 
 def wedge(tip_x, tip_y, height, k, lean=0):
-    """An ear: a triangle one pixel wide at the tip, widening downward."""
+    """An ear: a triangle a pixel wide at the tip, widening downward, leaning
+    `lean` pixels outward per row.
+
+    It widens on the *first* step rather than the second. One pixel of fur plus
+    a pixel of rim either side is a 3-pixel black-edged spike, and four rows of
+    that is a horn, not an ear -- which is exactly what the first version drew.
+    """
     out = []
     for i in range(height):
-        half = i // 2
+        half = (i + 1) // 2
         x = tip_x + int(round(lean * i))
         out.append((tip_y + i, x - half, x + half, k))
     return out
 
 
-def curl(points, k=1):
-    return [(y, x, x, k) for (x, y) in points]
+def curl(points, k=1, thick=2):
+    """A tail: a four-connected line through the given points, two pixels thick
+    at the root and one at the tip.
+
+    Four-connected matters. A purely diagonal run of single pixels is not a line
+    once the eight-connected rim has gone round it -- it is a row of beads with
+    daylight between them, which is what the first version drew and what made
+    the tail read as dirt on the lens."""
+    path = []
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        x, y = x0, y0
+        path.append((x, y))
+        while (x, y) != (x1, y1):
+            if x != x1:
+                x += 1 if x1 > x else -1
+                path.append((x, y))
+            if y != y1:
+                y += 1 if y1 > y else -1
+                path.append((x, y))
+    path.append(points[-1])
+    out = []
+    for i, (x, y) in enumerate(path):
+        w = thick if i < len(path) * 0.5 else 1
+        out.append((y, x, x + w - 1, k))
+    return out
 
 
 # --- the pose tables ------------------------------------------------------------
@@ -1043,6 +1072,7 @@ def dog_parts(cocked=False):
         + blob(18.5, 14, [4.5, 6, 6.5, 6.5, 6.5, 6.5, 6, 5, 3.5], fur)   # body
         + curl([(24, 15), (25, 14 - t), (26, 13 - t), (27, 11 - t),
                 (28, 9 - t), (28, 7 - t)], 2)                            # tail
+        + [(14, 11, 15, 2), (15, 11, 15, 2), (16, 11, 15, 2)]            # neck
         + blob(8.5, 12, [3, 4, 4.5, 4.5, 4.5, 4.5, 4, 3], fur)           # head
         + [(16, 2, 5, 2), (17, 2, 5, 2), (18, 3, 5, 3)]                  # snout
     )
@@ -1051,12 +1081,12 @@ def dog_parts(cocked=False):
     # the silhouette as a stub the rim could not reach.
     down = (
         blob(15.5, 10, [3.5, 4.5, 5.5, 5.5, 5.5, 4.5, 3.5], 2)           # shoulders
-        + wedge(10, 8, 6, 2, lean=-0.15) + wedge(21, 8 - e, 6, 3, lean=0.15)
+        + wedge(11, 8, 5, 2, lean=-0.5) + wedge(20, 8 - e, 5, 3, lean=0.5)
         + blob(15.5, 14, [3.5, 5.5, 6.5, 6.5, 6.5, 6.5, 5.5, 4.5], fur)  # head
         + blob(15.5, 22, [2.5, 2.5], 2)                                  # muzzle
     )
     up = (
-        wedge(10, 8, 6, 2, lean=-0.15) + wedge(21, 8 - e, 6, 3, lean=0.15)
+        wedge(11, 8, 5, 2, lean=-0.5) + wedge(20, 8 - e, 5, 3, lean=0.5)
         + blob(15.5, 11, [3.5, 5.5, 6.5, 6.5, 6.5, 5.5, 4.5], 2)         # skull
         + blob(15.5, 17, [3.5, 4.5, 5.5, 5.5, 5.5, 4.5, 3.5], fur)       # rump
         + curl([(20, 23), (21, 21 - t), (22, 19 - t), (23, 17 - t),
@@ -1074,6 +1104,7 @@ def cat_parts(cocked=False):
         + blob(18.5, 16, [3.5, 5, 5.5, 5.5, 5.5, 5, 3.5], fur)
         + curl([(24, 18), (25, 16 - t), (26, 14 - t), (27, 12 - t),
                 (28, 10 - t), (28, 8 - t), (27, 7 - t)], 2)
+        + [(15, 12, 16, 2), (16, 12, 16, 2), (17, 12, 16, 2)]            # neck
         + blob(9.5, 14, [2.5, 3.5, 3.5, 3.5, 3.5, 2.5], fur)
         + [(17, 4, 7, 2), (18, 5, 7, 3)]
     )
@@ -1082,12 +1113,12 @@ def cat_parts(cocked=False):
     down = (
         curl([(21, 14), (22, 12 - t), (23, 10 - t), (23, 8 - t)], 2)
         + blob(15.5, 13, [2.5, 3.5, 4.5, 4.5, 3.5, 2.5], 2)
-        + wedge(11, 10, 7, 2, lean=-0.1) + wedge(20, 10 - e, 7, 3, lean=0.1)
+        + wedge(12, 9, 6, 2, lean=-0.3) + wedge(19, 9 - e, 6, 3, lean=0.3)
         + blob(15.5, 16, [3.5, 4.5, 5.5, 5.5, 5.5, 4.5, 3.5], fur)
         + blob(15.5, 22, [2.0, 2.0], 2)
     )
     up = (
-        wedge(11, 10, 7, 2, lean=-0.1) + wedge(20, 10 - e, 7, 3, lean=0.1)
+        wedge(12, 9, 6, 2, lean=-0.3) + wedge(19, 9 - e, 6, 3, lean=0.3)
         + blob(15.5, 13, [3.5, 4.5, 5.5, 5.5, 4.5, 3.5], 2)
         + blob(15.5, 18, [3.5, 4.5, 5.5, 5.5, 4.5, 3.5], fur)
         + curl([(20, 23), (21, 21 - t), (22, 19 - t), (23, 17 - t),
@@ -1154,8 +1185,9 @@ def paint(c, spans, fur, stripes=False, hi=2, sh=2):
     for (y, x0, x1, k) in spans:
         base = fur[max(0, min(len(fur) - 1, k))]
         c.row(y, x0, x1, base)
-        if stripes and (y % 3) == 0 and x1 - x0 > 3:
-            c.row(y, x0 + 1, x1 - 1, fur[min(len(fur) - 1, k + 2)])
+        if stripes and (y % 3) == 0 and x1 - x0 >= 6:
+            c.row(y, x0 + 2, x0 + 3, fur[min(len(fur) - 1, k + 2)])
+            c.row(y, x1 - 4, x1 - 3, fur[min(len(fur) - 1, k + 2)])
         c.row(y, x0, min(x1, x0 + hi - 1), fur[max(0, k - 1)])
         c.row(y, max(x0, x1 - sh + 1), x1, fur[min(len(fur) - 1, k + 1)])
         c.px(x1, y, fur[min(len(fur) - 1, k + 2)])
