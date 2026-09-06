@@ -216,6 +216,7 @@ one and where it lives:
 | Objectives | 5, 6, 7 | `scripts/autoload/Objectives.gd`, `data/objectives/` |
 | Unlock toasts | 5 | `Notify` and the toast strip in `Main.gd` |
 | Dialogue | 6 | `scripts/autoload/Dialogue.gd`, `DialogueScreen.gd`, `data/dialogue/` |
+| The plate a screen stands on | 5, 6 | `run_area_id()` in `scripts/ui/Screen.gd`, which falls through to `HJWorld.place_id()` once the run leaves its anomaly |
 
 The one-shots themselves live in **`scripts/game/Tutorial.gd`** and nowhere
 else. Once-ness is `Meta.reveal()`, which returns true only the first time it is
@@ -232,3 +233,4 @@ What is *not* finished, and what it would change:
 | The portal is still a tile | #72 | Beat 2 works; it does not yet look like a hole in the world |
 | Anomaly **sites**, not instances | #73 | Beat 7's town anomalies are fixed cells, so they cannot move between loops |
 | Idle motion | #71 | nothing on screen moves except the animals |
+| Interior plates for dialogue | #86 | Beat 6 now draws against the town rather than the bedroom, but the whole town shares one exterior plate, so the tavern looks like the street |
