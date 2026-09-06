@@ -66,6 +66,13 @@ uniform vec4 shaft_pos[MAX_SHAFTS];
 uniform vec4 shaft_col[MAX_SHAFTS];
 // xy unit direction, z half-width gained per pixel travelled, w panes across
 uniform vec4 shaft_form[MAX_SHAFTS];
+// 0 a sunbeam, 1 a moonbeam. The one thing about night light that cannot be
+// done by tinting and turning the sun down: a sun shaft has a bright core with
+// soft shoulders and a crisp end, and a moon shaft has no core at all — it is a
+// wash that is brightest in the middle only in the sense that a fog is. At 1
+// the across-profile loses its plateau entirely and the beam fades over almost
+// its whole length instead of the last third.
+uniform float shaft_soft[MAX_SHAFTS];
 
 void fragment() {
 	vec2 p = UV * view_size;
@@ -131,8 +138,10 @@ void fragment() {
 		// Along: a short fade off the sill so the beam is not stamped out with a
 		// flat end where it leaves the frame, and a long one into the far half so
 		// it dies before the wall rather than against it.
-		float body = smoothstep(1.0, 0.55, abs(u))
-			* smoothstep(0.0, 0.12, dn) * smoothstep(1.0, 0.40, dn);
+		float soft = shaft_soft[i];
+		float body = smoothstep(1.0, mix(0.55, 0.0, soft), abs(u))
+			* smoothstep(0.0, mix(0.12, 0.30, soft), dn)
+			* smoothstep(1.0, mix(0.40, 0.05, soft), dn);
 
 		// THE FRAME. `bars` panes across the aperture: bright at each pane's
 		// centre, dark at the mullions between them and at the frame either side.

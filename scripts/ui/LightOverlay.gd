@@ -34,6 +34,7 @@ var _last_colour := Color(-1, -1, -1)
 var _spos: PackedVector4Array = PackedVector4Array()   ## xy mouth px, z length px, w gain
 var _scol: PackedVector4Array = PackedVector4Array()   ## rgb colour, a half-width px
 var _sform: PackedVector4Array = PackedVector4Array()  ## xy direction, z spread, w bars
+var _ssoft: PackedFloat32Array = PackedFloat32Array()  ## 0 a sunbeam, 1 a moonbeam
 var _scount := 0
 var _last_scount := -1
 var _warned := false
@@ -54,6 +55,7 @@ func _init() -> void:
 	_spos.resize(HJLighting.MAX_SHAFTS)
 	_scol.resize(HJLighting.MAX_SHAFTS)
 	_sform.resize(HJLighting.MAX_SHAFTS)
+	_ssoft.resize(HJLighting.MAX_SHAFTS)
 	# The quad only has to be re-issued when the rect changes or the whole pass
 	# switches on and off. Uniforms are read at render time, so pushing a light
 	# list does not need a redraw — asking for one every frame would rebuild the
@@ -114,6 +116,7 @@ func submit(positions: PackedVector4Array, colours: PackedVector4Array,
 		_material.set_shader_parameter("shaft_pos", _spos)
 		_material.set_shader_parameter("shaft_col", _scol)
 		_material.set_shader_parameter("shaft_form", _sform)
+		_material.set_shader_parameter("shaft_soft", _ssoft)
 
 
 func _draw() -> void:
@@ -134,9 +137,11 @@ func _gather_shafts(view: Vector2, given: Vector2, given_scale: float) -> void:
 	_scount = 0
 	if not HJLighting.shafts or view.x <= 0.0 or view.y <= 0.0:
 		return
-	# Night, or noon. Either way the sun is not coming through a window sideways
-	# and nothing below runs.
-	var gain := HJLighting.shaft_gain()
+	# Whichever body is in the sky, if either is. `sky_gain()` is the sun's gain
+	# by day and the moon's by night, and it is zero for the few minutes either
+	# side of a horizon when neither is up — at which point nothing below runs and
+	# the pass costs what it did before shafts existed.
+	var gain := HJLighting.sky_gain()
 	if gain <= 0.002:
 		return
 	# Cached rather than asked for: the reach of the longest aperture in the
@@ -165,15 +170,19 @@ func _gather_shafts(view: Vector2, given: Vector2, given_scale: float) -> void:
 	# The traces are only re-run when the sun has actually moved, and that is one
 	# comparison for the whole world rather than one per aperture: a player
 	# walking round a house at a fixed hour never enters the branch.
-	var stamp := HJLighting.sun_stamp()
+	var stamp := HJLighting.sky_stamp()
 	var stale := HJLighting.shafts_are_stale(stamp)
-	var travel := HJLighting.sun_travel()
-	var reach := HJLighting.sun_reach()
+	var travel := HJLighting.sky_travel()
+	var reach := HJLighting.sky_reach()
+	var reveal := HJLighting.sky_reveal()
+	# What the body in the sky does to an aperture's declared optics. Read once
+	# for the frame rather than per beam: it is a fact about the hour.
+	var optics := HJLighting.sky_optics()
 	for bucket in HJLighting.shaft_buckets_over(from, to):
 		for source in bucket:
 			var entry: Dictionary = source
 			if stale:
-				HJLighting.refresh_shaft(entry, stamp, travel, reach)
+				HJLighting.refresh_shaft(entry, stamp, travel, reach, reveal)
 			# The beam's own tile box against the view, before any float touches
 			# it. A bucket is sixteen tiles square and most of what one hands
 			# back throws its light somewhere the player cannot see.
@@ -181,12 +190,12 @@ func _gather_shafts(view: Vector2, given: Vector2, given_scale: float) -> void:
 			var hi: Vector2i = entry["hi"]
 			if hi.x < from.x or hi.y < from.y or lo.x > to.x or lo.y > to.y:
 				continue
-			_emit_shaft(entry, cam, scale, gain, view)
+			_emit_shaft(entry, cam, scale, gain, view, optics)
 
 
 ## One aperture: tiles to overlay pixels, a cull, and one slot filled.
 func _emit_shaft(entry: Dictionary, cam: Vector2, scale: float, gain: float,
-		view: Vector2) -> void:
+		view: Vector2, optics: Dictionary = {}) -> void:
 	var span := float(entry["span"])
 	if span <= 0.0:
 		return
@@ -201,8 +210,15 @@ func _emit_shaft(entry: Dictionary, cam: Vector2, scale: float, gain: float,
 	var lead: Vector2 = entry["from"]
 	var mouth := (Vector2(cell) + Vector2(0.5, 0.5) + lead) * scale - cam
 	var length := span * scale
-	var half := float(entry["half"]) * scale
-	var spread := float(entry["spread"])
+	# The aperture's declared optics, as the body in the sky has them. A window is
+	# the same hole at midnight as at noon; what changes is the light going
+	# through it, so the widening lives here and not in the manifest.
+	var widen: float = float(optics.get("widen", 1.0))
+	var half := float(entry["half"]) * widen * scale
+	var spread := float(entry["spread"]) * float(optics.get("spread", 1.0))
+	# Panes. A moon draws no mullions — at a quarter of the light on a floor this
+	# dark the eye reads a wash, not a frame, and drawn bars read as banding.
+	var bars := float(entry["bars"]) * (1.0 - float(optics.get("bars", 0.0)))
 
 	# Off screen by more than its own reach. The bucket hands back everything
 	# within sixteen tiles and a beam is a segment, so this is the segment's box
@@ -233,10 +249,17 @@ func _emit_shaft(entry: Dictionary, cam: Vector2, scale: float, gain: float,
 	else:
 		_scount += 1
 
+	# Night gets its own colour outright rather than the aperture's cooled down.
+	# The prop's `color` is a fact about its glass in daylight; a moonlit floor is
+	# not that colour dimmed, it is a different colour.
 	var tint: Color = entry["tint"]
+	var override: Color = optics.get("tint", Color.TRANSPARENT)
+	if override.a > 0.0:
+		tint = override
 	_spos[slot] = Vector4(mouth.x, mouth.y, length, strength)
 	_scol[slot] = Vector4(tint.r, tint.g, tint.b, half)
-	_sform[slot] = Vector4(dir.x, dir.y, spread, float(entry["bars"]))
+	_sform[slot] = Vector4(dir.x, dir.y, spread, bars)
+	_ssoft[slot] = float(optics.get("soft", 0.0))
 
 
 ## --- the projection -------------------------------------------------------------

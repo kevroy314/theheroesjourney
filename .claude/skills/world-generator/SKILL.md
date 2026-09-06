@@ -154,6 +154,44 @@ must run after nothing that can reopen it, and the fill is the proof.
 If you add a building or an enclosure, add the equivalent fill. It costs a few
 lines and it is the only honest way to know.
 
+## Adding a material, or deciding not to
+
+The question that comes up every time something new needs building: is this a
+new material, or an arrangement of what exists?
+
+**Reuse when the difference is position, arrangement or scale.** A bigger
+footprint, a door on the other side, more windows, a different floor from the
+five that exist. These cost nothing and carry a surprising amount — most of what
+makes two buildings read differently is where they sit and how they are laid
+out, not what they are made of.
+
+**Generate when the difference is material or construction**, and reusing would
+make two things that should read differently read the same. The tell is a
+count: the tileset held **one** `roof` when the town needed fifteen buildings.
+One roof across a whole town reads as a housing estate rather than a place that
+grew, and no amount of clever placement fixes it, because the thing that is
+wrong is not the arrangement.
+
+**Do not generate a variant that appears once**, unless it is a landmark the
+player will navigate by. A mill and a tavern earn unique treatment; a third
+ordinary house earns a variant of an existing one.
+
+The underlying design rule, which is what makes the judgement rather than a
+preference: **shared architecture is what makes it one town, and material is
+what makes them different buildings.** A consistent roof pitch, window shape and
+cap-and-face construction should be visible everywhere; the mill is stone
+because it takes weather and vibration, the tavern is timber-framed with plaster
+infill because it was cheap and got extended twice. Material follows from what
+the building *is* — its purpose and its age — and a material chosen for variety
+alone reads as a palette swap, which is worse than reuse.
+
+**Generate programmatically here, not with the image model.** The whole tileset
+is built in `tools/make_tiles.py`: it is deterministic, free, and the autotiling
+and precedence machinery absorbs a new material without complaint — the house
+work added four in a day (`wall_timber`, `floor_tile`, `floor_plank`,
+`floor_rug`). Reserve `game-art-pipeline` for something genuinely drawn, and
+read its budget warning first, because every generation costs real quota.
+
 ## Declarations must live in the generator, not only in the manifest
 
 **Symptom:** a field you added to `assets/tiles/tiles.json` is simply gone after

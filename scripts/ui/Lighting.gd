@@ -943,7 +943,7 @@ static func _blocked(world: HJWorld, x: int, y: int) -> bool:
 ##     the bearing is quantised to two degrees, so a walking player pays nothing
 ##     at all and a moving clock pays for one march every few seconds.
 static func refresh_shaft(entry: Dictionary, stamp: float, travel: Vector2,
-		reach: float) -> void:
+		reach: float, reveal: float = SUN_REVEAL) -> void:
 	if is_equal_approx(float(entry["stamp"]), stamp):
 		return
 	entry["stamp"] = stamp
@@ -961,7 +961,7 @@ static func refresh_shaft(entry: Dictionary, stamp: float, travel: Vector2,
 			entry["lo"] = cell
 			entry["hi"] = cell
 			return
-		dir = (travel + inward * SUN_REVEAL).normalized()
+		dir = (travel + inward * reveal).normalized()
 	entry["dir"] = dir
 	entry["gate"] = gate
 	var span := _trace(cell, dir, float(entry["reach"]) * reach)
