@@ -11,7 +11,7 @@ var _steps_chip: PanelContainer
 var _budget: Label
 var _where: Label
 var _act: Button
-var _pad: Control
+var _pad: HJMoveControls
 
 
 ## No plate. The world *is* the place here — a room photograph behind a room you
@@ -107,7 +107,9 @@ func build() -> void:
 	_act.custom_minimum_size.y = 84
 	_act.size_flags_vertical = Control.SIZE_SHRINK_END
 	v.add_child(_act)
-	_pad = _make_pad()
+	# Which control this is — four keys, a trackpad, or the map itself — is
+	# Meta.ui_move_control, and it carries the status line with it.
+	_pad = HJMoveControls.new(_world)
 	_pad.size_flags_vertical = Control.SIZE_SHRINK_END
 	v.add_child(_pad)
 
@@ -131,127 +133,11 @@ func _exit_tree() -> void:
 		Steps.budget_changed.disconnect(_sync_budget)
 
 
-## A four-way pad rather than a stick. The world is on a grid, so a stick would
-## only be a less accurate way of saying one of four things.
-func _make_pad() -> Control:
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-
-	var layout := [
-		Vector2i.ZERO, Vector2i.UP, Vector2i.ZERO,
-		Vector2i.LEFT, Vector2i.ZERO, Vector2i.RIGHT,
-		Vector2i.ZERO, Vector2i.DOWN, Vector2i.ZERO,
-	]
-	for direction in layout:
-		if direction == Vector2i.ZERO:
-			var gap := Control.new()
-			gap.custom_minimum_size = Vector2(84, 84)
-			grid.add_child(gap)
-			continue
-		var b := PadButton.new(direction)
-		b.changed.connect(func(dir: Vector2i, down: bool) -> void:
-			_world.hold(dir if down else Vector2i.ZERO))
-		grid.add_child(b)
-	return grid
-
-
-## One key of the pad: a drawn arrowhead that reports being *held*, not tapped.
-##
-## Not a Button. With `pointing/emulate_touch_from_mouse` on, one press arrives
-## as both a touch and a mouse event, and Button resolves that pair into an
-## immediate down-then-up — so holding a direction walked exactly one tile per
-## press however long you leaned on it. Same trick as HJUI.TapCard: only the
-## input family that started a press is allowed to end it.
-##
-## The arrow is drawn rather than typed because a pixel display face has no
-## dependable arrowhead glyph, and "^" renders as a speck at this size.
-class PadButton extends PanelContainer:
-	signal changed(direction: Vector2i, down: bool)
-
-	var _dir := Vector2i.UP
-	var _pressing := false
-	var _source := ""
-
-	func _init(direction: Vector2i) -> void:
-		_dir = direction
-		custom_minimum_size = Vector2(84, 84)
-		# STOP, not PASS: the pad is not inside a scroller, and a stray drag off
-		# a key must not become a page gesture.
-		mouse_filter = Control.MOUSE_FILTER_STOP
-		_restyle()
-
-	func _restyle() -> void:
-		var fill := Palette.ca("panel_alt", 0.9 if _pressing else 0.55)
-		add_theme_stylebox_override("panel", HJUI.stylebox(
-			fill, 12, Palette.ca("accent" if _pressing else "line", 0.8), 2, "button"))
-		queue_redraw()
-
-	func _gui_input(event: InputEvent) -> void:
-		if event is InputEventScreenTouch:
-			_press("touch", event.pressed)
-		elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-			_press("mouse", event.pressed)
-
-	func _press(source: String, is_down: bool) -> void:
-		if is_down:
-			if _pressing:
-				return              # the duplicate from the other input family
-			_pressing = true
-			_source = source
-		else:
-			if not _pressing or _source != source:
-				return
-			_pressing = false
-			_source = ""
-		accept_event()
-		_restyle()
-		changed.emit(_dir, is_down)
-
-	## Let go from anywhere. Releasing outside the key you pressed still has to
-	## stop the walk, and MOUSE_EXIT cannot do this job: with touch emulation the
-	## press itself drops hover, so an exit arrives immediately and the character
-	## walked exactly one tile per press no matter how long you held.
-	func release() -> void:
-		if not _pressing:
-			return
-		_pressing = false
-		_source = ""
-		_restyle()
-		changed.emit(_dir, false)
-
-	func _draw() -> void:
-		var c := size * 0.5
-		var r := minf(size.x, size.y) * 0.26
-		var forward := Vector2(_dir)
-		var side := Vector2(-forward.y, forward.x)
-		draw_colored_polygon(PackedVector2Array([
-			c + forward * r,
-			c - forward * r * 0.7 + side * r * 0.85,
-			c - forward * r * 0.7 - side * r * 0.85,
-		]), HJUI.tint(Palette.c("accent" if _pressing else "text"), "text"))
-
-
-## A release anywhere on the screen ends the walk, whether or not it landed back
-## on the key that started it.
-func _input(event: InputEvent) -> void:
-	var up := false
-	if event is InputEventScreenTouch:
-		up = not (event as InputEventScreenTouch).pressed
-	elif event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
-		up = mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed
-	if not up or _pad == null or not is_instance_valid(_pad):
-		return
-	for key in _pad.get_children():
-		if key is PadButton:
-			key.release()
-
-
+## The keyboard, which is every control's fifth option. Routed through the
+## movement controls rather than straight at the world, so that a key press
+## cancels a tap-to-walk route the same way a thumb on the pad does.
 func _unhandled_input(event: InputEvent) -> void:
-	if _world == null or not (event is InputEventKey):
+	if _world == null or _pad == null or not is_instance_valid(_pad) or not (event is InputEventKey):
 		return
 	var key := event as InputEventKey
 	var direction := Vector2i.ZERO
@@ -261,7 +147,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_A, KEY_LEFT: direction = Vector2i.LEFT
 		KEY_D, KEY_RIGHT: direction = Vector2i.RIGHT
 		_: return
-	_world.hold(direction if key.pressed else Vector2i.ZERO)
+	_pad.hold_from_key(direction if key.pressed else Vector2i.ZERO)
 	accept_event()
 
 

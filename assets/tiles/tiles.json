@@ -373,7 +373,7 @@
         "biome": "grass_short",
         "density": 0.0033333333333333335,
         "foot": [
-          2,
+          1,
           1
         ],
         "id": "log_fallen",
@@ -473,7 +473,7 @@
         "biome": "grass_tall",
         "density": 0.014,
         "foot": [
-          2,
+          1,
           1
         ],
         "id": "log_mossy",
@@ -989,8 +989,8 @@
         "biome": "placed",
         "density": 0.0,
         "foot": [
-          2,
-          2
+          1,
+          1
         ],
         "id": "well",
         "index": 56,
@@ -1001,7 +1001,7 @@
         "biome": "placed",
         "density": 0.0,
         "foot": [
-          2,
+          1,
           1
         ],
         "id": "cart",
@@ -1013,7 +1013,7 @@
         "biome": "placed",
         "density": 0.0,
         "foot": [
-          2,
+          1,
           1
         ],
         "id": "market_stall",
@@ -1047,7 +1047,7 @@
         "biome": "placed",
         "density": 0.0,
         "foot": [
-          2,
+          1,
           1
         ],
         "id": "bench",
@@ -1084,7 +1084,7 @@
         "density": 0.0,
         "foot": [
           1,
-          1
+          2
         ],
         "id": "table",
         "index": 63,
@@ -1245,6 +1245,14 @@
           "radius": 5.0
         },
         "plane": 75,
+        "shaft": {
+          "bars": 2,
+          "color": "#FFEFD2",
+          "intensity": 0.95,
+          "length": 9.0,
+          "spread": 0.1,
+          "width": 0.34
+        },
         "solid": false
       },
       {
@@ -2771,7 +2779,7 @@
         "biome": "grass_short",
         "density": 0.0033333333333333335,
         "foot": [
-          2,
+          1,
           1
         ],
         "id": "log_fallen_v2",
@@ -2783,7 +2791,7 @@
         "biome": "grass_short",
         "density": 0.0033333333333333335,
         "foot": [
-          2,
+          1,
           1
         ],
         "id": "log_fallen_v3",

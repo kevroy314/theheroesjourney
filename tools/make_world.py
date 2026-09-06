@@ -590,6 +590,54 @@ def house_plan(cells):
     Interior coordinates (i, j) run 0..16 across and 0..12 down from the cell
     inside the north-west corner, so the layout below reads as a floor plan and
     not as a list of magic world coordinates.
+
+    SCALE. One tile is about three feet. The bed is one cell by two and reads as
+    a 3 x 6 ft single; the front door is one cell and reads as a 36 in door;
+    36 in is also the code minimum for a circulation path, so ONE CLEAR TILE IS
+    ONE WALKWAY and two clear tiles is a generous one. Every clearance below is
+    quoted in tiles against that ruler.
+
+    THE PLAN is the English three-cell cottage: a hall you come in to, a heated
+    room where the cooking and the eating happen, a parlour that is the private
+    chamber, and an unheated service room at the far end. The previous layout
+    was three boxes with the furniture scattered where it happened to fit, and
+    what was wrong with it was not the walls -- it was that a bed floated in the
+    middle of a floor, a bookshelf stood in open space, the kitchen had no
+    working relationship between stove, sink and counter, and a 17 x 5 hall held
+    one of everything, which is the shape of a storage unit and not of a room.
+
+    What changed, and the rule each change is serving:
+
+    * A FOURTH ROOM. The 17 x 5 south range is now a 12 x 6 hall and a 4 x 6
+      pantry. A room reads as having a purpose or it reads as storage; the fix
+      for "one of everything" is not to spread the everything out, it is to give
+      the barrels and crates a room that is *supposed* to be full of them. The
+      service end of a real cottage -- buttery and pantry, unheated, at the low
+      end past the entrance -- is exactly that room.
+    * ONE ANCHOR PER ROOM, and everything else in the room serves it. Parlour:
+      the bed. Kitchen: the range and the table. Hall: the door you come in by
+      and the reading corner under the window. Pantry: the shelves.
+    * CASE GOODS AGAINST WALLS. Every bookshelf, dresser, chest, shelf and
+      counter below has its back on a wall cell. Only the tables, the chairs and
+      the rugs float, which is the one rule that separates a furnished room from
+      a warehouse floor.
+    * A SINGLE-WALL KITCHEN. The work triangle collapses to a line when the
+      kitchen is one run, and the NKBA rule for that case is: cold store, then
+      sink, then range, within 12 ft. Ours is dresser (10,0), sink (12,0), range
+      (14,0) -- 2 tiles and 2 tiles, 12 ft exactly -- with a tile of landing
+      counter on each side of both the sink and the range, and 15 ft of worktop
+      against a 13 ft minimum. No traffic crosses it: both doorways are at the
+      south of the room and the table sits three tiles clear of the run.
+    * CLEARANCES, all measured below and all met: one clear tile in front of
+      every doorway on both sides, two in front of the front door; one clear
+      tile each side of the bed and at its foot; one clear tile of chair ring on
+      every used side of a table; a two-tile aisle between the kitchen run and
+      the table.
+    * DOORS AND WINDOWS CONSTRAIN EVERYTHING. Nothing solid stands on a doorway
+      landing cell and nothing solid stands in front of a window. The bed's
+      headboard is on a solid wall, it is not under a window, and its column is
+      not the column of either doorway into the room -- you do not lie with your
+      feet pointing out of the door.
     """
     cx, cy = cells["waking_room"]
     x0, y0 = cx - HOUSE_W // 2, cy - HOUSE_H // 2
@@ -602,32 +650,56 @@ def house_plan(cells):
         "x0": x0, "y0": y0, "w": HOUSE_W, "h": HOUSE_H,
         "ix": ix, "iy": iy, "iw": HOUSE_W - 2, "ih": HOUSE_H - 2,
         "cell": cell,
-        # room -> (i0, j0, i1, j1) inclusive, and the material it is floored in
+        # room -> (i0, j0, i1, j1) inclusive, and the material it is floored in.
+        # The floor is what tells you which room you are in before you have seen
+        # a stick of its furniture, so the service room gets cold stone and the
+        # parlour gets the good boards.
         "rooms": {
-            "bedroom": ((0, 0, 6, 6), "floor_plank"),
-            "kitchen": ((8, 0, 16, 6), "floor_tile"),
-            "hall":    ((0, 8, 16, 12), "floor_boards"),
+            "parlour": ((0, 0, 7, 5), "floor_plank"),     # the bed chamber
+            "kitchen": ((9, 0, 16, 5), "floor_tile"),     # the range and the table
+            "hall":    ((0, 7, 11, 12), "floor_boards"),  # the door you come in by
+            "pantry":  ((13, 7, 16, 12), "floor_stone"),  # unheated, and full of it
         },
-        # the rug is a patch of a fourth floor inside the bedroom, laid where
-        # the player's feet land when they get out of bed
-        "rug": (1, 4, 4, 6),
+        # Rugs are patches of a fourth floor material, and they are how a group
+        # of furniture reads as one zone rather than as three objects: the rug
+        # has to reach under the front of every piece in the group. One beside
+        # the bed where the player's feet land, one under the reading corner.
+        "rugs": [(3, 1, 4, 3), (1, 10, 3, 12)],
         # internal walls, as runs, and the doorways punched through them
-        "walls": [(7, 0, 7, 6), (0, 7, 16, 7)],
-        "doorways": [(7, 4), (2, 7), (12, 7)],
+        "walls": [(8, 0, 8, 5), (0, 6, 16, 6), (12, 7, 12, 12)],
+        "doorways": [(8, 2), (2, 6), (10, 6), (12, 9)],
         # the front door sits in the south exterior wall; the road stops at the
         # cell outside it, never inside the building
         "door": (x0 + HOUSE_W // 2, y0 + HOUSE_H - 1),
         "door_outside": (x0 + HOUSE_W // 2, y0 + HOUSE_H),
-        # windows are props standing on wall cells, so they are (x, y) already
-        "windows": [(x0 + 4, y0), (x0 + 13, y0),
-                    (x0 + HOUSE_W - 1, y0 + 4), (x0, y0 + 11)],
+        # Windows are props standing on wall cells, so they are (x, y) already.
+        # North and east for the kitchen (the sink is under one of them, which is
+        # where a sink goes), west for the parlour and for the hall's reading
+        # corner, east for the pantry. Nothing solid stands on the floor cell in
+        # front of any of them.
+        "windows": [(x0 + 4, y0),                      # north, parlour
+                    (x0 + 13, y0),                     # north, over the sink
+                    (x0 + HOUSE_W - 1, y0 + 5),        # east, kitchen
+                    (x0, y0 + 2),                      # west, parlour
+                    (x0, y0 + 11),                     # west, hall
+                    (x0 + HOUSE_W - 1, y0 + 12)],      # east, pantry
         # you wake beside the bed, on the rug, and the hole in reality is in the
         # hall — Beat 2: "the player does not spawn on the anomaly"
-        "spawn": cell(2, 4),
+        "spawn": cell(4, 1),
         # The one hole in reality inside the house, in the hall, two rooms from
         # the bed. Beat 2: "the player does not spawn on the anomaly; it is
         # somewhere else in the house and they have to walk into it."
-        "anomaly": cell(12, 10),
+        "anomaly": cell(10, 10),
+        # SPITE, on the doorstep. He is the first person the player meets and he
+        # is met from INSIDE the threshold, so he stands on the ground outside
+        # it -- adjacent to the cell the player lands on when the front door
+        # finally opens, and outside the `indoors` rectangle, because Beat 5
+        # fires on crossing out of it and he is the reason for crossing. Not on
+        # the doorstep itself: that cell is the Beat 4 gate and has to stay
+        # walkable. Preference first, then the eight cells round the doorstep in
+        # a fixed order -- see main(), which resolves it against the finished
+        # world and raises if none of them is standable.
+        "spite": (x0 + HOUSE_W // 2 + 1, y0 + HOUSE_H + 1),
         # And where to start looking for the second one, out in the yard. It is
         # resolved against the walkable world in main() rather than fixed here,
         # because what is outside the south wall is generated terrain.
@@ -643,32 +715,70 @@ def house_plan(cells):
         # nothing, they are the only narrative device in the room, and the old
         # house used none of them.
         "furniture": [
-            # bedroom -- somebody got out of this bed and did not make it
-            ("bed", 1, 3), ("chest", 4, 1), ("candle", 5, 1),
-            ("floor_lamp", 6, 5), ("book_open", 0, 5), ("bottle", 0, 1),
-            ("cat", 3, 6), ("chair", 0, 3), ("bookshelf", 6, 1),
-            ("plant_pot", 6, 3), ("boots", 2, 2),
-            # kitchen -- a stove lit, a run of counter, a cup left on the end
-            ("stove", 9, 1), ("counter", 11, 1), ("counter", 12, 1),
-            ("counter", 13, 1), ("cup", 14, 1), ("shelf_open", 16, 1),
-            ("table", 12, 4), ("chair", 11, 4), ("chair_pulled", 13, 4),
-            ("bottle", 14, 4), ("plant_pot", 16, 6), ("barrel", 8, 1),
-            ("crate", 8, 6), ("book_open", 10, 4), ("shelf_open", 16, 5),
-            ("chest", 9, 6),
-            # hall -- and the boots by the front door
-            ("bookshelf", 1, 8), ("chest", 15, 8), ("crate", 13, 9),
-            ("boots", 7, 12), ("plant_pot", 0, 12), ("dog", 5, 11),
-            ("table", 3, 10), ("chair", 2, 10), ("chair_pulled", 4, 10),
-            ("cup", 3, 9), ("bench", 9, 8), ("barrel", 16, 12),
-            ("floor_lamp", 11, 12), ("bottle", 12, 8), ("rug", 8, 11),
+            # -- the parlour ---------------------------------------------------
+            # Anchor: the bed, headboard on the north wall, a clear tile down
+            # each side and at the foot, and not in the axis of either door. The
+            # three chests are the three chests a bed chamber actually has: one
+            # by the head for a candle, one against the wall for clothes, one at
+            # the foot for blankets. Somebody got out of this bed and did not
+            # make it.
+            ("bed", 5, 1), ("chest", 6, 0), ("bookshelf", 0, 0),
+            ("chest", 0, 2), ("shelf_open", 0, 4), ("plant_pot", 0, 5),
+            ("shelf_open", 7, 0), ("chair", 7, 3), ("chest", 7, 4),
+            ("floor_lamp", 7, 5),
+            # the washstand run along the south wall, and the bench beside it
+            ("bench", 3, 5), ("counter", 4, 5), ("counter", 5, 5),
+            ("candle", 6, 1), ("book_open", 4, 2), ("boots", 4, 3),
+            ("cat", 3, 3),
+            # -- the kitchen ---------------------------------------------------
+            # Anchor: the range, and the table that faces it. The north wall is
+            # the whole work run -- dresser, landing, sink under the window,
+            # prep, range, landing, worktop -- and the table sits two clear tiles
+            # south of it so that nobody walking to a door crosses the cook.
+            ("barrel", 9, 0), ("bookshelf", 10, 0), ("counter", 11, 0),
+            ("counter", 12, 0), ("counter", 13, 0), ("stove", 14, 0),
+            ("counter", 15, 0), ("counter", 16, 0), ("shelf_open", 16, 2),
+            ("table", 12, 4), ("chair", 11, 3), ("chair", 11, 4),
+            ("chair", 13, 3), ("chair_pulled", 14, 4),
+            ("bench", 9, 3), ("crate", 9, 5), ("chest", 16, 3),
+            ("plant_pot", 16, 5), ("cup", 13, 2), ("bottle", 16, 1),
+            # Four at table and one pushed back and turned away, with the gap at
+            # (13,4) it was pulled out of. §"evidence of use", and the cheapest
+            # sentence of story in the house.
+            # -- the hall ------------------------------------------------------
+            # Anchor: the front door and, at the far end under the west window,
+            # the reading corner -- table, chair, lamp, a book face down on the
+            # boards. The library wall is on the north side where it has a wall
+            # to stand against; the middle of the room is left open because it is
+            # the route from the door to every other room in the house.
+            ("plant_pot", 0, 7), ("bookshelf", 3, 7), ("bookshelf", 4, 7),
+            ("bookshelf", 5, 7), ("chest", 6, 7), ("bench", 8, 7),
+            ("bench", 9, 7), ("chest", 11, 7), ("crate", 11, 8),
+            # the settle under the library, and the table it looks at
+            ("table", 8, 9), ("chair", 7, 9), ("chair_pulled", 9, 9),
+            ("table", 1, 11), ("chair", 2, 10), ("chair", 2, 11),
+            ("floor_lamp", 3, 12), ("book_open", 2, 12),
+            ("barrel", 11, 11), ("crate", 10, 12), ("bench", 6, 12),
+            # and the boots by the front door, with the dog beside them
+            ("boots", 7, 12), ("dog", 6, 11),
+            # -- the pantry ----------------------------------------------------
+            # The one room that is allowed to read as storage, because storage is
+            # what it is for. Shelves across the top, casks and crates round the
+            # walls, and a two-tile aisle down the middle that reaches every one
+            # of them.
+            ("shelf_open", 13, 7), ("shelf_open", 14, 7), ("shelf_open", 15, 7),
+            ("barrel", 16, 7), ("crate", 16, 8), ("barrel", 13, 8),
+            ("chest", 16, 10), ("crate", 13, 11), ("barrel", 13, 12),
+            ("crate", 14, 12), ("chest", 15, 12), ("barrel", 16, 12),
+            ("cup", 14, 9), ("bottle", 15, 9),
         ],
         # (type, i, j, label or None). `type` names an entry in
         # data/content/interactables.json; the world only says where.
         "interactables": [
-            ("stove", 9, 1, None),
-            ("counter", 12, 1, None),
-            ("cat", 3, 6, None),
-            ("dog", 5, 11, None),
+            ("stove", 14, 0, None),
+            ("counter", 13, 0, None),
+            ("cat", 3, 3, None),
+            ("dog", 6, 11, None),
         ],
     }
     return plan
@@ -696,10 +806,10 @@ def stamp_house(world, plan):
         for j in range(j0, j1 + 1):
             for i in range(i0, i1 + 1):
                 world.put(*cell(i, j), tile=T[material])
-    ri0, rj0, ri1, rj1 = plan["rug"]
-    for j in range(rj0, rj1 + 1):
-        for i in range(ri0, ri1 + 1):
-            world.put(*cell(i, j), tile=T["floor_rug"])
+    for (ri0, rj0, ri1, rj1) in plan["rugs"]:
+        for j in range(rj0, rj1 + 1):
+            for i in range(ri0, ri1 + 1):
+                world.put(*cell(i, j), tile=T["floor_rug"])
     for (i0, j0, i1, j1) in plan["walls"]:
         for j in range(j0, j1 + 1):
             for i in range(i0, i1 + 1):
@@ -1320,6 +1430,23 @@ def main():
                    for y in range(plan["y0"], plan["y0"] + plan["h"])
                    for x in range(plan["x0"], plan["x0"] + plan["w"])}
 
+    # Spite stands on the doorstep, and he has to actually be standable on: his
+    # reach is `adjacent`, which is the eight cells around him plus his own, so
+    # a Spite three cells into the long grass is a Spite you cannot talk to. The
+    # preference from the plan first, then the rest of the ring round the door
+    # in a fixed order so the answer is the same on every run.
+    dx0, dy0 = plan["door_outside"]
+    ring = [plan["spite"]] + [(dx0 + a, dy0 + b)
+                              for (a, b) in ((1, 1), (-1, 1), (1, 0), (-1, 0),
+                                             (0, 1), (1, -1), (-1, -1))]
+    spite = next((c for c in ring
+                  if c in reach and c not in house_cells
+                  and c != plan["door_outside"]), None)
+    if spite is None:
+        raise SystemExit(
+            "there is nowhere for Spite to stand: every cell round the doorstep "
+            "at %s is blocked, indoors, or unreachable" % (plan["door_outside"],))
+
     # The yard anomaly: the nearest reachable cell to the plan's suggestion that
     # is outside the building and not on the doorstep. Searched rather than
     # fixed, because what is south-east of the house is generated terrain and
@@ -1353,7 +1480,8 @@ def main():
     stranded = [n for n, c in cells.items() if c not in reach]
 
     interactables = [{"x": plan["door"][0], "y": plan["door"][1],
-                      "type": "front_door", "label": "Front door"}]
+                      "type": "front_door", "label": "Front door"},
+                     {"x": spite[0], "y": spite[1], "type": "spite"}]
     for (kind, i, j, label) in plan["interactables"]:
         x, y = plan["cell"](i, j)
         entry = {"x": x, "y": y, "type": kind}
@@ -1428,6 +1556,9 @@ def main():
     house_anom = [a for a in anomalies if a.get("area") == "waking_room"][0]
     print("house: %dx%d at (%d,%d), %d walkable cells inside, sealed but for the door"
           % (plan["w"], plan["h"], plan["x0"], plan["y0"], len(inside)))
+    print("  Spite waits at %s, %d cell(s) from the doorstep at %s, outdoors"
+          % (spite, max(abs(spite[0] - dx0), abs(spite[1] - dy0)),
+             plan["door_outside"]))
     print("  wake at %s; the hole in reality is at (%d,%d), %.1f tiles away, tier %d"
           % (spawn, house_anom["x"], house_anom["y"],
              math.hypot(house_anom["x"] - spawn[0], house_anom["y"] - spawn[1]),

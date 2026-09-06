@@ -30,6 +30,13 @@ const SCREENS := {
 
 const FRAME_WIDTH := 720.0
 
+## How tall a band the toast column is allowed to fill before it starts trimming.
+const TOAST_BAND := 240.0
+## How much of the width the offset column takes. Wide enough for a sentence at
+## FS_SMALL, narrow enough that the right-hand end of whatever it is covering —
+## the nav bar, the Grit chip — is still readable underneath it.
+const TOAST_NARROW := 0.62
+
 var bg: ColorRect
 var frame: PanelContainer
 var host: MarginContainer
@@ -60,20 +67,15 @@ func _ready() -> void:
 
 	toasts = VBoxContainer.new()
 	toasts.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Top, not bottom: the bottom of the screen is the thumb zone where the
-	# primary action buttons live, and a toast must never sit on top of them.
-	toasts.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	toasts.offset_left = 20
-	toasts.offset_right = -20
-	toasts.offset_top = 16
-	toasts.offset_bottom = 240
-	toasts.grow_vertical = Control.GROW_DIRECTION_END
-	toasts.alignment = BoxContainer.ALIGNMENT_BEGIN
 	toasts.add_theme_constant_override("separation", 6)
 	add_child(toasts)
+	_place_toasts()
 
 	Events.screen_changed.connect(_on_screen_changed)
 	Events.theme_changed.connect(_restyle)
+	# Moving the column moves the toasts already in it, so the setting takes
+	# effect on the notification currently on screen rather than on the next one.
+	Events.meta_changed.connect(_place_toasts)
 	Events.logged.connect(_toast)
 	Events.unlocked.connect(_unlock_toast)
 
@@ -87,6 +89,54 @@ func _ready() -> void:
 
 	if _selftest_requested():
 		call_deferred("_run_selftest")
+
+
+## Where the toast column sits, from Meta.ui_toast_pos.
+##
+## Neither edge of a phone screen is free, which is why this is a preference and
+## not a fix. The top strip is the run header, the Steps/Grit chips and the buff
+## pills — so a full-width toast at the top covers the very numbers it is
+## usually talking about. The bottom strip is the thumb zone: the primary action
+## button, and on the overworld the movement pad under it. Covering information
+## you can read again in a second is a smaller harm than covering a control you
+## are reaching for, and _unlock_toast is itself tappable, so at the bottom it
+## can sit on the action button and take the tap meant for it.
+##
+##   "bottom"    a band above the bottom edge, newest nearest the thumb
+##   "top_left"  narrow and left-aligned: clips the header instead of blanketing it
+##   "top"       the original full-width strip
+func _place_toasts() -> void:
+	toasts.anchor_left = 0.0
+	toasts.anchor_right = 1.0
+	toasts.offset_left = 20.0
+	toasts.offset_right = -20.0
+	toasts.grow_horizontal = Control.GROW_DIRECTION_END
+	match Meta.ui_toast_pos:
+		"bottom":
+			toasts.anchor_top = 1.0
+			toasts.anchor_bottom = 1.0
+			toasts.offset_top = -TOAST_BAND
+			toasts.offset_bottom = -16.0
+			# END on both, so the newest line is the one closest to the bottom
+			# edge and older ones ride up out of the way.
+			toasts.grow_vertical = Control.GROW_DIRECTION_BEGIN
+			toasts.alignment = BoxContainer.ALIGNMENT_END
+		"top_left":
+			toasts.anchor_right = TOAST_NARROW
+			toasts.anchor_top = 0.0
+			toasts.anchor_bottom = 0.0
+			toasts.offset_right = -8.0
+			toasts.offset_top = 16.0
+			toasts.offset_bottom = 16.0 + TOAST_BAND
+			toasts.grow_vertical = Control.GROW_DIRECTION_END
+			toasts.alignment = BoxContainer.ALIGNMENT_BEGIN
+		_:
+			toasts.anchor_top = 0.0
+			toasts.anchor_bottom = 0.0
+			toasts.offset_top = 16.0
+			toasts.offset_bottom = 16.0 + TOAST_BAND
+			toasts.grow_vertical = Control.GROW_DIRECTION_END
+			toasts.alignment = BoxContainer.ALIGNMENT_BEGIN
 
 
 func _process(delta: float) -> void:

@@ -25,6 +25,26 @@ var _whence := "title"
 ## Reset by leaving the screen, so the form is never left open over a stale value.
 var _editing_server := false
 
+## The Danger Zone is folded away and has to be opened deliberately. Reset on
+## exit: coming back to Settings should never find the destructive controls
+## already on screen, because "I did not mean to be here" is most of how a save
+## gets wiped by accident.
+var _danger_open := false
+## What is typed in the state-code field, kept across rebuilds. This screen
+## rebuilds itself on `meta_changed` — the whole page, every child — and losing
+## half a typed code to a toast arriving is the kind of thing that makes a
+## testing tool not worth using.
+var _code_text := ""
+## The last thing the code field said back. Shown under it rather than only as a
+## toast, because a parse error you have to catch before it fades is not an error
+## message, it is a puzzle.
+var _code_note := ""
+
+## The download bar, held so `progress_changed` can move it without rebuilding
+## the page. See `_on_progress`.
+var _progress_bar: ProgressBar = null
+var _progress_label: Label = null
+
 ## Every screen Back may return to. "task" is here because the tutorial can send
 ## a player straight here from the middle of a task to turn the timers off, and
 ## the whole promise of that tooltip is that Back puts them back where they were
@@ -41,13 +61,27 @@ func _enter_tree() -> void:
 		_whence = Game.previous_screen
 	# The update card is a state machine — checking, downloading, ready — and it
 	# has to redraw as that state moves without the player touching anything.
+	# A *state* change moves the buttons, so it earns a rebuild.
 	Updater.state_changed.connect(refresh)
+	# Progress does not. It used to arrive on the same signal, and since
+	# HJScreen.refresh() frees every child and builds the page again, an 80MB
+	# download rebuilt this screen a hundred times — which is the flashing.
+	# Throttling the emits treated the symptom; the cause is that a moving
+	# number is not a change of shape. This one mutates two nodes in place.
+	Updater.progress_changed.connect(_on_progress)
 
 
 func _exit_tree() -> void:
 	super._exit_tree()
 	if Updater.state_changed.is_connected(refresh):
 		Updater.state_changed.disconnect(refresh)
+	# A signal that outlives its screen is the `Lambda capture ... was freed`
+	# class of bug wearing a different hat, and test.sh fails on it now.
+	if Updater.progress_changed.is_connected(_on_progress):
+		Updater.progress_changed.disconnect(_on_progress)
+	# Folded away again, so the destructive controls are never already open on
+	# the next visit.
+	_danger_open = false
 	# The highlight is spent by leaving, not by drawing: this screen rebuilds
 	# several times while the player is standing on it, and a flag consumed on
 	# the first build would take the highlight with it.
@@ -55,6 +89,10 @@ func _exit_tree() -> void:
 
 
 func build() -> void:
+	# Every child is about to be replaced, so the two nodes the download bar
+	# writes into are stale until _updates() makes new ones.
+	_progress_bar = null
+	_progress_label = null
 	var v := page(12)
 	var whence := _whence
 	v.add_child(HJUI.header("Settings", "The app, the phone, and when the clock runs",
@@ -100,14 +138,272 @@ func build() -> void:
 			Game.rebuild_rules()
 			Events.meta_changed.emit()))
 
-	list.add_child(HJUI.spacer(10))
-	var wipe := HJUI.danger("Wipe save", "Erase everything",
-		func() -> void:
-			Game.clear_saved_run()
-			Meta.wipe()
-			Game.goto("title")
-			Game.say("Wiped. Back to the first morning.", "warn"))
-	list.add_child(wipe)
+	_danger_zone(list)
+
+
+# --- the Danger Zone -----------------------------------------------------------
+#
+# Everything below writes over the save on this device, and it is a testing
+# affordance rather than a feature. Three things follow from that, and each one
+# is a deliberate choice rather than decoration:
+#
+# 1. **It is folded away.** Opening it is a tap you have to mean, and it folds
+#    itself back up when you leave the screen. The old "Wipe save" sat at the
+#    bottom of a scrolling page with nothing between it and the ruleset list.
+# 2. **Every destructive control is `HJUI.danger`**, which arms on the first tap
+#    and fires on the second, and turns solid when armed so it cannot be
+#    mistaken for the button that was there a moment ago. This screen rebuilds
+#    itself whenever `meta_changed` fires, and a rebuild moves things; arming is
+#    what makes a rebuild-under-your-finger cost you nothing, because a rebuilt
+#    button comes back disarmed. It fails closed.
+# 3. **Nothing here loses anything.** Reset and every state code take a backup
+#    first and say where it went. During a testing pass the difference between
+#    "I lost that state" and "it is in backups" is one line of code.
+
+
+## What "Reset character" is, and why there is not also a "Wipe save".
+##
+## There used to be one button, and it left four of the nine stores standing:
+## the run archive, any buffs still ticking, the animals from the run you were
+## abandoning, and the pedometer baseline. That is not a fresh install; it is a
+## save with the interesting half deleted, which is the single worst thing to
+## hand somebody about to test the first thirty minutes. Two buttons where one
+## is a strictly weaker version of the other is also exactly the pair a tired
+## thumb picks wrong, so this is one button that actually does what the old one
+## said it did. The inventory it clears is `HJSaveIO.STORES`.
+func _danger_zone(list: VBoxContainer) -> void:
+	list.add_child(HJUI.spacer(18))
+	list.add_child(HJUI.label("DANGER ZONE", HJUI.FS_SMALL, "danger"))
+
+	var card := HJUI.panel("panel", "danger")
+	var v := HJUI.vbox(10)
+	v.add_child(HJUI.label(
+		"Test tools. Not part of the game. Everything here writes over the save on this phone.",
+		HJUI.FS_TINY, "muted"))
+
+	if not _danger_open:
+		var show := HJUI.button("Show test tools", "quiet")
+		show.custom_minimum_size.y = 62
+		show.pressed.connect(func() -> void:
+			_danger_open = true
+			refresh())
+		v.add_child(show)
+		card.add_child(v)
+		list.add_child(card)
+		return
+
+	_backups(v)
+	_reset(v)
+	_state_codes(v)
+
+	v.add_child(HJUI.spacer(4))
+	var hide := HJUI.button("Hide test tools", "quiet")
+	hide.custom_minimum_size.y = 62
+	hide.pressed.connect(func() -> void:
+		_danger_open = false
+		refresh())
+	v.add_child(hide)
+
+	card.add_child(v)
+	list.add_child(card)
+
+
+## Backup and restore, over every store `HJSaveIO` knows about.
+##
+## The list of stores is printed rather than implied. A backup that silently
+## misses one is worse than no backup — it restores looking complete and is
+## wrong in one corner — so what it covers, and what it deliberately does not,
+## is on screen where it can be disagreed with.
+func _backups(v: VBoxContainer) -> void:
+	v.add_child(HJUI.rule())
+	v.add_child(HJUI.label("BACKUP", HJUI.FS_TINY, "muted"))
+	v.add_child(HJUI.label("Every store, in one timestamped file: %s."
+		% ", ".join(HJSaveIO.store_ids()), HJUI.FS_TINY, "muted"))
+	v.add_child(HJUI.label("Left out on purpose: %s." % ", ".join(HJSaveIO.OMITTED.keys()),
+		HJUI.FS_TINY, "muted"))
+
+	var take := HJUI.button("Back up now", "ghost")
+	take.custom_minimum_size.y = 66
+	take.pressed.connect(func() -> void:
+		var path := HJSaveIO.write_backup()
+		if path == "":
+			Game.say("Could not write the backup.", "warn")
+		else:
+			Game.say("Backed up to %s" % path.get_file(), "good")
+		refresh())
+	v.add_child(take)
+
+	var rows := HJSaveIO.list_backups()
+	if rows.is_empty():
+		v.add_child(HJUI.label("No backups yet.", HJUI.FS_TINY, "muted"))
+		return
+
+	for i in range(mini(rows.size(), 8)):
+		v.add_child(_backup_row(rows[i]))
+	if rows.size() > 8:
+		v.add_child(HJUI.label("%d older, kept on disk." % (rows.size() - 8),
+			HJUI.FS_TINY, "muted"))
+
+
+## One backup, saying what it holds before you commit to it.
+##
+## `missing` is the honest half: a file written before a store existed cannot
+## fill it, and saying so beforehand is the difference between a restore you can
+## trust and eight stores out of nine that look like nine.
+func _backup_row(row: Dictionary) -> PanelContainer:
+	var panel := HJUI.panel("panel_alt")
+	var box := HJUI.vbox(6)
+
+	var title := String(row["created"])
+	if bool(row["auto"]):
+		title += "  (auto)"
+	box.add_child(HJUI.label(title, HJUI.FS_SMALL, "text"))
+
+	var held: Array = row["held"]
+	var empty: Array = row["empty"]
+	box.add_child(HJUI.label("%d stores, %d empty · %s · v%s" % [
+		held.size(), empty.size(), HJSaveIO.format_bytes(int(row["bytes"])),
+		String(row["app_version"])], HJUI.FS_TINY, "muted"))
+
+	if String(row["label"]) != "":
+		box.add_child(HJUI.label(String(row["label"]), HJUI.FS_TINY, "muted"))
+
+	var missing: Array = row["missing"]
+	if not missing.is_empty():
+		box.add_child(HJUI.label("Cannot fill: %s — this backup predates them."
+			% ", ".join(missing), HJUI.FS_TINY, "warn"))
+	var stale: Array = row["stale"]
+	if not stale.is_empty():
+		box.add_child(HJUI.label("Too old for this build, would come back empty: %s."
+			% ", ".join(stale), HJUI.FS_TINY, "warn"))
+	var stray: Array = row["stray"]
+	if not stray.is_empty():
+		box.add_child(HJUI.label("This build cannot read: %s." % ", ".join(stray),
+			HJUI.FS_TINY, "warn"))
+
+	var path := String(row["path"])
+	var restore := HJUI.danger("Restore", "Overwrite everything", func() -> void:
+		var result := HJSaveIO.restore(path)
+		Game.say(HJSaveIO.summarise(result), "good" if bool(result["ok"]) else "warn")
+		# The title screen reads the restored state rather than assuming one:
+		# it offers "Carry on" if a run came back and "Wake up" if none did.
+		Game.goto("title"))
+	box.add_child(restore)
+
+	panel.add_child(box)
+	return panel
+
+
+func _reset(v: VBoxContainer) -> void:
+	v.add_child(HJUI.rule())
+	v.add_child(HJUI.label("RESET", HJUI.FS_TINY, "muted"))
+	v.add_child(HJUI.label(
+		"A new install: every store deleted, on disk and in memory. A backup is taken first.",
+		HJUI.FS_TINY, "muted"))
+	var reset := HJUI.danger("Reset character", "Erase everything", func() -> void:
+		var backup := HJSaveIO.reset_character()
+		Game.goto("title")
+		if backup == "":
+			Game.say("Reset. Back to the first morning.", "warn")
+		else:
+			Game.say("Reset. Backed up to %s first." % backup.get_file(), "warn"))
+	v.add_child(reset)
+
+
+## State codes: the old password screen, made tappable.
+##
+## Both halves are here on purpose. The rows are how you actually use it — no
+## typing, no keyboard over a portrait viewport, no chance of a typo landing you
+## somewhere you did not ask for. The field is for the structured form, which is
+## the only way to say "that preset but at ring 2", and it is deliberately last
+## on the page: `LineEdit` raises the Android soft keyboard and that resizes the
+## viewport, so anything above it would jump under your finger.
+func _state_codes(v: VBoxContainer) -> void:
+	v.add_child(HJUI.rule())
+	v.add_child(HJUI.label("STATE CODE", HJUI.FS_TINY, "muted"))
+	v.add_child(HJUI.label(
+		"Each one resets the character and loads a test state. A backup is taken first.",
+		HJUI.FS_TINY, "muted"))
+
+	for entry in HJStateCode.presets():
+		var preset: Dictionary = entry
+		var code := String(preset.get("code", "?"))
+		var load_it := HJUI.danger("%s   %s" % [code, String(preset.get("name", ""))],
+			"Reset and load", func() -> void: _load_code(code))
+		v.add_child(load_it)
+		v.add_child(HJUI.label(String(preset.get("desc", "")), HJUI.FS_TINY, "muted"))
+
+	v.add_child(HJUI.spacer(4))
+	v.add_child(HJUI.label("Or type one, with overrides: %s" % HJStateCode.legend(),
+		HJUI.FS_TINY, "muted"))
+
+	var field := LineEdit.new()
+	field.placeholder_text = "DP3-D2-T400"
+	field.text = _code_text
+	HJUI.face(field)
+	field.add_theme_font_size_override("font_size", HJUI.fs(HJUI.FS_SMALL))
+	# Nothing longer than this parses, and a phone keyboard will happily add
+	# spaces and capitals — HJStateCode.normalise throws both away rather than
+	# making the difference between a code working and not.
+	field.max_length = 32
+	field.text_changed.connect(func(text: String) -> void: _code_text = text)
+	# Submitting *checks* the code rather than firing it. The keyboard's return
+	# key is one tap, and one tap must never be enough to erase a save.
+	field.text_submitted.connect(func(text: String) -> void:
+		_code_text = text
+		_check_code(text)
+		refresh())
+	v.add_child(field)
+
+	if _code_note != "":
+		v.add_child(HJUI.label(_code_note, HJUI.FS_TINY, "warn"))
+
+	var go := HJUI.danger("Load typed code", "Reset and load",
+		func() -> void: _load_code(_code_text))
+	v.add_child(go)
+
+
+## Say what a typed code would do, without doing it.
+func _check_code(text: String) -> void:
+	var parsed := HJStateCode.parse(text)
+	if not bool(parsed["ok"]):
+		_code_note = String(parsed["error"])
+		return
+	var preset: Dictionary = parsed["preset"]
+	var over: Dictionary = parsed["overrides"]
+	_code_note = "%s reads as %s." % [String(parsed["code"]), String(preset.get("name", ""))]
+	if not over.is_empty():
+		_code_note += " Overriding %s." % ", ".join(over.keys())
+
+
+func _load_code(text: String) -> void:
+	var parsed := HJStateCode.parse(text)
+	if not bool(parsed["ok"]):
+		_code_note = String(parsed["error"])
+		Game.say(_code_note, "warn")
+		refresh()
+		return
+	_code_note = ""
+	var result := HJStateCode.apply(parsed)
+	Game.say("Loaded %s" % String(result["message"]), "good")
+	# Applying already moved the app once — starting a run goes to the overworld
+	# — so this is the last word on where the state actually lives.
+	Game.goto(String(result["screen"]))
+
+
+# --- the update card's moving parts --------------------------------------------
+
+## Move the bar, do not rebuild the page.
+##
+## This is the whole fix for the flashing: `Updater` emits this many times a
+## second while a download runs, and the two nodes it writes into are the only
+## things on the page that change. `is_instance_valid` because the screen can be
+## swapped out between the emit and the frame that would have drawn it.
+func _on_progress(fraction: float) -> void:
+	if _progress_bar != null and is_instance_valid(_progress_bar):
+		_progress_bar.value = clampf(fraction * 100.0, 0.0, 100.0)
+	if _progress_label != null and is_instance_valid(_progress_label):
+		_progress_label.text = "%d%%" % int(round(fraction * 100.0))
 
 
 ## Tasks: the two rules a player is allowed to switch off.
@@ -336,7 +632,14 @@ func _updates(list: VBoxContainer) -> void:
 
 	match Updater.state:
 		Updater.State.DOWNLOADING:
-			cv.add_child(HJUI.bar(Updater.progress * 100.0, 100.0, "accent"))
+			# Held rather than made and forgotten: `progress_changed` writes into
+			# these two every few frames, and rebuilding the page to move a bar
+			# is what made the screen flash for the whole of a download.
+			_progress_bar = HJUI.bar(Updater.progress * 100.0, 100.0, "accent")
+			cv.add_child(_progress_bar)
+			_progress_label = HJUI.label("%d%%" % int(round(Updater.progress * 100.0)),
+				HJUI.FS_TINY, "muted")
+			cv.add_child(_progress_label)
 		Updater.State.AVAILABLE:
 			var notes := String(Updater.latest.get("notes", ""))
 			if notes != "":

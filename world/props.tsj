@@ -331,7 +331,7 @@
         {
           "name": "foot_w",
           "type": "int",
-          "value": 2
+          "value": 1
         },
         {
           "name": "foot_h",
@@ -541,7 +541,7 @@
         {
           "name": "foot_w",
           "type": "int",
-          "value": 2
+          "value": 1
         },
         {
           "name": "foot_h",
@@ -1711,12 +1711,12 @@
         {
           "name": "foot_w",
           "type": "int",
-          "value": 2
+          "value": 1
         },
         {
           "name": "foot_h",
           "type": "int",
-          "value": 2
+          "value": 1
         }
       ]
     },
@@ -1741,7 +1741,7 @@
         {
           "name": "foot_w",
           "type": "int",
-          "value": 2
+          "value": 1
         },
         {
           "name": "foot_h",
@@ -1771,7 +1771,7 @@
         {
           "name": "foot_w",
           "type": "int",
-          "value": 2
+          "value": 1
         },
         {
           "name": "foot_h",
@@ -1831,7 +1831,7 @@
         {
           "name": "foot_w",
           "type": "int",
-          "value": 2
+          "value": 1
         },
         {
           "name": "foot_h",
@@ -1926,7 +1926,7 @@
         {
           "name": "foot_h",
           "type": "int",
-          "value": 1
+          "value": 2
         }
       ]
     },
@@ -5731,7 +5731,7 @@
         {
           "name": "foot_w",
           "type": "int",
-          "value": 2
+          "value": 1
         },
         {
           "name": "foot_h",
@@ -5761,7 +5761,7 @@
         {
           "name": "foot_w",
           "type": "int",
-          "value": 2
+          "value": 1
         },
         {
           "name": "foot_h",

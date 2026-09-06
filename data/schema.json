@@ -35,7 +35,8 @@
       "deadline",
       "log",
       "buff",
-      "tag"
+      "tag",
+      "dialogue"
     ],
     "spite_effects": [
       "grit",
@@ -189,6 +190,14 @@
     "critter_targets": [
       "player",
       "home"
+    ],
+    "_comment_statecodes": "Test start states. See scripts/game/StateCode.gd. Unlike the vocabularies above, statecode_anchors is NOT reconciled against the engine by tools/validate_data.py -- the anchors are a match in HJStateCode._anchor and adding an arm there means adding a word here by hand. It is a debug affordance with one reader, so the cost of drift is a preset that starts you at the spawn point instead of the door.",
+    "statecode_anchors": [
+      "spawn",
+      "door",
+      "outside",
+      "anomaly",
+      "town"
     ]
   },
   "types": {
@@ -1056,6 +1065,7 @@
         "states"
       ],
       "optional": [
+        "sheet",
         "transitions"
       ]
     },
@@ -1103,6 +1113,88 @@
       ],
       "enum": {
         "on": "critter_events"
+      }
+    },
+    "statecodes": {
+      "_comment": "One typable test start state. Applied as a patch over a fresh install, so every field left out means 'as a new save has it'. `code` is what you type: unambiguous glyphs only (issue #60), which is why it has no vowels. Not in `runtime`: HJStateCode reads the file directly rather than through Content, because a debug affordance has no business in the runtime catalogue -- so only the file-side tool checks these records.",
+      "files": {
+        "dir": "content",
+        "paths": [
+          "statecodes[]"
+        ]
+      },
+      "required": [
+        "id",
+        "code",
+        "name",
+        "desc"
+      ],
+      "optional": [
+        "screen",
+        "resolve",
+        "deepest_ring",
+        "anomalies_closed",
+        "loops",
+        "streak",
+        "best_streak",
+        "unlock_all",
+        "rooms_all",
+        "codex_all",
+        "wheel_all",
+        "revealed",
+        "items",
+        "dialogue_seen",
+        "objectives",
+        "axis_tasks",
+        "buffs",
+        "self_description",
+        "run"
+      ],
+      "enum": {
+        "screen": "screens"
+      },
+      "refs": {
+        "dialogue_seen": "dialogues",
+        "objectives": "objectives",
+        "buffs": "buffs"
+      },
+      "key_refs": {
+        "items": "items",
+        "axis_tasks": "axes"
+      }
+    },
+    "statecode_run": {
+      "_comment": "The run half of a preset. Present means 'start a run and patch it'; absent means the state has no run in progress. `at` is a named anchor rather than a coordinate because the overworld is generated and a hardcoded cell would quietly start pointing at the wrong hole the first time make_world.py runs. Same reason `close_areas` names areas: it is resolved against the world's own anomaly list at apply time.",
+      "files": {
+        "dir": "content",
+        "paths": [
+          "statecodes[].run"
+        ]
+      },
+      "required": [],
+      "optional": [
+        "at",
+        "seed",
+        "zone",
+        "grit",
+        "steps",
+        "fog",
+        "revealed",
+        "trinkets",
+        "tags",
+        "echoes",
+        "close_areas",
+        "close_to_tier",
+        "started_ago",
+        "deadline_in"
+      ],
+      "enum": {
+        "at": "statecode_anchors"
+      },
+      "refs": {
+        "trinkets": "trinkets",
+        "close_areas": "areas",
+        "echoes": "echoes"
       }
     }
   },
@@ -1157,6 +1249,25 @@
       "amount": "float greater than 0, world pixels the tip travels either side of rest",
       "speed": "float greater than 0, cycles per second",
       "mode": "'sway' (a horizontal bend about the base) or 'breathe' (a vertical stretch about it)"
+    },
+    "_prop_shaft": "What the sun does through a hole. A prop entry in assets/tiles/tiles.json may carry a `shaft` beside its `light`, and the split is deliberate: the prop declares that it is an APERTURE and what shape of beam it passes, and never a bearing. The bearing is the sun's, there is one of it, and scripts/ui/Lighting.gd derives it from `time_of_day` alone -- a window that could name its own sun would let two windows in one wall disagree about where morning is. Which way the hole faces and how far the beam gets before a wall are read from the map, not declared here, because the art cannot know them. HJLighting is the only reader, by key, so a misspelt field is a window that has quietly stopped throwing light -- the same silent failure `light` and `sway` have, which is why all four fields are required once the key is present. Declared in tools/make_tiles.py, not only in the generated manifest: that file rebuilds tiles.json from scratch and owns it.",
+    "prop_shaft": {
+      "required": [
+        "length",
+        "width",
+        "spread",
+        "bars"
+      ],
+      "optional": [
+        "color",
+        "intensity"
+      ],
+      "length": "float greater than 0, tiles the beam reaches at its longest before walls cut it short",
+      "width": "float greater than 0, half-width in tiles where the beam leaves the aperture",
+      "spread": "float 0 or more, extra half-width in tiles per tile travelled; a beam widens as it goes",
+      "bars": "integer 0 or more, panes across the aperture; 2 is one mullion, 0 is an unframed hole",
+      "color": "#RRGGBB; defaults to the prop's own `light` colour, or to first light",
+      "intensity": "float 0.0 to 1.0, default 1.0"
     }
   }
 }

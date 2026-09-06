@@ -44,6 +44,29 @@ uniform float ambient_mix : hint_range(0.0, 1.0) = 0.46;
 uniform vec3 ambient_colour = vec3(0.16, 0.19, 0.34);
 uniform float glow : hint_range(0.0, 1.0) = 0.34;
 
+// MORNING LIGHT THROUGH A HOLE
+// ---------------------------
+// A window emitter above is a circle, and a circle is what a lamp is. The sun
+// is not: it arrives along one bearing, so what a window puts on the floor is a
+// wedge — longer than it is wide, widening and softening as it goes, and
+// striped by the frame it came through. That striping is the whole tell. A
+// clean-edged wedge reads as a spotlight; the same wedge divided into panes
+// reads as a window, and it costs one sine.
+//
+// Everything per-aperture is resolved on the CPU (bearing, reach against the
+// walls, whether the sun faces this hole at all) because those are questions
+// about the map and the hour, not about this pixel. What is left here is a
+// change of basis and two curves.
+const int MAX_SHAFTS = 4;       // must match HJLighting.MAX_SHAFTS
+
+uniform int shaft_count = 0;
+// xy the mouth in local pixels, z length in pixels, w intensity
+uniform vec4 shaft_pos[MAX_SHAFTS];
+// rgb the colour of the light, a half-width at the mouth in pixels
+uniform vec4 shaft_col[MAX_SHAFTS];
+// xy unit direction, z half-width gained per pixel travelled, w panes across
+uniform vec4 shaft_form[MAX_SHAFTS];
+
 void fragment() {
 	vec2 p = UV * view_size;
 
@@ -80,6 +103,57 @@ void fragment() {
 
 		radiance += hue * (e * 1.15 + core * 0.55) * L.w;
 		energy += e * L.w;
+	}
+
+	for (int i = 0; i < MAX_SHAFTS; i++) {
+		if (i >= shaft_count) { break; }
+		vec4 S = shaft_pos[i];
+		vec4 F = shaft_form[i];
+		vec2 rel = p - S.xy;
+
+		// Into the beam's own frame: `along` down the bearing, `across` at right
+		// angles to it. Negative `along` is behind the aperture — the far side of
+		// the wall it is set in — and is dropped rather than mirrored, which is
+		// what stops the beam wrapping round into the room next door.
+		float along = dot(rel, F.xy);
+		if (along < 0.0 || along > S.z) { continue; }
+		float across = dot(rel, vec2(-F.y, F.x));
+
+		// The wedge widens as it travels, so `u` is measured against the width
+		// HERE, not against the width at the sill. That is also what makes the
+		// bars diverge with the beam instead of running parallel like railings.
+		float half_w = S.z > 0.0 ? shaft_col[i].a + along * F.z : 1.0;
+		float u = across / max(half_w, 0.5);
+		if (abs(u) > 1.0) { continue; }
+		float dn = along / max(S.z, 1.0);
+
+		// Two profiles. Across: soft to nothing at the edges, never a hard rim.
+		// Along: a short fade off the sill so the beam is not stamped out with a
+		// flat end where it leaves the frame, and a long one into the far half so
+		// it dies before the wall rather than against it.
+		float body = smoothstep(1.0, 0.55, abs(u))
+			* smoothstep(0.0, 0.12, dn) * smoothstep(1.0, 0.40, dn);
+
+		// THE FRAME. `bars` panes across the aperture: bright at each pane's
+		// centre, dark at the mullions between them and at the frame either side.
+		// `sharp` is the penumbra — a mullion's shadow is crisp at the sill and
+		// gone by the far end, because the sun is a disc and not a point, and
+		// letting the bars survive the whole length is what makes a striped
+		// wedge look like a barcode instead of like light.
+		if (F.w > 0.0) {
+			float pane = abs(sin(F.w * 3.14159265 * (u + 1.0) * 0.5));
+			float sharp = 1.0 - smoothstep(0.10, 0.85, dn);
+			body *= mix(1.0, smoothstep(0.05, 0.55, pane), sharp);
+		}
+
+		float lit = body * S.w;
+		// Into the same two accumulators the lamps use, so a shaft buys the art
+		// back out of the ambient exactly the way a lamp does and the two can
+		// never end up on different curves. Weighted toward `energy` rather than
+		// `radiance`: morning light on a floor is the floor being visible, not a
+		// glowing patch laid over it.
+		radiance += shaft_col[i].rgb * lit * 0.55;
+		energy += lit * 0.90;
 	}
 
 	energy = clamp(energy, 0.0, 1.0);

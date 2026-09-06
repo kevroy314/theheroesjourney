@@ -584,6 +584,17 @@ func apply_effects(effects: Array) -> void:
 				# Buffs are data, so anything that can fire an effect can grant
 				# one: a ruleset hook, a trinket, an interactable in the world.
 				Buffs.apply(String(effect.get("buff", "")), silent)
+			"dialogue":
+				# Anything in the world can start a conversation. Deferred,
+				# because this fires from inside an interaction that is about to
+				# return, and changing the screen out from under it is the same
+				# hazard as redirecting during build(). `once` on the
+				# conversation is what stops a second Talk repeating it.
+				var talk := String(effect.get("dialogue", ""))
+				if Dialogue.available(talk):
+					Dialogue.open.call_deferred(talk)
+				elif not silent:
+					say("There is nothing more to say.", "info")
 			"tag":
 				# A tag is the run remembering something happened. The front door
 				# being open is a tag, which is why the gate needs no new field:

@@ -65,6 +65,15 @@ var paused: bool = false               ## injury / illness / life. Freezes deadl
 ## who cannot tap quickly should not be locked out of half the movements.
 var timers_on: bool = true
 var hold_confirm: bool = false
+
+# --- how the interface behaves ------------------------------------------------
+## Where a toast lands. The top strip is where the run header, the step budget
+## and the buff pills already live, so a notification there covers the numbers
+## it is usually talking about.
+## One of: "bottom" | "top_left" | "top".
+var ui_toast_pos: String = "bottom"
+## How walking is driven. One of: "dpad" | "pad4" | "pad8" | "tap_path".
+var ui_move_control: String = "dpad"
 var pause_started: int = 0
 
 var selected_theme: String = ""
@@ -555,6 +564,7 @@ func save_game() -> void:
 		"seen_first_reset": seen_first_reset, "seen_warden": seen_warden,
 		"paused": paused, "pause_started": pause_started,
 		"timers_on": timers_on, "hold_confirm": hold_confirm,
+		"ui_toast_pos": ui_toast_pos, "ui_move_control": ui_move_control,
 		"selected_theme": selected_theme, "selected_ruleset": selected_ruleset,
 		"guild_id": guild_id, "stats": stats, "notify_prefs": notify_prefs,
 	}
@@ -620,6 +630,8 @@ func load_game() -> void:
 			# Note the asymmetric default: timers are on until turned off.
 			timers_on = bool(parsed.get("timers_on", true))
 			hold_confirm = bool(parsed.get("hold_confirm", false))
+			ui_toast_pos = String(parsed.get("ui_toast_pos", "bottom"))
+			ui_move_control = String(parsed.get("ui_move_control", "dpad"))
 			pause_started = int(parsed.get("pause_started", 0))
 			selected_theme = String(parsed.get("selected_theme", ""))
 			selected_ruleset = String(parsed.get("selected_ruleset", ""))
@@ -658,6 +670,8 @@ func wipe() -> void:
 	paused = false
 	timers_on = true
 	hold_confirm = false
+	ui_toast_pos = "bottom"
+	ui_move_control = "dpad"
 	selected_theme = ""
 	selected_ruleset = ""
 	stats = {"runs": 0, "clears": 0, "tasks": 0, "scaled": 0, "grit_earned": 0, "resolve_earned": 0}

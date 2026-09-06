@@ -1,0 +1,326 @@
+{
+  "_comment": "Test start states, reachable by typing a short code in the Danger Zone. Read by scripts/game/StateCode.gd, which loads this file directly rather than through Content — nothing in the game proper reads it, and a debug affordance should not be merged into the runtime catalogue. Each preset is a patch applied over a fresh install, so a field left out means 'as a new save has it'. Codes use only glyphs that are unambiguous in the pixel font (see issue #60): the letters DFHJKMNPQTVWXY and the digits 23456, which leaves no vowels, so they are consonant skeletons rather than words. They are also a tappable list on the screen — typing one is the fallback, not the path. Every beat boundary in docs/FIRST-THIRTY.md is a state worth reaching directly, and beats 0 through 7 are the first five entries here.",
+  "statecodes": [
+    {
+      "id": "new_file",
+      "code": "NWF",
+      "name": "New file",
+      "desc": "Beat 0. A fresh install: no run, no history, nothing seen. Every store on disk is gone, not merely emptied.",
+      "screen": "title"
+    },
+    {
+      "id": "white_room",
+      "code": "WHT",
+      "name": "White room",
+      "desc": "Beat 1. Awake in the house with the Boon of the White Room up, the dog and the cat where they sleep, and the first anomaly somewhere you have not walked yet.",
+      "screen": "overworld",
+      "run": {
+        "at": "spawn"
+      }
+    },
+    {
+      "id": "doorstep",
+      "code": "DTP",
+      "name": "Doorstep",
+      "desc": "Beat 4. The survey is done and there is Grit in hand — enough for the door and one of the two comforts, not both. The moment before stepping outside.",
+      "screen": "overworld",
+      "self_description": {
+        "name": "Tester",
+        "strength": "self_weak",
+        "nourishment": "self_underfed",
+        "rest": "self_spent",
+        "bonds": "self_waits"
+      },
+      "run": {
+        "at": "door",
+        "grit": 90,
+        "tags": [
+          "named",
+          "self_weak",
+          "self_underfed",
+          "self_spent",
+          "self_waits"
+        ],
+        "close_areas": [
+          "waking_room"
+        ]
+      }
+    },
+    {
+      "id": "after_spite",
+      "code": "FND",
+      "name": "After Spite",
+      "desc": "Beat 6. Outside, the boon broken, the Hearth open, Spite said his piece: the town objective is running and the Finder is in the bag.",
+      "screen": "overworld",
+      "revealed": [
+        "beat:left_house"
+      ],
+      "items": {
+        "finder": 1
+      },
+      "dialogue_seen": [
+        "spite_doorstep"
+      ],
+      "objectives": [
+        "close_town_anomalies"
+      ],
+      "self_description": {
+        "name": "Tester",
+        "strength": "self_weak",
+        "nourishment": "self_underfed",
+        "rest": "self_spent",
+        "bonds": "self_waits"
+      },
+      "run": {
+        "at": "outside",
+        "grit": 40,
+        "steps": 300,
+        "tags": [
+          "named",
+          "self_weak",
+          "self_underfed",
+          "self_spent",
+          "self_waits"
+        ],
+        "close_areas": [
+          "waking_room"
+        ]
+      }
+    },
+    {
+      "id": "town_closed",
+      "code": "TWN",
+      "name": "Town closed",
+      "desc": "Beat 7, finished. Every ring-0 anomaly shut, so the town objective completes the moment you land. The tutorial is over and the world is the game now.",
+      "screen": "overworld",
+      "resolve": 60,
+      "revealed": [
+        "beat:left_house",
+        "beat:timers_optional"
+      ],
+      "items": {
+        "finder": 1,
+        "rest_token": 1
+      },
+      "dialogue_seen": [
+        "spite_doorstep"
+      ],
+      "objectives": [
+        "close_town_anomalies"
+      ],
+      "axis_tasks": {
+        "move": 4,
+        "water": 2,
+        "rest": 2
+      },
+      "run": {
+        "at": "town",
+        "grit": 120,
+        "steps": 600,
+        "fog": true,
+        "close_to_tier": 0,
+        "tags": [
+          "named",
+          "self_weak",
+          "self_underfed",
+          "self_spent",
+          "self_waits"
+        ]
+      },
+      "self_description": {
+        "name": "Tester",
+        "strength": "self_weak",
+        "nourishment": "self_underfed",
+        "rest": "self_spent",
+        "bonds": "self_waits"
+      }
+    },
+    {
+      "id": "deep_run",
+      "code": "DP3",
+      "name": "Deep run",
+      "desc": "Ring 3, 400 Grit, three trinkets and a full bag, two loops behind you and a four-day streak. Nothing tutorial is left. Override the numbers with -D and -T.",
+      "screen": "overworld",
+      "resolve": 900,
+      "deepest_ring": 3,
+      "anomalies_closed": 9,
+      "loops": 2,
+      "streak": 4,
+      "unlock_all": true,
+      "revealed": [
+        "beat:left_house",
+        "beat:timers_optional"
+      ],
+      "items": {
+        "finder": 1,
+        "rest_token": 2,
+        "tonic": 1,
+        "lantern": 1,
+        "hourglass": 1
+      },
+      "dialogue_seen": [
+        "spite_doorstep"
+      ],
+      "objectives": [
+        "close_town_anomalies"
+      ],
+      "axis_tasks": {
+        "move": 22,
+        "water": 16,
+        "fuel": 9,
+        "rest": 12,
+        "mind": 7,
+        "bond": 4
+      },
+      "buffs": [
+        "coffee"
+      ],
+      "run": {
+        "at": "anomaly",
+        "zone": 3,
+        "grit": 400,
+        "steps": 2500,
+        "fog": true,
+        "trinkets": [
+          "wanderers_charm",
+          "deep_well",
+          "steady_hand"
+        ],
+        "tags": [
+          "named",
+          "self_weak",
+          "self_underfed",
+          "self_spent",
+          "self_waits",
+          "varied",
+          "rested"
+        ],
+        "close_to_tier": 1,
+        "started_ago": 40000
+      },
+      "self_description": {
+        "name": "Tester",
+        "strength": "self_weak",
+        "nourishment": "self_underfed",
+        "rest": "self_spent",
+        "bonds": "self_waits"
+      }
+    },
+    {
+      "id": "closing_loop",
+      "code": "DDN",
+      "name": "Closing loop",
+      "desc": "The same run, ninety seconds from its deadline and a long way from town. This is the loop about to close, without waiting a day for it.",
+      "screen": "overworld",
+      "resolve": 640,
+      "deepest_ring": 3,
+      "anomalies_closed": 6,
+      "loops": 1,
+      "streak": 3,
+      "unlock_all": true,
+      "revealed": [
+        "beat:left_house",
+        "beat:timers_optional"
+      ],
+      "items": {
+        "finder": 1,
+        "second_wind": 1
+      },
+      "dialogue_seen": [
+        "spite_doorstep"
+      ],
+      "objectives": [
+        "close_town_anomalies"
+      ],
+      "axis_tasks": {
+        "move": 15,
+        "water": 11,
+        "rest": 8,
+        "mind": 5
+      },
+      "run": {
+        "at": "anomaly",
+        "zone": 3,
+        "grit": 310,
+        "steps": 400,
+        "fog": true,
+        "trinkets": [
+          "long_memory",
+          "banked_fire"
+        ],
+        "tags": [
+          "named",
+          "self_weak",
+          "self_underfed",
+          "self_spent",
+          "self_waits",
+          "varied"
+        ],
+        "close_to_tier": 1,
+        "started_ago": 84000,
+        "deadline_in": 90
+      },
+      "self_description": {
+        "name": "Tester",
+        "strength": "self_weak",
+        "nourishment": "self_underfed",
+        "rest": "self_spent",
+        "bonds": "self_waits"
+      }
+    },
+    {
+      "id": "everything",
+      "code": "MXD",
+      "name": "Everything open",
+      "desc": "Every pack, theme and ruleset unlocked, every trait maxed, the Mind Palace built out, the Codex full and the Wheel claimed. Twelve loops deep, no run in progress. For looking at screens that are normally half empty.",
+      "screen": "palace",
+      "resolve": 5000,
+      "deepest_ring": 4,
+      "anomalies_closed": 40,
+      "loops": 12,
+      "streak": 30,
+      "best_streak": 41,
+      "unlock_all": true,
+      "rooms_all": true,
+      "codex_all": true,
+      "wheel_all": true,
+      "revealed": [
+        "beat:left_house",
+        "beat:timers_optional"
+      ],
+      "items": {
+        "finder": 1,
+        "rest_token": 5,
+        "tonic": 3,
+        "hourglass": 2,
+        "warp_stone": 2,
+        "echo_lens": 2,
+        "scaling_chalk": 2,
+        "whistle": 2,
+        "lantern": 2,
+        "second_wind": 2
+      },
+      "dialogue_seen": [
+        "spite_doorstep"
+      ],
+      "objectives": [
+        "close_town_anomalies"
+      ],
+      "axis_tasks": {
+        "move": 90,
+        "water": 80,
+        "fuel": 70,
+        "rest": 70,
+        "mind": 60,
+        "bond": 55
+      },
+      "self_description": {
+        "name": "Tester",
+        "strength": "self_strong",
+        "nourishment": "self_sweet",
+        "rest": "self_rested",
+        "bonds": "self_reaches"
+      }
+    }
+  ]
+}

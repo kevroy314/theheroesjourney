@@ -53,6 +53,11 @@ const VERSION := 1
 ## the player, in the same layout, so one loader serves both.
 const CYCLE := [1, 0, 2, 0]
 const FIDGET_COL := 3
+## The animals' sheets are 4 columns of 32x32. A person's is 3 columns of 32x48
+## — the same layout and row order as player.png, one column short because a
+## figure has no fidget frame. A species may override either, so the difference
+## between an animal and a person standing in the world is data.
+const SHEET := {"cols": 4, "rows": 4, "w": 32, "h": 32}
 const FACING_ROW := {
 	Vector2i.DOWN: 0, Vector2i.UP: 1, Vector2i.LEFT: 2, Vector2i.RIGHT: 3,
 }
@@ -413,10 +418,14 @@ func views() -> Array:
 		var c: Dictionary = entry
 		var def := species(String(c["id"]))
 		var moving: bool = float(c["t"]) < 1.0
+		var sheet: Dictionary = def.get("sheet", SHEET)
+		var cols := int(sheet.get("cols", SHEET["cols"]))
 		var col := 0
 		if moving:
 			col = int(CYCLE[int(round(float(c["t"]) * 3.0)) % CYCLE.size()])
-		elif float(c["fidget"]) < 0.28:
+		elif float(c["fidget"]) < 0.28 and cols > FIDGET_COL:
+			# A sheet with no fidget column stands still rather than reading a
+			# frame off the end of its own row.
 			col = FIDGET_COL
 		out.append({
 			"key": String(c["key"]),
@@ -426,6 +435,11 @@ func views() -> Array:
 			"cell": c["cell"], "from": c["from"], "t": float(c["t"]),
 			"row": int(FACING_ROW.get(c["facing"], 0)),
 			"col": col,
+			# Frame size travels with the view so the renderer never has to know
+			# which species is which. A 32x48 figure is drawn from its feet, the
+			# same as the player, so the extra height goes upward.
+			"fw": int(sheet.get("w", SHEET["w"])),
+			"fh": int(sheet.get("h", SHEET["h"])),
 			"moving": moving,
 		})
 	return out

@@ -1,5 +1,5 @@
 {
-  "_comment": "The catalogue of things in the world you can act on. This file says what a kind of object *is* — its verb, its price and what it does. Where the instances stand is world data: `data/world/overworld.json` carries an `interactables` list of { x, y, type, label? } records, which the Tiled round trip turns into a draggable object layer (see docs/MAP-EDITING.md). So the house agent places them and the designer retypes them, and neither needs code. `cost_key` names a config key rather than a literal so a trinket can bend the price; `effect` is one entry of the same effect vocabulary hooks use, applied by Game.apply_effects. A `critter` names a species in data/content/critters.json: the placement spawns that animal where it stands, reach follows it as it walks, and `critter_event` is fired at it when you act — which is how one Pet verb makes the dog follow you and the cat leave.",
+  "_comment": "The catalogue of things in the world you can act on. This file says what a kind of object *is* \u2014 its verb, its price and what it does. Where the instances stand is world data: `data/world/overworld.json` carries an `interactables` list of { x, y, type, label? } records, which the Tiled round trip turns into a draggable object layer (see docs/MAP-EDITING.md). So the house agent places them and the designer retypes them, and neither needs code. `cost_key` names a config key rather than a literal so a trinket can bend the price; `effect` is one entry of the same effect vocabulary hooks use, applied by Game.apply_effects. A `critter` names a species in data/content/critters.json: the placement spawns that animal where it stands, reach follows it as it walks, and `critter_event` is fired at it when you act \u2014 which is how one Pet verb makes the dog follow you and the cat leave.",
   "interactables": [
     {
       "id": "front_door",
@@ -73,6 +73,19 @@
       },
       "critter": "cat",
       "critter_event": "petted"
+    },
+    {
+      "id": "spite",
+      "name": "Spite",
+      "verb": "Talk",
+      "desc": "He has been waiting. He is always going to have been waiting.",
+      "icon": "spite",
+      "reach": "adjacent",
+      "critter": "spite",
+      "effect": {
+        "type": "dialogue",
+        "dialogue": "spite_doorstep"
+      }
     }
   ]
 }

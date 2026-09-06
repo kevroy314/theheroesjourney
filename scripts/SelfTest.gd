@@ -48,13 +48,19 @@ const LOCK := "user://selftest.lock"
 ## by accident this session — leaves the file behind, and every run for the next
 ## half hour is refused with no way to tell a corpse from a peer.
 const LOCK_STALE_SECONDS := 600
+## How long to queue behind a live run before giving up. Long enough for two
+## full suites ahead of us, short enough that a genuinely wedged run does not
+## hold CI all afternoon.
+const LOCK_WAIT_SECONDS := 900.0
 
 
 static func run_all(host: Node) -> int:
-	if not _take_lock():
-		push_error("selftest: another run holds %s — refusing to start" % LOCK)
-		print("selftest: another run is already in progress. Refusing, because "
-			+ "two harnesses sharing one backup file destroys the save.")
+	if not await _take_lock(host):
+		push_error("selftest: waited %ds for %s and it is still held"
+			% [int(LOCK_WAIT_SECONDS), LOCK])
+		print("selftest: gave up waiting for another run to finish. Two "
+			+ "harnesses sharing one backup file destroys the save, so this "
+			+ "one will not start.")
 		return 1
 
 	# A backup still on disk means the last run died before it could restore.
@@ -339,18 +345,32 @@ static func _play_one(host: Node, seed_value: int, failures: Array) -> Dictionar
 	return { "cleared": Game.summary.get("cleared", false), "tasks": tasks }
 
 
-## Claim the lock, or report that someone else holds it.
+## Claim the lock, **waiting** for it rather than refusing.
 ##
-## A lock left by a killed process would block every future run, so one older
-## than LOCK_STALE_SECONDS is treated as abandoned and taken. That is a
-## deliberate trade: a stale lock silently blocking CI is a worse failure than
-## the vanishingly rare case of a suite that genuinely ran for half an hour.
-static func _take_lock() -> bool:
-	if FileAccess.file_exists(LOCK):
+## The first version refused outright, which was right about the danger and
+## wrong about the remedy. Two harnesses sharing one backup file destroys the
+## save — that part stands — but refusing turns every collision into a failed
+## run somebody has to notice and retry, and with several agents testing at once
+## the retries cost more than the collisions ever did. Queueing serialises them
+## instead: the second run waits its turn and then passes.
+##
+## A lock left by a killed process would block everything, so one older than
+## LOCK_STALE_SECONDS is treated as abandoned and taken.
+static func _take_lock(host: Node) -> bool:
+	var waited := 0.0
+	while FileAccess.file_exists(LOCK):
 		var age := HJClock.now() - int(FileAccess.get_modified_time(LOCK))
-		if age < LOCK_STALE_SECONDS:
+		if age >= LOCK_STALE_SECONDS:
+			print("selftest: taking a lock %d seconds old; assuming it was abandoned" % age)
+			break
+		if waited >= LOCK_WAIT_SECONDS:
 			return false
-		print("selftest: taking a lock %d seconds old; assuming it was abandoned" % age)
+		if waited == 0.0:
+			print("selftest: another run holds the lock; waiting for it")
+		await host.get_tree().create_timer(2.0).timeout
+		waited += 2.0
+	if waited > 0.0:
+		print("selftest: lock free after %ds, starting" % int(waited))
 	var f := FileAccess.open(LOCK, FileAccess.WRITE)
 	if f == null:
 		# Cannot write the lock: better to run than to refuse forever on a

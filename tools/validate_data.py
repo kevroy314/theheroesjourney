@@ -764,6 +764,69 @@ def world_pass(report, docs, schema):
                 report.warn("assets/tiles/tiles.json",
                             "%s carries '%s', which nothing reads" % (where, key))
 
+    # And the same for shafts, which have one wrinkle the other two do not: a
+    # `shaft` is optics for a hole, and a hole with nothing to see through it is
+    # not a thing. `light` is not required beside it -- a gap in a roof is dark
+    # at night -- but a shaft whose numbers are nonsense is a window that throws
+    # a beam of length nought, which looks exactly like a window that was never
+    # given the key at all.
+    spec_shaft = spec.get("prop_shaft", {})
+    apertures = set()
+    for prop in tiles["props"]["list"]:
+        shaft = prop.get("shaft")
+        if shaft is None:
+            continue
+        apertures.add(prop["plane"])
+        where = "prop '%s' shaft" % prop["id"]
+        for key in spec_shaft.get("required", []):
+            if key not in shaft:
+                report.error("assets/tiles/tiles.json",
+                             "%s is missing '%s'" % (where, key))
+        for key in ("length", "width"):
+            value = shaft.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) \
+                    or value <= 0:
+                report.error("assets/tiles/tiles.json",
+                             "%s %s is %r; it must be a number greater than 0"
+                             % (where, key, value))
+        for key in ("spread", "bars"):
+            value = shaft.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) \
+                    or value < 0:
+                report.error("assets/tiles/tiles.json",
+                             "%s %s is %r; it must be a number of 0 or more"
+                             % (where, key, value))
+        if "color" in shaft:
+            colour = shaft.get("color")
+            if not isinstance(colour, str) or not hexcolour.match(colour):
+                report.error("assets/tiles/tiles.json",
+                             "%s color is %r; it must be #RRGGBB" % (where, colour))
+        if "intensity" in shaft:
+            value = shaft.get("intensity")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) \
+                    or not 0.0 <= value <= 1.0:
+                report.error("assets/tiles/tiles.json",
+                             "%s intensity is %r; it must be between 0.0 and 1.0"
+                             % (where, value))
+        allowed = spec_shaft.get("required", []) + spec_shaft.get("optional", [])
+        for key in shaft:
+            if key not in allowed:
+                report.warn("assets/tiles/tiles.json",
+                            "%s carries '%s', which nothing reads" % (where, key))
+
+    # An aperture nothing ever places throws no light anywhere. The same is not
+    # worth saying about a lamp -- a lamppost with a density scatters itself --
+    # but every aperture so far is hand-placed on a wall, so one that appears in
+    # no world is a declaration that does nothing and will go on doing nothing.
+    if apertures:
+        planes = zlib.decompress(base64.b64decode(world["props_b64_deflate"]))
+        standing = set(planes)
+        for prop in tiles["props"]["list"]:
+            if prop["plane"] in apertures and prop["plane"] not in standing:
+                report.warn("assets/tiles/tiles.json",
+                            "prop '%s' declares a shaft and stands nowhere in "
+                            "the world" % prop["id"])
+
     order = tiles["order"]
     walkable = tiles["walkable"]
     width, height = int(world["w"]), int(world["h"])

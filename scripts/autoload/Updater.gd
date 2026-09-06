@@ -15,7 +15,16 @@ extends Node
 ## installer needs native code, because Android requires a FileProvider
 ## content:// URI that OS.shell_open cannot produce.
 
+## The update moved from one state to another — checking, downloading, ready.
+## Screens rebuild on this, so it must fire only when the *shape* of what is on
+## screen changes.
 signal state_changed
+## The download advanced. Deliberately separate from state_changed, because a
+## screen must never rebuild itself for a progress bar: HJScreen.refresh() frees
+## every child and builds the page again, so a hundred percent-steps meant a
+## hundred full teardowns, and the visible symptom was the screen flashing
+## through an entire download. Bind this to a bar and leave the page alone.
+signal progress_changed(fraction: float)
 
 enum State { IDLE, CHECKING, UP_TO_DATE, AVAILABLE, DOWNLOADING, READY, FAILED }
 
@@ -161,13 +170,12 @@ func _process(_delta: float) -> void:
 	if total <= 0:
 		return
 	progress = clampf(float(_http.get_downloaded_bytes()) / float(total), 0.0, 1.0)
-	# Whole percent only. Screens rebuild on this signal, and eighty megabytes
-	# at sixty frames a second would be five thousand rebuilds of a settings
-	# page to move one progress bar.
+	# Whole percent only. Even bound to a bar rather than a rebuild there is no
+	# reason to repaint sixty times a second to move one pixel.
 	if absf(progress - _last_progress) < 0.01 and progress < 1.0:
 		return
 	_last_progress = progress
-	state_changed.emit()
+	progress_changed.emit(progress)
 
 
 func _on_apk(result: int, code: int, _headers_out: PackedStringArray, _body: PackedByteArray) -> void:

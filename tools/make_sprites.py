@@ -859,6 +859,7 @@ def main():
             save(ws, "_player_walk.png")
 
     write_animals(save, grounds)
+    write_spite(save, grounds, cels)
 
     # Prove the contract rather than assert it.
     print()
@@ -1379,6 +1380,929 @@ def write_animals(save, grounds):
               % (len(px), min(px), max(px), sum(px) / len(px)))
         if not ok:
             raise SystemExit("ANIMAL CONTRACT FAILED: %s" % name)
+
+
+# --- Spite ----------------------------------------------------------------------
+#
+# The other person in the game, and the first one the player talks to. He is
+# written before he is drawn -- data/content/spite.json and data/dialogue/
+# spite.json are the brief -- so the only job here is not to contradict them.
+#
+# What the writing says, and what each line costs in pixels:
+#
+#   "Because I am what is left over when you talk yourself out of things. There
+#   is a great deal of me. I would like there to be less."
+#
+# He is not a villain and he is not cute. He is the sneer, and the sneer is
+# ashamed of itself. So: THIN, and composed SMALL inside his own portrait, with
+# too much air above his head. A character who wants there to be less of him
+# does not fill his frame.
+#
+#   "Four hundred and six. That's how many times you have opened that door."
+#
+# He is the one who remembers. He has been SITTING on your step for four
+# hundred loops while you walked. So he carries nothing: no pack, no belt kit,
+# no bedroll. The traveller is equipped; Spite is not going anywhere.
+#
+# The two alters, and this is the whole of the portrait spec:
+#
+#   kind  "the one who remembers you"          -- the face doing the OPEN thing
+#   wary  "the one who remembers the endings"  -- the face doing the CLOSED thing
+#
+# Three deliberate inversions of the player, because the reason to draw a second
+# character is to say something the first one cannot:
+#
+#   NO HOOD. The traveller is a hood with a suggestion of a face in it; you have
+#   never seen who you are playing. Spite is a bare head and a whole face,
+#   because he has nothing to keep the weather off and nowhere to be. The
+#   silhouettes therefore differ at the crown, which is the first thing the eye
+#   reads on a 32px figure.
+#
+#   ARMS IN. Every frame of the traveller has arms swinging OUTSIDE his own
+#   outline -- the file above spends a paragraph on why. Spite walks with his
+#   hands in his pockets, elbows out, arms inside the silhouette. Open versus
+#   closed, said in the outline rather than in the face, so it survives the zoom.
+#
+#   THE SCARF, UNTIED. He wears the same object the traveller wears: the one
+#   saturated garment, in the same WARM ramp, at the same place on the body. The
+#   traveller has it wrapped twice at the throat. Spite has it hanging loose in
+#   two uneven ends. Same colour, same cloth, worn as though abandoned -- which
+#   is the shortest way to draw "I am part of you" without drawing your face.
+#
+# That last point is load-bearing for a different reason. The Warden is already
+# "your face, thirty years further on", so a second character built out of the
+# player's face would be the same trick twice. Spite is not the player's face.
+# He is the player's coat.
+#
+# Authored, not generated, and the reasoning is the pipeline skill's own:
+#
+#   The skill's hard finding is that the model cannot hold an identity across
+#   images. TWO PORTRAITS OF ONE MAN IN TWO MOODS IS EXACTLY THAT PROBLEM --
+#   it is the sprite-sheet failure with two cells instead of twelve. Generating
+#   `kind` and `wary` separately buys two different men, and "the same person,
+#   twice" is the entire requirement. Here the two moods are one geometry table
+#   plus a delta, so they cannot drift: same skull, same hair, same nose, same
+#   scarf, by construction.
+#
+#   And every colour on him is mixed from data/themes/firstlight.json, the same
+#   way the traveller and the animals are. A quantised render does not land in
+#   those ramps, and a cast where one member is off-palette reads as a cast with
+#   a guest in it.
+#
+# Quota spent: zero.
+
+PORTRAITS = os.path.join(ROOT, "assets", "portraits")
+
+PW = 56                              # the portrait's logical size...
+PSCALE = 2                           # ...doubled to the 112 the screen asks for
+MOODS = ["kind", "wary"]             # the alter ids in data/content/spite.json
+
+# His hair. The brightest thing on him and the only place he outranks the
+# traveller in value, so the head is what you see first at 3x on dark ground.
+HAIR = [
+    mix(C["muted"], C["text"], 0.42),   # 0  lit -- deliberately no brighter than
+    mix(C["muted"], C["text"], 0.14),   # 1     the traveller's crown specular
+    C["muted"],                         # 2  base
+    mix(C["line"], C["muted"], 0.50),   # 3  shade
+    mix(C["line"], C["bg"], 0.20),      # 4  the deep side, the brows, the fringe
+]
+
+# His skin is the traveller's SKIN with the blood out of it -- literally the
+# same base mix pushed toward `muted`. Same person, worse week.
+# It must also sit BELOW the hair in value. The first cut put the base at luma
+# 160 against hair at 146, so in profile the face was the brightest thing on the
+# figure and read as a beak on a grey skull -- the exact failure the traveller's
+# draw_brow() records. Base 128 now: the hair is the pale cap, the face is the
+# mid tone under it, and the head reads as a head from the side.
+_SSKIN = mix(mix(_SKIN, C["muted"], 0.38), C["bg"], 0.22)
+SSKIN = [
+    mix(_SSKIN, C["text"], 0.22),       # 0  lit -- nose ridge, cheekbone
+    _SSKIN,                             # 1  base
+    mix(_SSKIN, C["bg"], 0.30),         # 2  the shaded side of the face
+    mix(_SSKIN, C["bg"], 0.58),         # 3  under the jaw, in the collar
+    mix(C["bg"], BLACK, 0.30),          # 4  eyes, mouth line
+]
+
+# The coat. The traveller's own COOL ramp, used from the dark end only, so the
+# two of them are cut from one bolt of cloth and Spite is the darker cut.
+COAT_LIT, COAT, COAT_DK, COAT_DEEP = 4, 5, 6, 7
+
+
+# --- the overworld sprite -------------------------------------------------------
+#
+#   y  3..6    hair        a pale cap, 12 wide -- against the traveller's 16-wide
+#                          hood, so the crowns differ before anything else does
+#   y  7..13   face        uncovered. Seven rows: brow, eyes, cheek, nose, mouth,
+#                          jaw, chin
+#   y 14..16   neck        and the scarf's loop
+#   y 17..19   shoulders   18 wide, against the traveller's 22, and rising into
+#                          the neck rather than squaring off -- the hunch
+#   y 20..32   coat        long, straight, no taper. Elbows push the outline out
+#                          at 23..26: hands in pockets, said in the silhouette
+#   y 33..44   legs        12 rows against the traveller's 15, because the coat
+#                          is longer. He shows less leg, so he strides less
+#   y 40..47   shadow
+#
+# He tops out at y3 where the traveller tops out at y1. Two rows shorter, and
+# all of it taken out of the neck.
+
+SP_HEAD_F = [
+    (3, 12, 19), (4, 11, 20), (5, 10, 21), (6, 10, 21),
+    (7, 10, 21), (8, 10, 21), (9, 10, 21), (10, 10, 21),
+    (11, 10, 21), (12, 11, 20), (13, 12, 19),
+]
+SP_NECK_F = [(14, 13, 18), (15, 12, 19), (16, 11, 20)]
+
+SP_BODY_F = [
+    (17, 9, 22), (18, 7, 24), (19, 7, 24),
+    (20, 7, 24), (21, 7, 24), (22, 7, 24),
+    (23, 6, 25), (24, 6, 25), (25, 6, 25), (26, 6, 25),   # elbows
+    (27, 7, 24), (28, 7, 24),
+    (29, 8, 23), (30, 8, 23), (31, 8, 23), (32, 8, 23),
+]
+# The coat is most of him, so where it sits in value decides whether he is
+# legible at all. COOL has a deliberate hole between 43 and 90 -- sand, ice,
+# dune and snow all live in it -- so the body stays at 108 and 90 and only the
+# skirt, the seams and the opening drop through to 43 and 30. Filling the lower
+# half with COAT_DK cost 35% of the figure "lost" on grass; this is 21%.
+SP_BODY_F_K = [COAT_LIT, COAT_LIT, COAT_LIT,
+               COAT_LIT, COAT_LIT, COAT,
+               COAT, COAT, COAT, COAT,
+               COAT, COAT,
+               COAT, COAT, COAT_DK, COAT_DK]
+SP_HEM_F = [(33, 8, 14), (33, 17, 23)]
+
+
+def sp_hair_front(f, dy, back=False):
+    """The cap of hair. Parted and uneven on purpose: a clean edge all the way
+    round reads as a helmet at this size, and he is not wearing one."""
+    for (y, x0, x1) in SP_HEAD_F[:4]:
+        f.row(y + dy, x0, x1, HAIR[2])
+        f.row(y + dy, x0, x0 + 2, HAIR[1])
+        f.px(x0, y + dy, HAIR[0])
+        f.row(y + dy, x1 - 1, x1, HAIR[3])
+    if back:
+        # From behind there is no fringe and no face: hair to the nape, one
+        # part, one cowlick. The head is a pale oval and nothing else -- which
+        # is the whole of the up/down tell above the shoulders.
+        for (y, x0, x1) in SP_HEAD_F[4:]:
+            f.row(y + dy, x0, x1, HAIR[2])
+            f.row(y + dy, x0, x0 + 2, HAIR[1])
+            f.px(x0, y + dy, HAIR[0])
+            f.row(y + dy, x1 - 1, x1, HAIR[3])
+        f.px(12, 4 + dy, HAIR[1])                    # a cowlick off the crown
+        f.px(19, 5 + dy, HAIR[3])
+        f.row(12 + dy, 12, 19, HAIR[3])              # the nape, turning away
+        f.row(13 + dy, 13, 18, HAIR[4])
+        return
+    # The fringe, parted: hair down the temples to the eye line, forehead bare
+    # between them. Two dark bands across a 12-pixel head read as goggles; one
+    # band with a gap in it reads as hair.
+    f.row(7 + dy, 10, 13, HAIR[3])
+    f.row(7 + dy, 18, 21, HAIR[4])
+    f.px(13, 8 + dy, HAIR[4])
+    f.px(18, 8 + dy, HAIR[4])
+    f.col(10, 8 + dy, 10 + dy, HAIR[3])              # temples
+    f.col(21, 8 + dy, 10 + dy, HAIR[4])
+
+
+def sp_face_front(f, dy):
+    """Seven rows of face. The traveller has never shown one, and that is the
+    point: you have played four hundred runs without seeing who you are, and the
+    first face in the game belongs to the part of you that sneers."""
+    for (y, x0, x1) in SP_HEAD_F[4:]:
+        f.row(y + dy, x0, x1, SSKIN[1])
+        f.row(y + dy, x1 - 2, x1, SSKIN[2])          # lit from the north-west
+    f.row(7 + dy, 14, 17, SSKIN[1])                  # the forehead, between the
+    f.px(14, 7 + dy, SSKIN[0])                       # two halves of the fringe
+    f.row(8 + dy, 12, 13, HAIR[3])                   # brows: two pixels each. A
+    f.row(8 + dy, 18, 19, HAIR[3])                   # bar reads as goggles
+    f.row(9 + dy, 12, 13, SSKIN[4])                  # eyes
+    f.row(9 + dy, 18, 19, SSKIN[4])
+    f.px(15, 10 + dy, SSKIN[0])                      # nose, the one lit skin
+    f.px(16, 10 + dy, SSKIN[2])
+    f.row(12 + dy, 15, 16, SSKIN[3])                 # the mouth. Two pixels, and
+    f.px(17, 12 + dy, SSKIN[3])                      # a third at one corner --
+    f.row(13 + dy, 14, 17, SSKIN[2])                 # a wider one is a moustache
+
+
+def sp_scarf(f, dy, front=True):
+    """The traveller's scarf, untied. Wrapped, it is what keeps his throat warm
+    on the mountain; hanging, it is just cloth he has not taken off. Two ends of
+    different lengths, because a tied scarf is even and this one is not."""
+    f.row(15 + dy, 12, 19, WARM[1])
+    f.row(15 + dy, 12, 13, WARM[0])
+    f.row(16 + dy, 11, 20, WARM[2])
+    f.row(16 + dy, 11, 12, WARM[1])
+    f.row(16 + dy, 19, 20, WARM[3])
+    if not front:
+        return
+    for y in range(17, 27):                          # the long end
+        f.row(y + dy, 12, 13, WARM[2])
+        f.px(12, y + dy, WARM[1])
+    f.row(27 + dy, 12, 13, WARM[3])
+    for y in range(17, 23):                          # the short one
+        f.row(y + dy, 18, 19, WARM[3])
+        f.px(18, y + dy, WARM[2])
+
+
+def sp_coat_front(f, dy):
+    """The coat, open, with nothing under it worth showing: a dark column down
+    the middle. The lapels are the only lit line on the body, and they point at
+    the face."""
+    for y in range(19, 33):                          # the opening
+        f.row(y + dy, 15, 16, cool(COAT_DEEP))
+    for i in range(4):                               # lapels
+        f.px(14 - i, 19 + i + dy, cool(COAT_LIT - 1))
+        f.px(17 + i, 19 + i + dy, cool(COAT_DK))
+    # Sleeves: a panel down each side one step darker than the coat, so the arms
+    # read as arms without leaving the silhouette.
+    for y in range(20, 28):
+        f.row(y + dy, 7, 9, cool(COAT_DK))
+        f.px(7, y + dy, cool(COAT))
+        f.row(y + dy, 22, 24, cool(COAT_DEEP))
+    f.row(28 + dy, 8, 9, LEATHER[2])                 # cuffs, going into pockets
+    f.row(28 + dy, 22, 23, LEATHER[3])
+    f.row(29 + dy, 9, 11, cool(COAT_DK))             # the pocket mouths
+    f.row(29 + dy, 20, 22, cool(COAT_DEEP))
+
+
+def sp_coat_back(f, dy):
+    """From behind: one seam, no opening, no lapels, and the same sleeves. The
+    warm note is only the loop at his neck, so the front shows colour down the
+    chest and the back shows a collar -- the same device the traveller's pack
+    plays, in reverse."""
+    f.col(15, 19 + dy, 32 + dy, cool(COAT_DK))
+    f.col(16, 19 + dy, 32 + dy, cool(COAT_DEEP))
+    for y in range(20, 28):
+        f.row(y + dy, 7, 9, cool(COAT_DK))
+        f.px(7, y + dy, cool(COAT))
+        f.row(y + dy, 22, 24, cool(COAT_DEEP))
+    f.row(28 + dy, 8, 9, LEATHER[2])
+    f.row(28 + dy, 22, 23, LEATHER[3])
+    f.row(19 + dy, 10, 21, cool(COAT_LIT - 1))       # the yoke seam
+
+
+def sp_legs_frontal(f, pose, dy):
+    """Twelve rows of leg against the traveller's fifteen. Same contract: the
+    planted boot ends on SOLE, the lifted one is drawn short."""
+    def leg(x0, lift, out):
+        top = 33 + dy
+        bot = SOLE - lift
+        for y in range(top, bot - 3 + 1):
+            f.row(y, x0, x0 + 3, cool(COAT))
+            f.px(x0, y, cool(COAT_LIT))
+            f.px(x0 + 3, y, cool(COAT_DK))
+        for y in range(bot - 2, bot + 1):
+            f.row(y, x0 - out, x0 + 3, LEATHER[1])
+            f.px(x0 - out, y, LEATHER[0])
+        f.row(bot, x0 - out, x0 + 3, LEATHER[2])
+
+    if pose == "neutral":
+        leg(11, 0, 1)
+        leg(17, 0, 0)
+    elif pose == "step_left":
+        leg(10, 0, 1)
+        leg(18, 4, 0)
+    else:
+        leg(10, 4, 1)
+        leg(18, 0, 0)
+
+
+def sp_build_frontal(pose, facing_up):
+    f = Frame()
+    dy = 0 if pose == "neutral" else 1
+    sculpt(f, SP_NECK_F, [COAT_DK] * 3, dy, hi=1, sh=1)
+    sculpt(f, SP_BODY_F, SP_BODY_F_K, dy)
+    sculpt(f, SP_HEM_F, COAT_DEEP, dy)
+    sp_hair_front(f, dy, back=facing_up)
+    if not facing_up:
+        sp_face_front(f, dy)
+    if facing_up:
+        sp_coat_back(f, dy)
+    else:
+        sp_coat_front(f, dy)
+    sp_scarf(f, dy, front=not facing_up)
+    # The coat swings a column against the stride, as the traveller's cloak does.
+    if pose == "step_left":
+        f.col(24, 29 + dy, 32 + dy, cool(COAT_DEEP))
+        f.row(33 + dy, 17, 24, cool(COAT_DEEP))
+    elif pose == "step_right":
+        f.col(7, 29 + dy, 32 + dy, cool(COAT_DK))
+        f.row(33 + dy, 7, 14, cool(COAT_DEEP))
+    sp_legs_frontal(f, pose, dy)
+    return f
+
+
+# --- his profile ----------------------------------------------------------------
+#
+# The traveller's side view is sold by a hood brim jutting two pixels forward.
+# Spite has no brim, so his is sold by the two features a bare head has and a
+# hood hides: a nose that breaks the outline, and a mass of hair behind the
+# skull that the neck does not follow. Both are two-pixel steps, which is what
+# the traveller's file measured as the minimum that survives 3x.
+
+SP_HEAD_P = [
+    (3, 12, 20), (4, 11, 21), (5, 11, 21), (6, 11, 21),
+    (7, 10, 21), (8, 10, 21), (9, 9, 20), (10, 10, 20),
+    (11, 10, 19), (12, 11, 19), (13, 12, 18),
+]
+SP_NECK_P = [(14, 13, 18), (15, 12, 19), (16, 11, 20)]
+SP_BODY_P = [
+    (17, 9, 21), (18, 8, 22), (19, 8, 22),
+    (20, 8, 22), (21, 8, 22), (22, 8, 22),
+    (23, 7, 22), (24, 7, 22), (25, 7, 22), (26, 7, 22),
+    (27, 8, 23), (28, 8, 24),
+    (29, 8, 24), (30, 8, 25), (31, 8, 25), (32, 8, 25),
+]
+SP_BODY_P_K = SP_BODY_F_K
+SP_HEM_P = [(33, 8, 25)]
+
+
+def sp_build_profile(pose):
+    f = Frame()
+    dy = 0 if pose == "neutral" else 1
+    sculpt(f, SP_NECK_P, [COAT_DK] * 3, dy, hi=1, sh=1)
+    sculpt(f, SP_BODY_P, SP_BODY_P_K, dy)
+    sculpt(f, SP_HEM_P, COAT_DEEP, dy)
+
+    # Hair: the whole skull, overhanging the neck at the back.
+    for (y, x0, x1) in SP_HEAD_P:
+        f.row(y + dy, x0, x1, HAIR[2])
+        f.row(y + dy, x1 - 2, x1, HAIR[3])
+        f.px(x1, y + dy, HAIR[4])
+    for (y, x0, x1) in SP_HEAD_P[:3]:
+        f.px(x0, y + dy, HAIR[0])
+        f.px(x0 + 1, y + dy, HAIR[1])
+    # The face: a notch four pixels wide cut out of the front of that hair, and
+    # no wider. The traveller's file records that a lit wedge sticking out of a
+    # pale dome is a bird's head at any zoom; the fix there was to stop lighting
+    # the brim, and the fix here is to stop the skin before it becomes the
+    # silhouette. Only the nose ridge -- one pixel, on the row the outline
+    # already steps forward -- gets the lit tone.
+    f.row(8 + dy, 10, 11, SSKIN[1])                  # brow and eye socket
+    f.px(10, 8 + dy, SSKIN[4])                       # the eye
+    f.row(9 + dy, 9, 11, SSKIN[1])                   # the nose, out one pixel
+    f.px(9, 9 + dy, SSKIN[0])
+    f.px(10, 10 + dy, SSKIN[2])                      # under it, in its own shade
+    f.px(11, 10 + dy, SSKIN[1])
+    f.px(10, 11 + dy, SSKIN[3])                      # the mouth
+    f.px(11, 11 + dy, SSKIN[2])
+    f.row(12 + dy, 11, 12, SSKIN[3])                 # jaw, into the collar
+    f.px(13, 7 + dy, HAIR[4])                        # the fringe over the brow
+
+    f.col(21, 19 + dy, 31 + dy, cool(COAT_DEEP))     # the coat's back seam
+    if pose != "neutral":                            # its skirt, thrown back on
+        for y in range(26, 33):                      # the step frames only
+            t = int(round(3 * (y - 25) / 7.0))
+            f.row(y + dy, 25, 25 + t, cool(COAT_DEEP))
+
+    sp_scarf(f, dy, front=False)
+    for y in range(17, 26):                          # one end, over the chest
+        f.row(y + dy, 9, 10, WARM[2])
+        f.px(9, y + dy, WARM[1])
+    f.row(26 + dy, 9, 10, WARM[3])
+
+    # The near arm, inside the outline, hand in the pocket: a panel with an
+    # elbow that pushes the coat's back edge, not its front.
+    # In a side view the near arm lies OVER the torso, toward the front, not
+    # against the back seam -- the first cut had it at the back and it read as a
+    # satchel, which is the one prop he must not have.
+    # And it CATCHES light rather than losing it. Drawn a step darker than the
+    # coat it lies on, an arm at this size is a black rectangle -- a hole, not a
+    # limb. Lit panel, one dark seam behind it, one at the cuff.
+    ax = {"neutral": 11, "step_left": 10, "step_right": 12}[pose]
+    for y in range(20, 28):
+        f.row(y + dy, ax, ax + 3, cool(COAT_LIT))
+        f.px(ax, y + dy, cool(COAT_LIT - 1))
+        f.px(ax + 4, y + dy, cool(COAT_DEEP))        # the seam behind the arm
+    f.row(28 + dy, ax, ax + 3, LEATHER[2])           # cuff into the pocket
+    f.row(29 + dy, ax + 1, ax + 2, cool(COAT_DEEP))
+
+    # Legs, near and far, with a pixel of daylight between them at rest.
+    if pose == "neutral":
+        near, far, nlift, flift = 11, 16, 0, 0
+    elif pose == "step_left":
+        near, far, nlift, flift = 9, 18, 0, 3
+    else:
+        near, far, nlift, flift = 18, 9, 3, 0
+
+    def leg(x0, lift, shade, toe):
+        top = 33 + dy
+        bot = SOLE - lift
+        for y in range(top, bot - 3 + 1):
+            f.row(y, x0, x0 + 3, cool(COAT + shade))
+            f.px(x0, y, cool(COAT_LIT + shade))
+        for y in range(bot - 2, bot + 1):
+            f.row(y, x0 - toe, x0 + 3, LEATHER[1 + shade])
+            f.px(x0 - toe, y, LEATHER[0 + shade])
+        f.row(bot, x0 - toe, x0 + 3, LEATHER[2])
+
+    leg(far, flift, 1, 0)
+    leg(near, nlift, 0, 2)
+    return f
+
+
+def sp_build(facing, pose):
+    if facing == "down":
+        return sp_build_frontal(pose, False).img
+    if facing == "up":
+        return sp_build_frontal(pose, True).img
+    return sp_build_profile(pose).img
+
+
+def sp_build_all():
+    cels = {}
+    for fa in ("down", "up"):
+        for po in FRAMES:
+            cels[(fa, po)] = sp_build(fa, po)
+    prof = recentre([sp_build("left", po) for po in FRAMES])
+    for po, im in zip(FRAMES, prof):
+        cels[("left", po)] = im
+    for key in list(cels):
+        contact_shadow(rim(cels[key]), rx=9.5, ry=4.0)
+    lb = [cels[("left", po)].getbbox() for po in FRAMES]
+    lc = (min(b[0] for b in lb) + max(b[2] for b in lb) - 1) / 2.0
+    for po in FRAMES:
+        cels[("right", po)] = cels[("left", po)].transpose(Image.FLIP_LEFT_RIGHT)
+    rb = [cels[("right", po)].getbbox() for po in FRAMES]
+    rc = (min(b[0] for b in rb) + max(b[2] for b in rb) - 1) / 2.0
+    shift = int(round(lc - rc))
+    if shift:
+        for po in FRAMES:
+            n = Image.new("RGBA", (FW, FH), CLEAR)
+            n.paste(cels[("right", po)], (shift, 0))
+            cels[("right", po)] = n
+    return cels
+
+
+# --- the dialogue portrait ------------------------------------------------------
+#
+# 112x112, because that is what DialogueScreen._portrait() reserves and has
+# reserved since before there was any art -- the placeholder plate is already
+# that size so the layout would not move when this landed.
+#
+# Drawn at 56 and doubled. That is the one decision here worth defending: 112
+# native pixels would be a finer grain than anything else on the screen -- the
+# world runs 32px tiles at ZOOM 3, so a world pixel is three logical pixels and
+# a native portrait pixel would be one. At 56x2 a portrait pixel is two, which
+# reads as "closer than the world" rather than as "a different game". It also
+# keeps the face inside a budget an authored table can actually fill: 3,136
+# cells, against the traveller's 773.
+#
+# COMPOSITION. He sits low and small with a lot of air over his head. That is
+# not a mistake and it is not framing convention -- it is the line:
+#
+#   "There is a great deal of me. I would like there to be less."
+#
+# A character who says that does not get a heroic bust that fills its plate.
+# Behind him, two faint vertical seams: the door he has his back to.
+#
+# THE TWO MOODS. One geometry table, one delta. Same skull, same hair, same
+# nose, same scarf, same light, same framing -- so they cannot be two different
+# men, which is exactly the failure mode a generated pair would have had. What
+# changes is what a face actually changes:
+#
+#   kind   head level, eyes open three rows, brows level, mouth level and
+#          slightly parted, shoulders down, collar down so the scarf shows.
+#   wary   head sunk one row into shoulders raised two, upper lids down over a
+#          row of each eye, brows ASYMMETRIC -- one up, one down, which is what
+#          a sneer actually is and reads at 112px where a curled lip does not --
+#          mouth pulled up at one corner, collar up over the jaw, face a step
+#          colder.
+#
+# The head moving down while the shoulders move up is worth two rows of pixels
+# and does most of the work: at a glance, before any feature resolves, `wary` is
+# a man with his head pulled in and `kind` is a man with his head out.
+
+# The skull. Twenty-two rows, twenty wide, crown at y12 -- which leaves eleven
+# rows of empty door above his head. That headroom is the line, drawn:
+#
+#   "There is a great deal of me. I would like there to be less."
+#
+# A character who says that does not get a heroic bust that fills its plate.
+P_HEAD = [
+    (12, 22, 33), (13, 20, 35), (14, 19, 36), (15, 18, 37),
+    (16, 18, 37), (17, 18, 37), (18, 18, 37), (19, 18, 37),
+    (20, 18, 37), (21, 18, 37), (22, 18, 37), (23, 18, 37),
+    (24, 18, 37), (25, 18, 37), (26, 19, 36), (27, 19, 36),
+    (28, 20, 35), (29, 20, 35), (30, 21, 34), (31, 22, 33),
+    (32, 23, 32), (33, 25, 30),
+]
+P_HAIRLINE = 20                      # the last row that is hair, not forehead
+P_SHOULDER = 38                      # where the coat starts, four rows under the
+                                     # jaw. The first cut left seven rows of bare
+                                     # neck and he read as a totem pole.
+
+
+class Plate:
+    """A portrait canvas. Opaque, unlike a sprite cel -- a portrait is a picture
+    with a background, not a cut-out."""
+
+    def __init__(self, w, h, base):
+        self.w, self.h = w, h
+        self.img = Image.new("RGBA", (w, h), tuple(base) + (255,))
+
+    def px(self, x, y, c):
+        if 0 <= x < self.w and 0 <= y < self.h:
+            self.img.putpixel((int(x), int(y)), tuple(c) + (255,))
+
+    def row(self, y, x0, x1, c):
+        for x in range(int(x0), int(x1) + 1):
+            self.px(x, y, c)
+
+    def col(self, x, y0, y1, c):
+        for y in range(int(y0), int(y1) + 1):
+            self.px(x, y, c)
+
+    def box(self, x0, y0, x1, y1, c):
+        for y in range(int(y0), int(y1) + 1):
+            self.row(y, x0, x1, c)
+
+
+def sk(i):
+    return SSKIN[max(0, min(len(SSKIN) - 1, i))]
+
+
+def p_ground(p):
+    """The door he has his back to. Two plank seams, a rail, and a lift in the
+    value where the head will be -- so a dark coat has something to be dark
+    against and he is somewhere rather than nowhere."""
+    for y in range(p.h):
+        t = 1.0 - abs(y - 22) / 44.0
+        base = mix(C["bg"], C["panel"], 0.26 + 0.34 * max(0.0, t))
+        for x in range(p.w):
+            u = (x - 27.5) / 31.0
+            p.px(x, y, mix(base, C["bg"], min(1.0, u * u * 1.7)))
+    for x in (8, 46):
+        p.col(x, 0, p.h - 1, mix(C["bg"], C["line"], 0.22))
+        p.col(x + 1, 0, p.h - 1, mix(C["bg"], BLACK, 0.14))
+    p.row(7, 9, 45, mix(C["bg"], C["line"], 0.16))          # a rail across it
+    p.row(8, 9, 45, mix(C["bg"], BLACK, 0.14))
+
+
+def p_coat(p, dy, collar_up):
+    """Coat, collar and the untied scarf. Everything below the jaw.
+
+    It runs off all three lower edges of the plate. A bust floating clear of its
+    own frame is a cut-out; one that leaves the picture is a person sitting in
+    front of you, which is where the conversation says he is."""
+    yoke = [(38, 18, 37), (39, 15, 40), (40, 12, 43), (41, 9, 46),
+            (42, 6, 49), (43, 3, 52)]
+    for (y, x0, x1) in yoke:
+        p.row(y + dy, x0, x1, cool(COAT))
+        p.row(y + dy, x0, x0 + 5, cool(COAT_LIT))
+        p.row(y + dy, x1 - 6, x1, cool(COAT_DK))
+    for y in range(44, 56):
+        p.row(y + dy, 0, p.w - 1, cool(COAT))
+        p.row(y + dy, 0, 8, cool(COAT_LIT))
+        p.row(y + dy, 44, p.w - 1, cool(COAT_DK))
+    p.row(43 + dy, 3, 52, cool(COAT_LIT))                   # the shoulder's edge
+    p.row(43 + dy, 40, 52, cool(COAT_DK))
+
+    # The collar: two lapels with a hard seam either side, standing higher and
+    # closer to the throat when he is closed. Drawn as widening wedges of the
+    # same cool ramp they lie on, they vanished -- a lapel at this size is its
+    # SEAMS, not its shading.
+    top = 33 if collar_up else 37
+    for i, y in enumerate(range(top, 56)):
+        w = min(12, 1 + i)
+        p.row(y + dy, 25 - w, 25, cool(COAT_LIT))
+        p.px(25 - w, y + dy, cool(COAT_DEEP))
+        p.px(25, y + dy, cool(COAT_DEEP))
+        p.row(y + dy, 30, 30 + w, cool(COAT_DK))
+        p.px(30 + w, y + dy, cool(COAT_DEEP))
+        p.px(30, y + dy, cool(COAT_DEEP))
+
+    # The neck: four rows, and dark. It is a hollow between two lapels, not a
+    # column holding up a head.
+    p.box(24, 34 + dy, 31, top + 1 + dy, sk(3))
+    p.box(24, 34 + dy, 26, top + 1 + dy, sk(2))
+    p.row(34 + dy, 24, 31, sk(4))                           # the jaw's shadow
+
+    # The scarf: the traveller's own garment, untied. A loop round the throat
+    # and two ends of different lengths, one longer than the plate, with the
+    # coat's dark opening showing between them.
+    #
+    # Small. The first cut widened it a pixel a row and he was wearing a bib --
+    # the accent is 6% of the traveller by area and it has to stay about that
+    # here, or the one saturated thing in a cold palette becomes the subject.
+    ly = top + 1
+    for i, y in enumerate(range(ly, ly + 4)):
+        w = 4 + min(i, 2)
+        p.row(y + dy, 27 - w, 28 + w, WARM[1])
+        p.row(y + dy, 27 - w, 29 - w, WARM[0])
+        p.row(y + dy, 26 + w, 28 + w, WARM[2])
+    for i, y in enumerate(range(ly + 4, 56)):               # the long end
+        x0 = 22 - i // 5
+        p.row(y + dy, x0, x0 + 4, WARM[2])
+        p.row(y + dy, x0, x0 + 1, WARM[1])
+        p.px(x0 + 4, y + dy, WARM[3])
+    for y in range(ly + 4, min(56, ly + 11)):               # the short one
+        p.row(y + dy, 30, 33, WARM[3])
+        p.row(y + dy, 30, 31, WARM[2])
+
+
+def p_head(p, dy, warm):
+    """Skull, hair, nose and the flat of the face. Identical in both moods --
+    every difference between them lives in the three functions below."""
+    for (y, x0, x1) in P_HEAD:
+        if y <= P_HAIRLINE:
+            continue
+        p.row(y + dy, x0, x1, sk(1 - warm))
+        p.row(y + dy, x0, x0 + 2, sk(0 - warm))       # lit from the north-west
+        p.row(y + dy, x1 - 3, x1, sk(2 - warm))
+        p.px(x1, y + dy, sk(3 - warm))
+    for (y, x0, x1) in P_HEAD:                        # the cap of hair
+        if y > P_HAIRLINE:
+            break
+        p.row(y + dy, x0, x1, HAIR[2])
+        p.row(y + dy, x0, x0 + 3, HAIR[1])
+        p.row(y + dy, x0, x0 + 1, HAIR[0])
+        p.row(y + dy, x1 - 4, x1, HAIR[3])
+        p.px(x1, y + dy, HAIR[4])
+    for (y, x0, x1) in P_HEAD:                        # temples, past the eye
+        if not (P_HAIRLINE < y <= 26):
+            continue
+        p.row(y + dy, x0, x0 + 1, HAIR[3])
+        p.row(y + dy, x1 - 1, x1, HAIR[4])
+    # The fringe: an uneven edge, cut by nobody. A straight one is a helmet.
+    for x, drop in ((19, 2), (20, 3), (21, 1), (23, 2), (24, 3), (26, 1),
+                    (28, 2), (29, 1), (31, 2), (32, 3), (34, 1), (35, 2),
+                    (36, 1)):
+        for k in range(drop):
+            p.px(x, P_HAIRLINE + 1 + k + dy, HAIR[3] if x < 27 else HAIR[4])
+    # The nose: a lit ridge and a shaded flank, then a tip with two nostrils.
+    # Drawn as two full-length columns it was a bar down the middle of the face.
+    p.col(27, 24 + dy, 27 + dy, sk(0 - warm))
+    p.col(28, 25 + dy, 28 + dy, sk(2 - warm))
+    p.row(28 + dy, 26, 29, sk(0 - warm))
+    p.px(25, 28 + dy, sk(3))                          # nostrils
+    p.px(30, 28 + dy, sk(3))
+    p.px(25, 29 + dy, sk(2 - warm))                   # and the crease beside
+    p.px(30, 29 + dy, sk(2 - warm))                   # each -- a full row of
+                                                      # shade here runs into the
+                                                      # mouth and makes a muzzle
+    # Cheekbone and jaw, so the head is a solid and not a disc. Along the edge,
+    # not a patch in the middle of it.
+    for y in range(25, 31):
+        p.row(y + dy, 34, 36, sk(2 - warm))
+    p.px(33, 27 + dy, sk(2 - warm))
+    p.px(33, 28 + dy, sk(2 - warm))
+    p.px(22, 29 + dy, sk(2 - warm))                   # under the cheekbones, so
+    p.px(33, 29 + dy, sk(2 - warm))                   # the jaw is narrower than
+    p.px(23, 30 + dy, sk(2 - warm))                   # the cheekbone above it
+    p.px(32, 30 + dy, sk(2 - warm))
+    p.row(32 + dy, 25, 30, sk(2 - warm))              # under the lip
+    p.row(33 + dy, 26, 29, sk(3))                     # the chin, turning under
+
+
+def p_eyes(p, dy, lid, warm):
+    """Four pixels wide, three rows tall, two of pupil and one of white either
+    side. The lid coming down over the top row is the whole of the difference
+    between a man looking at you and a man who has already decided how it goes.
+    """
+    for x0 in (21, 31):
+        p.row(23 + dy, x0 - 1, x0 + 4, sk(2 - warm))     # the socket
+        p.box(x0, 24 + dy, x0 + 3, 25 + dy, sk(0))       # the whites
+        p.box(x0 + 1, 24 + dy, x0 + 2, 25 + dy, sk(4))   # iris and pupil
+        p.row(26 + dy, x0 - 1, x0 + 4, sk(1 - warm))     # lower lid, catching
+        if lid:
+            p.row(24 + dy, x0, x0 + 3, sk(3))
+            p.px(x0 + 1, 24 + dy, sk(4))
+            p.px(x0 + 2, 24 + dy, sk(4))
+        else:
+            p.px(x0 + 1, 24 + dy, C["text"])             # one pixel of catchlight
+
+
+def p_brows(p, dy, base, tilt):
+    """Two rows of hair over each eye, the lower one inset so the brow tapers
+    instead of sitting there as a bar. `tilt` is per-brow: one of them a row
+    higher than the other is a raised eyebrow, and that -- not a curled lip --
+    is what a sneer looks like from across a doorstep."""
+    for (x0, x1, t) in ((20, 25, tilt[0]), (30, 35, tilt[1])):
+        y = base + t
+        p.row(y + dy, x0, x1, HAIR[3])
+        p.row(y + 1 + dy, x0 + 2, x1 - 2, HAIR[4])
+        p.px(x0, y + dy, HAIR[2])
+
+
+def p_mouth(p, dy, curl, warm):
+    """A flat line and nothing under it. It is never a smile in either mood --
+    `kind` is open, not happy -- so the whole expression is the corner.
+
+    Two rows of it with a lit lower lip gave him teeth and a grin. One row, the
+    darkest value only in the middle of it, and for the sneer the whole right
+    half lifted a row rather than a hook stuck on the end."""
+    if curl:
+        p.row(30 + dy, 24, 31, sk(3))
+        p.row(30 + dy, 26, 29, sk(4))
+        p.px(31, 29 + dy, sk(3))                      # two pixels of corner,
+        p.px(32, 29 + dy, sk(3))                      # up. Lifting the whole
+        p.px(24, 31 + dy, sk(3))                      # right half instead put
+                                                      # a moustache under his
+                                                      # nose at 1:1
+    else:
+        p.row(30 + dy, 24, 31, sk(3))
+        p.row(30 + dy, 26, 29, sk(4))
+        p.px(24, 30 + dy, sk(2 - warm))
+        p.px(31, 30 + dy, sk(2 - warm))
+        p.row(31 + dy, 26, 29, sk(2 - warm))
+
+
+# The delta, and the whole of it. Note what is NOT in here: the light. Both
+# halves are the same man in the same doorway at the same hour, so dimming
+# `wary` a step -- which the first cut did -- bought a corpse rather than a
+# mood. Every difference below is geometry.
+MOOD = {
+    # head, shoulders, lid, brow row, brow tilt (left, right), curl
+    "kind": dict(hdy=0, sdy=0, lid=0, brow=20, tilt=(0, 0), curl=0, warm=1),
+    "wary": dict(hdy=1, sdy=-2, lid=1, brow=21, tilt=(0, -1), curl=1, warm=1),
+}
+
+
+def portrait(mood):
+    m = MOOD[mood]
+    p = Plate(PW, PW, C["bg"])
+    p_ground(p)
+    p_coat(p, m["sdy"], collar_up=bool(m["lid"]))
+    p_head(p, m["hdy"], m["warm"])
+    p_brows(p, m["hdy"], m["brow"], m["tilt"])
+    p_eyes(p, m["hdy"], m["lid"], m["warm"])
+    p_mouth(p, m["hdy"], m["curl"], m["warm"])
+    return p.img.resize((PW * PSCALE, PW * PSCALE), Image.NEAREST)
+
+
+# --- output ---------------------------------------------------------------------
+
+def spite_contact(sheet, scale=4):
+    pad_l, pad_t = 44, 16
+    big = sheet.resize((sheet.width * scale, sheet.height * scale), Image.NEAREST)
+    out = Image.new("RGBA", (big.width + pad_l + 8, big.height + pad_t + 8),
+                    mix(C["bg"], BLACK, 0.35) + (255,))
+    out.alpha_composite(big, (pad_l, pad_t))
+    d = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    rule = C["line"] + (255,)
+    for c in range(len(FRAMES) + 1):
+        x = pad_l + c * FW * scale
+        d.line([(x, pad_t), (x, pad_t + big.height)], fill=rule)
+    for r in range(len(FACINGS) + 1):
+        y = pad_t + r * FH * scale
+        d.line([(pad_l, y), (pad_l + big.width, y)], fill=rule)
+    for c, name in enumerate(FRAMES):
+        d.text((pad_l + c * FW * scale + 2, 3), "%d %s" % (c, name),
+               fill=C["muted"] + (255,), font=font)
+    for r, name in enumerate(FACINGS):
+        d.text((3, pad_t + r * FH * scale + 4), name,
+               fill=C["muted"] + (255,), font=font)
+    return out
+
+
+def side_by_side(cels, other, grounds, zoom=3):
+    """Spite beside the traveller on every ground, at the zoom the game runs at.
+    Two characters in one world is the only test that matters for a second
+    character: he has to be legible AND he has to not be the first one."""
+    cw, ch = 96, 80
+    pad_l, pad_t = 48, 14
+    out = Image.new("RGBA",
+                    (pad_l + len(FACINGS) * cw * zoom + 8,
+                     pad_t + len(grounds) * ch * zoom + 8),
+                    mix(C["bg"], BLACK, 0.35) + (255,))
+    d = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    for r, (name, _i, gm, tile) in enumerate(grounds):
+        for c, fa in enumerate(FACINGS):
+            cell = ground_patch(tile, cw, ch).convert("RGBA")
+            cell.alpha_composite(other[(fa, "neutral")], (12, ch - 48))
+            cell.alpha_composite(cels[(fa, "neutral")], (52, ch - 48))
+            out.alpha_composite(cell.resize((cw * zoom, ch * zoom), Image.NEAREST),
+                                (pad_l + c * cw * zoom, pad_t + r * ch * zoom))
+        d.text((3, pad_t + r * ch * zoom + 4), "%s\n%.0f" % (name[:11], gm),
+               fill=C["muted"] + (255,), font=font)
+    for c, fa in enumerate(FACINGS):
+        d.text((pad_l + c * cw * zoom + 3, 3), "%s   you / him" % fa,
+               fill=C["muted"] + (255,), font=font)
+    return out
+
+
+def portrait_contact(plates):
+    """Both moods at 1:1 on the real panel colour -- which is the check that
+    matters, because a face that only works at 5x is not a portrait -- and again
+    at 4x with the two overlaid in difference, which is where you see that they
+    are one person."""
+    pad, gap, zoom = 20, 24, 4
+    w = pad * 2 + max(112 * 2 + gap, (112 * zoom) * 2 + gap)
+    h = pad * 3 + 112 + 112 * zoom + 30
+    out = Image.new("RGBA", (w, h), tuple(C["bg"]) + (255,))
+    d = ImageDraw.Draw(out)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    for i, mood in enumerate(MOODS):
+        x = pad + i * (112 + gap)
+        panel = Image.new("RGBA", (112 + 8, 112 + 8), tuple(C["panel_alt"]) + (255,))
+        ImageDraw.Draw(panel).rectangle([0, 0, 119, 119], outline=C["accent"] + (255,))
+        out.alpha_composite(panel, (x - 4, pad - 4))
+        out.alpha_composite(plates[mood], (x, pad))
+        d.text((x, pad + 116), "%s  1:1 (112px, as shipped)" % mood,
+               fill=C["muted"] + (255,), font=font)
+    y = pad * 2 + 112 + 24
+    for i, mood in enumerate(MOODS):
+        big = plates[mood].resize((112 * zoom, 112 * zoom), Image.NEAREST)
+        out.alpha_composite(big, (pad + i * (112 * zoom + gap), y))
+        d.text((pad + i * (112 * zoom + gap), y - 12), mood,
+               fill=C["muted"] + (255,), font=font)
+    return out
+
+
+def write_spite(save, grounds, player_cels):
+    cels = sp_build_all()
+    sheet = Image.new("RGBA", (FW * len(FRAMES), FH * len(FACINGS)), CLEAR)
+    for r, fa in enumerate(FACINGS):
+        for c, po in enumerate(FRAMES):
+            sheet.paste(cels[(fa, po)], (c * FW, r * FH))
+    save(sheet, "spite.png")
+    save(spite_contact(sheet), "_spite_x4.png")
+    if grounds:
+        save(side_by_side(cels, player_cels, grounds), "_spite_ground.png")
+        ws = walk_strip(cels, grounds)
+        if ws is not None:
+            save(ws, "_spite_walk.png")
+
+    os.makedirs(PORTRAITS, exist_ok=True)
+    written = []
+    plates = {}
+    for mood in MOODS:
+        plates[mood] = portrait(mood)
+        name = "spite_%s.png" % mood
+        plates[mood].save(os.path.join(PORTRAITS, name))
+        written.append(name)
+    pc = portrait_contact(plates)
+    pc.save(os.path.join(PORTRAITS, "_spite_portraits.png"))
+    written.append("_spite_portraits.png")
+
+    print()
+    print("spite.png  %dx%d  =  %d cols x %d rows of %dx%d   (player's layout)"
+          % (sheet.width, sheet.height, len(FRAMES), len(FACINGS), FW, FH))
+    ok = True
+    for fa in FACINGS:
+        boxes = [cels[(fa, po)].getbbox() for po in FRAMES]
+        body = []
+        for po in FRAMES:
+            im = cels[(fa, po)]
+            rowsy = [y for y in range(FH)
+                     if any(im.getpixel((x, y))[3] == 255 for x in range(FW))]
+            body.append((min(rowsy), max(rowsy)))
+        feet = {b[1] for b in body}
+        x0, x1 = min(b[0] for b in boxes), max(b[2] for b in boxes) - 1
+        centre = (x0 + x1) / 2.0
+        stable = len(feet) == 1
+        ok = ok and stable and abs(centre - CX) <= 0.5 and x0 >= 1 and x1 <= FW - 2
+        print("  %-6s bbox x %d..%d  centre %.1f   figure y %d..%d   sole row %s"
+              % (fa, x0, x1, centre, min(b[0] for b in body),
+                 max(b[1] for b in body),
+                 "%d stable" % feet.pop() if stable else "MOVES %s" % sorted(feet)))
+    st, rows = legibility(cels, grounds) if grounds else (
+        sprite_stats(cels[("down", "neutral")]), [])
+    pst = sprite_stats(player_cels[("down", "neutral")])
+    print()
+    print("  figure: %d opaque px   luma min %.0f / p50 %.0f / p90 %.0f / max %.0f"
+          "   MEAN %.1f  (traveller %.1f)"
+          % (st["n"], st["lo"], st["p50"], st["p90"], st["hi"], st["mean"],
+             pst["mean"]))
+    def _w(im):
+        cols = [x for x in range(FW)
+                if any(im.getpixel((x, y))[3] == 255 for y in range(FH))]
+        return max(cols) - min(cols) + 1
+    print("  shoulders: %d px across against the traveller's %d, and %d rows of"
+          " figure against %d -- narrower, and hunched"
+          % (_w(cels[("down", "neutral")]), _w(player_cels[("down", "neutral")]),
+             44 - 2, 44 - 0))
+    if rows:
+        worst = max(rows, key=lambda r: r[5])
+        print("  %-13s %6s %8s %7s %7s %7s"
+              % ("ground", "luma", "delta", "lit", "dark", "lost"))
+        for name, gm, dl, lit, dark, lost in rows:
+            print("  %-13s %6.1f %+8.1f %6.1f%% %6.1f%% %6.1f%%"
+                  % (name, gm, dl, lit * 100, dark * 100, lost * 100))
+        print("  worst ground: %s -- %.0f%% light, %.0f%% dark, %.0f%% lost"
+              % (worst[0], worst[3] * 100, worst[4] * 100, worst[5] * 100))
+    print()
+    print("  portraits %dx%d (%d logical x%d): %s"
+          % (PW * PSCALE, PW * PSCALE, PW, PSCALE, ", ".join(written)))
+    diff = sum(1 for a, b in zip(plates["kind"].getdata(), plates["wary"].getdata())
+               if a != b) / float(PW * PSCALE * PW * PSCALE)
+    print("  kind vs wary: %.1f%% of pixels differ -- one man, two faces" % (diff * 100))
+    if not ok:
+        raise SystemExit("SPITE CONTRACT FAILED")
 
 
 if __name__ == "__main__":

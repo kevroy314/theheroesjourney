@@ -28,9 +28,9 @@ const ZOOM := 3                     ## the character is ~4mm tall at 1:1 on a ph
 ## purpose: 0,1,2 gives a limp, because there is no neutral to pass through.
 const CYCLE := [1, 0, 2, 0]
 
-## Preloaded rather than given a class_name: the art ships beside its own
-## helper, and nothing outside this renderer has any use for it.
-const AnomalyArt := preload("res://assets/anomaly/AnomalyArt.gd")
+## Preloaded rather than given a class_name: the portal ships its own helper,
+## and nothing outside this renderer has any use for it.
+const Portal := preload("res://scripts/ui/Portal.gd")
 
 const FACINGS := {
 	Vector2i.DOWN: 0, Vector2i.UP: 1, Vector2i.LEFT: 2, Vector2i.RIGHT: 3,
@@ -61,7 +61,18 @@ var _held := Vector2i.ZERO           ## direction the player is holding
 ## per step rather than per frame so a buff landing mid-tile does not stretch or
 ## snap the stride already in progress; it takes effect on the next tile.
 var _step_time := 0.17
-var _anomalies := AnomalyArt.new()
+var _portals := Portal.new()
+## Anomalies by the row they stand on: y -> Array of Vector3i(x, y, tier).
+##
+## Resolved once, because a portal is drawn from the row loop and the row loop
+## must not pay for it. Asking world.anomaly_tier() per visible cell was a
+## dictionary probe on every one of the ~250 cells in view every frame, to find
+## the nought or one of them that is actually there; there are twenty-nine
+## anomalies in a 256x256 world, so indexing them by row turns that into one
+## probe per visible *row*. It is also what makes the portal's overscan free:
+## reaching three tiles further out costs six more row lookups, not two hundred
+## more cell lookups.
+var _anomaly_rows: Dictionary = {}
 
 ## The lit world. A child node rather than part of _draw, because a CanvasItem
 ## has one material and this pass needs its own — see HJLightOverlay. Null when
@@ -116,9 +127,13 @@ func _init(run_ref: HJRun, start: Vector2i = Vector2i(-1, -1)) -> void:
 	for spawn in world.anomalies:
 		var entry: Dictionary = spawn
 		var at := Vector2i(int(entry.get("x", 0)), int(entry.get("y", 0)))
+		var tier := int(entry.get("tier", 0))
 		_anomaly_lights.append(Vector4(float(at.x), float(at.y),
-			HJLighting.ANOMALY_RADIUS + 0.5 * float(int(entry.get("tier", 0))),
+			HJLighting.ANOMALY_RADIUS + 0.5 * float(tier),
 			HJLighting.phase_for(at)))
+		if not _anomaly_rows.has(at.y):
+			_anomaly_rows[at.y] = []
+		(_anomaly_rows[at.y] as Array).append(Vector3i(at.x, at.y, tier))
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	clip_contents = true
@@ -180,7 +195,15 @@ func _process(delta: float) -> void:
 			node_entered.emit(arrived)
 	if _held != Vector2i.ZERO:
 		_try_move(_held)
-	_anomalies.advance(delta)
+	_portals.advance(delta)
+	# A collapse that has played out is a cleared anomaly: it stops being drawn
+	# and its glow stops being gathered, which is the visible half of the fact
+	# the run already records. Costs one empty dictionary walk on a frame where
+	# nothing is closing, which is every frame but about seventy of them.
+	if _portals.closing_any():
+		for cell in _portals.done():
+			_cleared[cell] = true
+			_portals.forget(cell)
 	queue_redraw()
 
 
@@ -419,7 +442,14 @@ var _cleared: Dictionary = {}
 
 
 func collapse_anomaly(cell: Vector2i) -> void:
-	_anomalies.collapse(cell)
+	# Taken back out of the cleared set on purpose. The set is seeded from
+	# run.anomalies_cleared, and the only caller is the screen replaying the
+	# close for an anomaly you just finished — which is in that set by
+	# definition, so without this the one shot ran for a portal that was already
+	# being skipped and the consequence you were meant to see never drew a
+	# pixel. Harvesting in _process puts it back when the shot has played.
+	_cleared.erase(cell)
+	_portals.collapse(cell)
 
 
 func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
@@ -432,10 +462,27 @@ func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 	var homes := Critters.home_cells()
 	var here := _cell.y
 	var drawn_character := false
-	for y in range(maxi(0, first.y - 1), mini(world.h, last.y + 3)):
+	# Two ranges, not one. Props are 64x96 anchored on their cell, so one row of
+	# overscan covers them; a portal is a 4x3-tile object centred on its cell and
+	# needs REACH more at each end or it pops in as you walk towards it. Only the
+	# portal scan runs in the extra band — the prop body is skipped there, so the
+	# wider loop costs a row lookup and a comparison per extra row.
+	var top := maxi(0, first.y - 1)
+	var bottom := mini(world.h, last.y + 3)
+	for y in range(maxi(0, top - Portal.REACH_Y),
+			mini(world.h, bottom + Portal.REACH_Y)):
 		if not drawn_character and y > here:
 			_draw_character(cam)
 			drawn_character = true
+		# Drawn from inside the Y-sorted row loop rather than as a child node,
+		# which is the whole reason this is drawn at all rather than shaded: a
+		# Control's children draw after the parent's entire _draw, so a shaded
+		# quad would either hide under the ground or paint over the character's
+		# legs. Here a tear on his row is behind him — he stands *in* it, which
+		# is what the reference is of — and one to his south is in front.
+		_draw_portals(y, cam, first.x, last.x)
+		if y < top or y >= bottom:
+			continue
 		# On the row *above*, for the same reason the character is: an actor
 		# standing on row R must be in front of everything on row R and behind
 		# everything on row R+1, so it is drawn as the loop leaves its row.
@@ -444,16 +491,6 @@ func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 			if int((view["cell"] as Vector2i).y) + 1 == y:
 				_draw_critter(view, cam)
 		for x in range(maxi(0, first.x - 1), mini(world.w, last.x + 2)):
-			# Drawn from inside the Y-sorted row loop rather than as a child node,
-			# which is the whole reason this is a sprite strip and not a shader: a
-			# Control's children draw after the parent's entire _draw, so a shaded
-			# quad would either hide under the ground or paint over the character's
-			# legs. Here a tear on his row is behind him and one to his south is in
-			# front, which is what a hole in the ground has to do.
-			var tier := world.anomaly_tier(x, y)
-			if tier >= 0 and not _cleared.has(Vector2i(x, y)):
-				_anomalies.draw_at(self, Vector2i(x, y), tier, cam, TILE, ZOOM)
-
 			var plane := world.prop_at(x, y)
 			if plane == 0:
 				continue
@@ -484,6 +521,25 @@ func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 				_draw_prop_moving(slot, at, spec, Vector2i(x, y))
 	if not drawn_character:
 		_draw_character(cam)
+
+
+## Every portal standing on one row, culled to the columns in view.
+##
+## The row index is walked rather than the cells: almost every row has none, and
+## the ones that do have one.
+func _draw_portals(y: int, cam: Vector2, first_x: int, last_x: int) -> void:
+	var row: Variant = _anomaly_rows.get(y)
+	if row == null:
+		return
+	for entry in row as Array:
+		var e: Vector3i = entry
+		if e.x < first_x - Portal.REACH_X or e.x > last_x + Portal.REACH_X:
+			continue
+		var cell := Vector2i(e.x, e.y)
+		if _cleared.has(cell):
+			continue
+		_portals.draw_at(self, cell, e.z, cam, TILE, ZOOM, _mnow,
+			cell == _cell and not _moving)
 
 
 ## Sheets are loaded on first sight rather than in _ready: which animals exist

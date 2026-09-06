@@ -1720,6 +1720,17 @@ def mkramp(hue, mean, spread):
 # so an object reads as an object at a glance and at arm's length.
 PP = {
     "wood":    mkramp(_hue((C["accent"], 1.0), (C["line"], 1.2)), 46, 36),
+    # Indoor timber, and brighter than outdoor wood on purpose. §2.6 asks a prop
+    # to reach 110-135 against a ground plane of 24-46; `wood` tops out at 78,
+    # which is fine for a fencepost on grass and is why a table on a board floor
+    # of the same hue read as a stain. This ramp is the furniture's, and only the
+    # furniture's -- tree trunks and gate rails still use `wood`.
+    "timber":  mkramp(_hue((C["accent"], 1.0), (C["line"], 1.2)), 68, 54),
+    # Bedding. The player opens their eyes on this, so it is the one prop that
+    # has to read before anything else does: a warm quilt near the top of the
+    # value range and linen brighter still, against a plank floor at 40.
+    "quilt":   mkramp(_hue((C["danger"], 1.0), (C["accent"], 0.7)), 72, 50),
+    "linen":   mkramp(_hue((C["muted"], 1.0), (C["accent"], 0.5)), 104, 32),
     "bark":    mkramp(_hue((C["accent"], 1.0), (C["line"], 2.0)), 36, 32),
     "leaf":    mkramp(_hue((C["good"], 1.0), (C["accent_2"], 0.25)), 52, 46),
     "leaf_dry": mkramp(_hue((C["good"], 1.0), (C["warn"], 1.1)), 46, 42),
@@ -2190,204 +2201,362 @@ def b_box(img, rng, p):
         for dx in range(-w, w + 1):
             pp_(img, dx, dy, pal["dark"] if dx > 0 else pal["base"])
     for dy in range(d):
-        span = int(w * math.sqrt(max(0.0, 1.0 - ((dy - d / 2.0) / (d / 2.0 + 0.5)) ** 2)))
+        if p.get("square"):
+            # A flat lid seen in the same three-quarter view as every other top
+            # surface: full width, and lit toward the north edge. A chest drawn
+            # with an elliptical top is a barrel with a lock on it.
+            span, t = w - (d - 1 - dy) // 3, dy / float(max(1, d - 1))
+            c = pal["tip"] if t > 0.75 else (pal["lit"] if t > 0.25 else pal["mid"])
+        else:
+            span = int(w * math.sqrt(max(0.0, 1.0 - ((dy - d / 2.0) / (d / 2.0 + 0.5)) ** 2)))
+            c = None
         for dx in range(-span, span + 1):
-            pp_(img, dx, h + dy - 1, pal["lit"] if dx < 0 else pal["mid"])
+            pp_(img, dx, h + dy - 1,
+                c if c is not None else (pal["lit"] if dx < 0 else pal["mid"]))
     if p.get("bands"):
-        for dy in (2, h - 3):
+        for dy in (2, 3, h - 4, h - 3):
             for dx in range(-w, w + 1):
-                pp_(img, dx, dy, PP["metal"]["mid"] if dx < 0 else PP["metal"]["dark"])
+                pp_(img, dx, dy, PP["metal"]["lit"] if dx < -w // 3 else
+                    (PP["metal"]["dark"] if dx > w // 3 else PP["metal"]["mid"]))
     if p.get("slats"):
         for dx in range(-w + 2, w, 3):
             for dy in range(h):
                 pp_(img, dx, dy, pal["deep"])
     if p.get("lid"):
-        for dx in range(-w, w + 1):
+        for dx in range(-w, w + 1):                # the band the lid closes on
             pp_(img, dx, h - 1, PP["metal"]["dark"])
-        pp_(img, 0, h - 3, PP["gold"]["tip"])
+            pp_(img, dx, h - 2, PP["metal"]["deep"])
+        for dx in (-w + 2, w - 2):                 # the corner straps
+            for dy in range(h):
+                pp_(img, dx, dy, PP["metal"]["mid"] if dx < 0 else PP["metal"]["dark"])
+        for dy in range(h - 6, h - 1):             # the lock plate
+            for dx in range(-2, 3):
+                pp_(img, dx, dy, PP["gold"]["tip"] if dy == h - 4 and abs(dx) < 2
+                    else PP["gold"]["base"])
     return w
+
+
+def _slab(img, x0, x1, y0, y1, pal, top="lit"):
+    """A horizontal surface seen from above.
+
+    Lit along its north edge and falling to base at the south, which is the
+    `cap` half of the cap-and-face pair the wall set uses. A tabletop drawn as
+    one flat colour reads as a rectangle; drawn as a ramp it reads as a plane
+    with a thickness, and that is the whole difference between furniture and
+    a sticker.
+    """
+    span = max(1, y1 - y0)
+    for dy in range(y0, y1 + 1):
+        t = (dy - y0) / float(span)
+        # Bright, and mostly bright. A horizontal surface in a top-down scene is
+        # the plane facing the light, so a tabletop that shades from `base` to
+        # `lit` reads as the FRONT of a cupboard instead: the whole point of the
+        # cap-and-face pair is that the cap is the light half.
+        c = pal["tip"] if t > 0.86 else (pal[top] if t > 0.20 else pal["mid"])
+        for dx in range(x0, x1 + 1):
+            pp_(img, dx, dy, c)
+
+
+def _face(img, x0, x1, y0, y1, pal):
+    """The vertical front of a carcass: lit on the west, dark on the east, and
+    the deep line along the floor that stops it from floating."""
+    for dy in range(y0, y1 + 1):
+        for dx in range(x0, x1 + 1):
+            c = pal["base"] if dx < 0 else pal["dark"]
+            if dy < y0 + 2:
+                c = pal["deep"]
+            pp_(img, dx, dy, c)
+
+
+def _legs(img, xs, y0, y1, pal, w=2):
+    for x in xs:
+        for dy in range(y0, y1 + 1):
+            for k in range(w):
+                pp_(img, x + k, dy, pal["dark"] if k else pal["deep"])
 
 
 def b_furniture(img, rng, p):
     """The waking room. §1.1: the story is 'you wake and cross a bedroom floor',
-    and there is nothing in the bedroom. There is now."""
+    and there is nothing in the bedroom. There is now.
+
+    SCALE. Every one of these was drawn at roughly half the tile it stands on,
+    so a kitchen full of furniture read as a doll's house: a table 25 px wide in
+    a 32 px cell, a chest 17 px wide, a barrel 15. The rule now is that a piece
+    of furniture one cell wide is drawn 29-31 px wide -- it fills the cell it
+    blocks -- and is at least 32 px tall, so it occupies the cell on screen as
+    well as in the collision plane. Anything taller than a table then keeps
+    growing upward past the cell, which is what reads as height.
+
+    A footprint of (1, k) is the only multi-cell shape the anchor convention
+    honours: the art is centred on the anchor cell and the footprint grows north
+    from it, so both stay in register. (2, 1) cannot work -- the footprint grows
+    EAST while the art stays centred, and the 64 px slot cannot reach far enough
+    east to cover the second cell anyway. Everything below is (1, 1) or (1, 2).
+    """
     kind = p["kind"]
-    wood, cloth = PP["wood"], PP["cloth"]
+    wood, cloth, pale = PP["timber"], PP["cloth"], PP["pale"]
     if kind == "bed":
-        # Two cells long and one wide, which is what `foot` says and what the
-        # old one did not do: it declared a 2x2 footprint and drew 23 pixels,
-        # so the bed the player wakes in was smaller than the cell it blocked.
-        # A footprint of (1, k) is the only multi-cell shape the anchor
-        # convention actually honours -- the art is centred on the anchor cell
-        # and grows upward, and so does the footprint.
+        cloth, pale = PP["quilt"], PP["linen"]
+    if kind == "bed":
+        # One cell wide and two long -- 32 x 64 of collision, and the art now
+        # fills it. The old one declared a 2x2 footprint and drew 23 pixels, so
+        # the bed the player wakes in was smaller than the cell it blocked; the
+        # version after that was honest about its footprint but still 29 x 56,
+        # sitting inside its own collision box with a margin all round.
         #
-        # The covers are thrown back on the west side. §"evidence of use": the
-        # first thing the player sees should say somebody got out of this bed,
-        # not that a bed is present.
-        for dy in range(6):                               # footboard
-            for dx in range(-14, 15):
-                pp_(img, dx, dy, wood["dark"] if dy < 3 else wood["base"])
-        for dy in range(6, 45):                           # mattress and covers
+        # It is also the one prop that has to be readable as *what it is* at a
+        # glance, because it is the first object in the game. That is four bands
+        # of clearly different value stacked up the sprite -- dark frame, red
+        # quilt, a shadow gap, bright linen pillow, dark headboard -- and not a
+        # single wash of bedding. The covers are thrown back on the west side:
+        # §"evidence of use", somebody got out of this and did not make it.
+        for dy in range(8):                               # footboard
+            for dx in range(-15, 16):
+                pp_(img, dx, dy, wood["deep"] if dy < 3 else
+                    (wood["dark"] if dy < 6 else wood["mid"]))
+        for dy in range(8, 50):                           # the frame rails
+            for dx in (-15, -14, 14, 15):
+                pp_(img, dx, dy, wood["dark"] if dx > 0 else wood["base"])
+        for dy in range(8, 37):                           # quilt
             for dx in range(-13, 14):
-                thrown = dx < -4 and dy > 14              # the turned-back half
-                c = PP["pale"]["base"] if thrown else cloth["base"]
+                thrown = dx < -5                          # the turned-back half
+                c = pale["base"] if thrown else cloth["base"]
                 if dx < -11:
-                    c = PP["pale"]["lit"] if thrown else cloth["lit"]
+                    c = pale["lit"] if thrown else cloth["lit"]
                 elif dx > 11:
                     c = cloth["deep"]
                 pp_(img, dx, dy, c)
         for dx in range(-13, 14):                         # the fold of the quilt
-            pp_(img, dx, 22, cloth["dark"] if dx >= -4 else PP["pale"]["dark"])
-            pp_(img, dx, 23, cloth["mid"] if dx >= -4 else PP["pale"]["mid"])
-        for dy in range(15, 45):                          # the edge of the turn-back
-            pp_(img, -4, dy, cloth["deep"])
-            pp_(img, -5, dy, PP["pale"]["lit"])
-        for dy in range(36, 45):                          # the pillow, dented
-            for dx in range(-11, 12):
-                dent = abs(dx + 2) < 5 and 38 < dy < 43
-                pp_(img, dx, dy, PP["pale"]["mid"] if dent else
-                    (PP["pale"]["lit"] if dx < 0 else PP["pale"]["base"]))
-        for dy in range(45, 56):                          # headboard
-            for dx in range(-14, 15):
-                pp_(img, dx, dy, wood["mid"] if dy > 53 else
-                    (wood["base"] if dx < 0 else wood["dark"]))
-        return 14
-    if kind == "table":
-        for dy in range(9):
-            for dx in ((-9, -8, 8, 9) if dy < 9 else ()):
-                pp_(img, dx, dy, wood["dark"])
-        for dy in range(9, 14):
+            pp_(img, dx, 21, cloth["dark"] if dx >= -5 else pale["dark"])
+            pp_(img, dx, 22, cloth["mid"] if dx >= -5 else pale["mid"])
+        for dy in range(8, 37):                           # edge of the turn-back
+            pp_(img, -5, dy, cloth["deep"])
+            pp_(img, -6, dy, pale["tip"])
+        for dy in range(37, 40):                          # the shadow under it
+            for dx in range(-13, 14):
+                pp_(img, dx, dy, cloth["deep"])
+        for dy in range(40, 50):                          # the pillow, dented
             for dx in range(-12, 13):
-                pp_(img, dx, dy, wood["lit"] if dy > 11 else (wood["base"] if dx < 0 else wood["dark"]))
-        return 12
-    if kind == "chair":
-        for dy in range(9):
-            for dx in (-5, 5):
-                pp_(img, dx, dy, wood["dark"])
-        for dy in range(9, 12):
-            for dx in range(-6, 7):
-                pp_(img, dx, dy, wood["lit"] if dy > 10 else wood["base"])
-        for dy in range(12, 22):
-            for dx in range(-6, 7):
-                pp_(img, dx, dy, wood["base"] if dx < 0 else wood["dark"])
-        return 6
-    if kind == "shelf":
-        for dy in range(26):
-            for dx in range(-9, 10):
-                pp_(img, dx, dy, wood["base"] if dx < 0 else wood["dark"])
-        for dy in (6, 13, 20):
-            for dx in range(-9, 10):
+                edge = abs(dx) > 10 or dy in (40, 49)
+                dent = abs(dx + 2) < 6 and 42 < dy < 48
+                pp_(img, dx, dy, pale["mid"] if (dent or edge) else
+                    (pale["tip"] if dx < 0 else pale["lit"]))
+        for dy in range(50, 62):                          # headboard
+            for dx in range(-15, 16):
+                pp_(img, dx, dy, wood["deep"] if dy < 53 else
+                    (wood["mid"] if dy > 59 else
+                     (wood["base"] if dx < 0 else wood["dark"])))
+        return 15
+    if kind == "table":
+        # A refectory table: one cell wide, two cells long, running north-south
+        # with a chair to either side. The old table was 25 x 14 on a single
+        # cell -- a foot-stool. Two cells is what a table you can eat at needs
+        # and (1, 2) is the way to spend them.
+        #
+        # The silhouette cue that separates a table from a cupboard is FLOOR
+        # BETWEEN THE LEGS. The near pair are drawn wide apart with nothing
+        # between them and the far pair peep out at the top, so the eye reads
+        # under the top rather than at a flat front.
+        for x in (-14, 11):                               # the near legs
+            for dy in range(11):
+                for k in range(4):
+                    pp_(img, x + k, dy, wood["deep"] if k < 1 else
+                        (wood["dark"] if k > 2 else wood["base"]))
+        for x in (-12, 9):                                # the far legs, behind
+            for dy in range(54, 58):
+                for k in range(3):
+                    pp_(img, x + k, dy, wood["deep"])
+        _face(img, -15, 15, 11, 17, wood)                 # the apron, face on
+        _slab(img, -15, 15, 17, 58, wood)                 # the top
+        for dx in (-8, -1, 6):                            # plank seams
+            for dy in range(18, 57):
                 pp_(img, dx, dy, wood["mid"])
-            for dx in range(-8, 9, 2):
-                hh = rng.randint(3, 5)
-                col = (PP["cloth"], PP["leaf"], PP["gold"], PP["metal"])[rng.randint(0, 3)]
-                for j in range(1, hh):
-                    pp_(img, dx, dy + j, col["base"])
-                    pp_(img, dx + 1, dy + j, col["dark"])
-        return 9
-    if kind == "lamp":
-        for dy in range(16):
-            pp_(img, 0, dy, PP["metal"]["dark"])
-            pp_(img, -1, dy, PP["metal"]["base"])
-        for dy in range(16, 23):
-            span = 4 - abs(dy - 19)
-            for dx in range(-span, span + 1):
-                pp_(img, dx, dy, PP["gold"]["tip"] if abs(dx) < 2 else PP["gold"]["base"])
-        return 4
-    if kind == "pot":
-        pal = PP["stone"]
-        for dy in range(11):
-            span = int(6 * math.sin(math.pi * (0.25 + 0.6 * dy / 11.0)))
-            for dx in range(-span, span + 1):
-                pp_(img, dx, dy, pal["mid"] if dx < -span + 2 else (pal["deep"] if dx > span - 2 else pal["base"]))
-        for dy in range(11, 16):
-            for dx in range(-3, 4):
-                pp_(img, dx + rng.choice((-1, 0, 1)), dy, PP["leaf"]["base"])
-        return 6
-    if kind == "rug":
-        for dy in range(11):
-            for dx in range(-14, 15):
-                c = cloth["base"]
-                if abs(dx) > 11 or dy < 2 or dy > 8:
-                    c = cloth["dark"]
-                elif (dx // 3 + dy // 3) % 2 == 0:
-                    c = cloth["mid"]
-                pp_(img, dx, dy, c)
-        return 0
+        for dx in range(-15, 16):                         # the far edge
+            pp_(img, dx, 58, wood["mid"])
+            pp_(img, dx, 17, wood["deep"])
+        return 15
+    if kind == "chair":
+        _legs(img, (-12, 10), 0, 8, wood)
+        _face(img, -13, 13, 8, 12, wood)                  # front rail of seat
+        _slab(img, -13, 13, 12, 22, wood)                 # the seat
+        for dy in range(22, 33):                          # the back
+            for dx in range(-12, 13):
+                gap = abs(dx) > 9 or dy > 30 or (dx + 12) % 6 < 3
+                pp_(img, dx, dy, (wood["base"] if dx < 0 else wood["dark"])
+                    if gap else wood["deep"])
+        return 13
     if kind == "chair_pulled":
         # The same chair, turned away from the table and pushed back. §"evidence
         # of use": somebody got up from this and has not come back. It is one
         # sprite and it is the cheapest sentence of story in the whole tileset.
-        for dy in range(8):
-            for dx in (-6, 3):
-                pp_(img, dx + dy // 4, dy, wood["dark"])
-        for dy in range(8, 11):
-            for dx in range(-7, 6):
-                pp_(img, dx + dy // 6, dy, wood["lit"] if dy > 9 else wood["base"])
-        for dy in range(11, 20):
-            lean = (dy - 11) // 3
-            for dx in range(-8 + lean, 4 + lean):
-                pp_(img, dx, dy, wood["base"] if dx < -2 else wood["dark"])
-        return 7
-    if kind == "stove":
-        metal, ember = PP["metal"], PP["gold"]
-        for dy in range(15):
-            for dx in range(-9, 10):
-                c = metal["dark"] if dx > 2 else metal["base"]
-                if dy < 2:
-                    c = metal["deep"]
-                pp_(img, dx, dy, c)
-        # The firebox, and the one warm thing in the room.
-        for dy in range(4, 10):
-            for dx in range(-6, 3):
-                edge = dy in (4, 9) or dx in (-6, 2)
-                pp_(img, dx, dy, metal["deep"] if edge else
-                    (ember["tip"] if (dx + dy) % 3 else ember["base"]))
-        for dy in range(15, 19):
-            span = int(10 * math.sqrt(max(0.0, 1 - ((dy - 16.5) / 2.5) ** 2)))
-            for dx in range(-span, span + 1):
-                pp_(img, dx, dy, metal["lit"] if dx < 0 else metal["mid"])
-        for dx in (-6, -2, 3, 7):                 # hotplates
-            for dy in range(17, 19):
-                pp_(img, dx, dy, metal["deep"])
-                pp_(img, dx + 1, dy, metal["dark"])
-        for dy in range(19, 32):                  # the flue
-            for dx in (-2, -1, 0, 1):
-                pp_(img, dx, dy, metal["base"] if dx < 0 else metal["dark"])
-        return 10
-    if kind == "counter":
-        for dy in range(13):
-            for dx in range(-14, 15):
-                c = wood["base"] if dx < 0 else wood["dark"]
-                if dy < 2:
-                    c = wood["deep"]
-                pp_(img, dx, dy, c)
-        for dy in (5, 9):                          # drawer seams
-            for dx in range(-13, 14):
-                pp_(img, dx, dy, wood["deep"])
-            for dx in (-8, 7):
-                pp_(img, dx, dy - 2, PP["metal"]["lit"])
-                pp_(img, dx + 1, dy - 2, PP["metal"]["base"])
-        for dy in range(13, 17):                   # the worktop, overhanging
+        _legs(img, (-13, 8), 0, 7, wood)
+        _legs(img, (-10, 11), 3, 10, wood)
+        _face(img, -13, 12, 10, 13, wood)
+        for dy in range(13, 23):                          # seat, skewed
+            sk = (dy - 13) // 4
+            for dx in range(-13 + sk, 13 + sk):
+                t = (dy - 13) / 10.0
+                pp_(img, dx, dy, wood["lit"] if t > 0.70 else
+                    (wood["mid"] if t > 0.25 else wood["base"]))
+        for dy in range(23, 32):                          # the back, leaning
+            lean = 2 + (dy - 23) // 3
+            for dx in range(-11 + lean, 12 + lean):
+                gap = abs(dx - lean) > 8 or (dx + 12) % 6 < 3
+                pp_(img, dx, dy, (wood["base"] if dx < lean else wood["dark"])
+                    if gap else wood["deep"])
+        return 13
+    if kind == "shelf":
+        # A tall case against a wall: 31 wide and 54 high, so it reads as the
+        # biggest thing in the room after the bed, which is what a full-height
+        # bookcase is.
+        _face(img, -15, 15, 0, 5, wood)                   # the plinth
+        for dy in range(5, 54):                           # carcass and sides
             for dx in range(-15, 16):
-                pp_(img, dx, dy, PP["stone"]["lit"] if dy > 14 else PP["stone"]["mid"])
-        return 14
-    if kind == "shelf_open":
-        for dy in range(20):
-            for dx in (-10, 9):
-                pp_(img, dx, dy, wood["dark"])
-        for dy in (3, 11, 18):
-            for dx in range(-10, 10):
+                edge = dx < -12 or dx > 12
+                pp_(img, dx, dy, (wood["base"] if dx < 0 else wood["dark"])
+                    if edge else wood["deep"])
+        for dy in (9, 20, 31, 42):                        # shelves and books
+            for dx in range(-12, 13):
                 pp_(img, dx, dy, wood["mid"])
                 pp_(img, dx, dy - 1, wood["deep"])
-            for dx in range(-8, 8, 4):
-                col = (PP["pale"], PP["ice"], PP["cloth"])[rng.randint(0, 2)]
-                hh = rng.randint(3, 5)
+            dx = -12
+            while dx < 12:
+                bw = rng.randint(2, 3)
+                hh = rng.randint(6, 10)
+                col = (cloth, PP["leaf"], PP["gold"], PP["metal"], PP["ice"])[rng.randint(0, 4)]
+                lean = rng.random() < 0.18
                 for j in range(1, hh):
-                    pp_(img, dx, dy + j, col["base"])
-                    pp_(img, dx + 1, dy + j, col["dark"])
-                    pp_(img, dx - 1, dy + j, col["lit"])
-        return 10
+                    for k in range(bw):
+                        if dx + k > 12:
+                            continue
+                        c = col["lit"] if k == 0 else (col["dark"] if k == bw - 1 else col["base"])
+                        pp_(img, dx + k + (1 if lean and j > hh // 2 else 0), dy + j, c)
+                dx += bw + (1 if rng.random() < 0.3 else 0)
+        for dx in range(-15, 16):                         # the cornice
+            pp_(img, dx, 54, wood["lit"] if dx < 0 else wood["mid"])
+        return 15
+    if kind == "lamp":
+        for dy in range(4):                               # the foot
+            span = 6 - dy
+            for dx in range(-span, span + 1):
+                pp_(img, dx, dy, PP["metal"]["mid"] if dx < 0 else PP["metal"]["dark"])
+        for dy in range(4, 34):                           # the stem
+            for dx in (-2, -1, 0, 1):
+                pp_(img, dx, dy, PP["metal"]["base"] if dx < 0 else PP["metal"]["deep"])
+        for dy in range(34, 47):                          # the shade
+            span = 8 - abs(dy - 40)
+            for dx in range(-span, span + 1):
+                pp_(img, dx, dy, PP["gold"]["tip"] if abs(dx) < 3 else
+                    (PP["gold"]["lit"] if dx < 0 else PP["gold"]["base"]))
+        return 7
+    if kind == "pot":
+        pal = PP["stone"]
+        for dy in range(17):                              # the pot
+            span = int(11 * math.sin(math.pi * (0.28 + 0.58 * dy / 17.0)))
+            for dx in range(-span, span + 1):
+                pp_(img, dx, dy, pal["mid"] if dx < -span + 3 else
+                    (pal["deep"] if dx > span - 3 else pal["base"]))
+        for dx in range(-11, 12):                         # the rim
+            pp_(img, dx, 17, pal["lit"] if dx < 0 else pal["mid"])
+        for dy in range(18, 36):                          # the plant
+            span = int(9 * math.sin(math.pi * (0.15 + 0.7 * (36 - dy) / 18.0)))
+            for _ in range(max(2, span)):
+                dx = rng.randint(-span, span)
+                pp_(img, dx, dy, PP["leaf"]["base"] if dx < 0 else PP["leaf"]["dark"])
+                pp_(img, dx, dy + 1, PP["leaf"]["lit"] if rng.random() < 0.3 else PP["leaf"]["base"])
+        return 11
+    if kind == "rug":
+        # A hearth rug that covers the cell it is laid on, with a fringe on the
+        # south edge. (floor_rug is the *material* for a rug that covers a whole
+        # corner of a room; this is the single mat you drop beside a bed.)
+        for dy in range(2, 30):
+            for dx in range(-15, 16):
+                c = cloth["base"]
+                if abs(dx) > 12 or dy < 5 or dy > 27:
+                    c = cloth["dark"]
+                elif abs(dx) > 10 or dy < 7 or dy > 25:
+                    c = pale["dark"]
+                elif (dx // 4 + dy // 4) % 2 == 0:
+                    c = cloth["mid"]
+                pp_(img, dx, dy, c)
+        for dx in range(-14, 15, 2):                      # the fringe
+            pp_(img, dx, 1, pale["mid"])
+            pp_(img, dx, 0, pale["dark"])
+        return 0
+    if kind == "stove":
+        # Cast iron, one cell, and tall enough with its flue to be the thing
+        # your eye lands on when the kitchen comes on screen.
+        metal, ember = PP["metal"], PP["gold"]
+        for dy in range(5):                               # the legs and ash pan
+            for dx in range(-14, 15):
+                edge = abs(dx) > 11
+                pp_(img, dx, dy, metal["deep"] if not edge else
+                    (metal["dark"] if dx > 0 else metal["base"]))
+        for dy in range(5, 28):                           # the body
+            for dx in range(-14, 15):
+                c = metal["dark"] if dx > 2 else metal["base"]
+                pp_(img, dx, dy, c)
+        for dy in range(9, 23):                           # the firebox door
+            for dx in range(-10, 5):
+                edge = dy in (9, 22) or dx in (-10, 4)
+                pp_(img, dx, dy, metal["deep"] if edge else
+                    (ember["tip"] if (dx + dy) % 3 else ember["base"]))
+        for dy in range(13, 19):                          # its handle
+            pp_(img, 6, dy, metal["lit"])
+            pp_(img, 7, dy, metal["mid"])
+        _slab(img, -15, 15, 28, 38, metal)                # the hob
+        for cx in (-9, 1, 9):                             # hotplates
+            for dy in range(31, 36):
+                span = int(4 * math.sqrt(max(0.0, 1 - ((dy - 33.5) / 2.5) ** 2)))
+                for dx in range(-span, span + 1):
+                    pp_(img, cx + dx, dy, metal["deep"] if abs(dx) == span else metal["dark"])
+        for dy in range(38, 62):                          # the flue
+            for dx in range(-3, 3):
+                pp_(img, dx, dy, metal["base"] if dx < 0 else metal["dark"])
+        for dx in range(-5, 5):                           # its collar
+            pp_(img, dx, 40, metal["mid"])
+        return 14
+    if kind == "counter":
+        # Drawn to abut: 31 px of carcass in a 32 px cell, so a run of three
+        # counters reads as one worktop with drawer seams rather than three
+        # separate boxes with gaps between them.
+        _face(img, -15, 15, 0, 22, wood)
+        for dy in (8, 16):                                # drawer seams
+            for dx in range(-14, 15):
+                pp_(img, dx, dy, wood["deep"])
+            for dx in (-9, 7):
+                pp_(img, dx, dy - 3, PP["metal"]["lit"])
+                pp_(img, dx + 1, dy - 3, PP["metal"]["base"])
+                pp_(img, dx + 2, dy - 3, PP["metal"]["base"])
+        _slab(img, -15, 15, 22, 33, PP["stone"])          # the worktop
+        for dx in range(-15, 16):                         # the overhang lip
+            pp_(img, dx, 22, PP["stone"]["deep"])
+        return 15
+    if kind == "shelf_open":
+        # Uprights and boards with daylight between them -- the same footprint
+        # as the bookcase and a completely different silhouette.
+        for dy in range(42):
+            for dx in (-15, -14, 13, 14):
+                pp_(img, dx, dy, wood["base"] if dx < 0 else wood["dark"])
+        for dy in (4, 16, 28, 40):
+            for dx in range(-15, 15):
+                pp_(img, dx, dy, wood["mid"])
+                pp_(img, dx, dy - 1, wood["deep"])
+            if dy == 40:
+                continue
+            dx = -12
+            while dx < 11:
+                bw = rng.randint(3, 5)
+                hh = rng.randint(5, 9)
+                col = (pale, PP["ice"], cloth, PP["gold"])[rng.randint(0, 3)]
+                for j in range(1, hh):
+                    for k in range(bw):
+                        if dx + k > 11:
+                            continue
+                        c = col["lit"] if k == 0 else (col["dark"] if k == bw - 1 else col["base"])
+                        pp_(img, dx + k, dy + j, c)
+                dx += bw + rng.randint(1, 3)
+        return 15
     return 6
 
 
@@ -2406,17 +2575,18 @@ def b_clutter(img, rng, p):
     kind = p["kind"]
     if kind == "cup":
         pal = PP["pale"]
-        for dy in range(6):
-            span = 3 if dy < 5 else 2
+        for dy in range(9):
+            span = 5 if dy < 8 else 4
             for dx in range(-span, span + 1):
                 pp_(img, dx, dy + 1, pal["lit"] if dx < 0 else pal["base"])
-        for dy in range(1, 5):
-            pp_(img, 4, dy + 1, pal["mid"])
-        for dx in range(-3, 4):
-            pp_(img, dx, 7, pal["tip"] if dx < 1 else pal["mid"])
-        pp_(img, -1, 6, PP["wood"]["deep"])          # what is left in it
-        pp_(img, 0, 6, PP["wood"]["dark"])
-        return 3
+        for dy in range(2, 8):                       # the handle
+            pp_(img, 6, dy + 1, pal["mid"])
+            pp_(img, 7, dy + 1, pal["dark"])
+        for dx in range(-5, 6):
+            pp_(img, dx, 10, pal["tip"] if dx < 1 else pal["mid"])
+        for dx in range(-3, 3):                      # what is left in it
+            pp_(img, dx, 9, PP["wood"]["deep"] if dx < 0 else PP["wood"]["dark"])
+        return 5
     if kind == "boots":
         pal = PP["bark"]
         for side, lean in ((-4, -1), (4, 1)):
@@ -2430,18 +2600,18 @@ def b_clutter(img, rng, p):
             pp_(img, side - 3, 9, pal["lit"])
         return 8
     if kind == "book":
-        pal, page = PP["cloth"], PP["pale"]
-        for dy in range(7):
-            for dx in range(-8, 9):
-                spine = abs(dx) < 1
+        pal, page = PP["cloth"], PP["linen"]
+        for dy in range(11):
+            for dx in range(-11, 12):
+                spine = abs(dx) < 2
                 c = pal["dark"] if spine else (page["lit"] if dx < 0 else page["base"])
                 if dy == 0:
                     c = pal["deep"]
                 pp_(img, dx, dy + 1, c)
-        for dy in (2, 4):
-            for dx in list(range(-7, -1)) + list(range(2, 8)):
+        for dy in (3, 5, 7):
+            for dx in list(range(-9, -2)) + list(range(3, 10)):
                 pp_(img, dx, dy + 1, page["dark"])
-        return 8
+        return 11
     if kind == "candle":
         pal, wax = PP["metal"], PP["pale"]
         for dx in range(-4, 5):
@@ -2615,67 +2785,101 @@ def b_structure(img, rng, p):
     kind = p["kind"]
     stone, wood, metal = PP["stone"], PP["wood"], PP["metal"]
     if kind == "well":
-        for dy in range(11):
-            span = 11 - abs(dy - 5) // 3
+        # One cell, and now drawn as one cell: the drum was 23 px inside a
+        # 64 x 64 declared footprint.
+        for dy in range(16):
+            span = 15 - abs(dy - 7) // 4
             for dx in range(-span, span + 1):
                 c = stone["base"]
-                if dx < -span + 3:
+                if dx < -span + 4:
                     c = stone["mid"]
-                elif dx > span - 3:
+                elif dx > span - 4:
                     c = stone["deep"]
                 if (dx + dy * 2) % 7 == 0:
                     c = stone["dark"]
                 pp_(img, dx, dy, c)
-        for dy in range(11, 14):
-            span = int(10 * math.sqrt(max(0.0, 1 - ((dy - 12.5) / 2.5) ** 2)))
+        for dy in range(16, 22):                   # the coping, seen from above
+            span = int(15 * math.sqrt(max(0.0, 1 - ((dy - 19.0) / 3.5) ** 2)))
             for dx in range(-span, span + 1):
-                pp_(img, dx, dy, stone["lit"] if dy > 12 else stone["mid"])
-        for dx in range(-6, 7):
-            for dy in range(11, 14):
+                pp_(img, dx, dy, stone["lit"] if dy > 19 else stone["mid"])
+        for dy in range(17, 22):                   # the shaft, going down
+            span = int(10 * math.sqrt(max(0.0, 1 - ((dy - 19.5) / 3.0) ** 2)))
+            for dx in range(-span, span + 1):
                 pp_(img, dx, dy, mix(C["bg"], BLACK, 0.5))
         for side in (-1, 1):
-            for dy in range(14, 30):
-                pp_(img, side * 9, dy, wood["base"])
-                pp_(img, side * 9 - 1, dy, wood["lit"] if side < 0 else wood["dark"])
-        for dx in range(-11, 12):
-            for dy in range(30, 34):
-                pp_(img, dx, dy, wood["mid"] if dy > 32 else (wood["base"] if dx < 0 else wood["dark"]))
-        return 11
+            for dy in range(22, 42):
+                for k in (0, 1):
+                    pp_(img, side * 13 + k, dy, wood["base"] if side < 0 else wood["dark"])
+                pp_(img, side * 13 - 1, dy, wood["lit"] if side < 0 else wood["deep"])
+        for dy in range(30, 34):                   # the windlass
+            for dx in range(-12, 13):
+                pp_(img, dx, dy, wood["mid"] if dy > 31 else wood["deep"])
+        for dx in range(-16, 17):                  # the little roof
+            drop = abs(dx) // 5
+            for dy in range(42 - drop, 48 - drop):
+                pp_(img, dx, dy, wood["mid"] if dy > 45 - drop else
+                    (wood["base"] if dx < 0 else wood["dark"]))
+        return 15
     if kind == "cart":
-        for dy in range(6, 16):
-            for dx in range(-13, 10):
+        # Blocks one cell and is drawn across it. Bigger wheels, a deeper bed and
+        # a load in it, so it reads at a glance rather than as a smudge.
+        for dy in range(7, 22):                    # the bed, side on
+            for dx in range(-15, 12):
                 pp_(img, dx, dy, wood["base"] if dx < -2 else wood["dark"])
-        for dx in range(-13, 10, 3):
-            for dy in range(6, 16):
+        for dx in range(-15, 12, 4):               # its planks
+            for dy in range(7, 22):
                 pp_(img, dx, dy, wood["deep"])
-        for dx in range(-13, 10):
-            pp_(img, dx, 16, wood["lit"])
-        for cx in (-9, 5):
-            for a in range(24):
-                th = a / 24.0 * math.tau
-                pp_(img, cx + math.cos(th) * 6, 6 + math.sin(th) * 6, metal["mid"])
-                pp_(img, cx + math.cos(th) * 5, 6 + math.sin(th) * 5, metal["deep"])
-        for dx in range(9, 20):
-            pp_(img, dx, 10, wood["mid"])
-        return 13
+        for dx in range(-15, 12):                  # the rail along the top
+            pp_(img, dx, 22, wood["lit"])
+            pp_(img, dx, 21, wood["mid"])
+        for _ in range(70):                        # the load
+            dx = rng.randint(-13, 9)
+            dy = 23 + rng.randint(0, 5) - abs(dx) // 6
+            pal = (PP["leaf"], PP["leaf_dry"], PP["reed"])[rng.randint(0, 2)]
+            pp_(img, dx, dy, pal["base"] if dx < 0 else pal["dark"])
+            pp_(img, dx, dy + 1, pal["lit"])
+        for cx in (-10, 6):                        # the wheels
+            for a in range(40):
+                th = a / 40.0 * math.tau
+                pp_(img, cx + math.cos(th) * 9, 8 + math.sin(th) * 9, metal["mid"])
+                pp_(img, cx + math.cos(th) * 8, 8 + math.sin(th) * 8, metal["deep"])
+            for a in range(6):
+                th = a / 6.0 * math.pi
+                for r in range(-7, 8):
+                    pp_(img, cx + math.cos(th) * r, 8 + math.sin(th) * r, metal["dark"])
+        for dx in range(11, 24):                   # the shaft
+            pp_(img, dx, 13 + (dx - 11) // 4, wood["mid"])
+            pp_(img, dx, 12 + (dx - 11) // 4, wood["dark"])
+        return 15
     if kind == "stall":
-        for side in (-1, 1):
-            for dy in range(20):
-                pp_(img, side * 13, dy, wood["dark"])
-                pp_(img, side * 13 - 1, dy, wood["base"])
-        for dy in range(9, 14):
-            for dx in range(-13, 14):
-                pp_(img, dx, dy, wood["mid"] if dy > 12 else wood["base"])
-        for dx in range(-16, 17):
-            for dy in range(20, 26):
-                band = ((dx + 48) // 4) % 2
+        # One cell, drawn 31 px across it with the awning overhanging, which is
+        # what an awning does. It used to declare two cells and draw 33 px.
+        for side in (-1, 1):                       # the posts
+            for dy in range(28):
+                for k in (0, 1):
+                    pp_(img, side * 14 + k, dy, wood["dark"] if k else wood["base"])
+        for dy in range(11, 15):                   # the trestle, face on
+            for dx in range(-15, 16):
+                pp_(img, dx, dy, wood["deep"] if dy < 13 else wood["base"])
+        for dy in range(15, 24):                   # the counter, from above
+            t = (dy - 15) / 9.0
+            for dx in range(-15, 16):
+                pp_(img, dx, dy, wood["lit"] if t > 0.70 else
+                    (wood["mid"] if t > 0.25 else wood["base"]))
+        for _ in range(60):                        # what is for sale on it
+            dx = rng.randint(-13, 13)
+            dy = rng.randint(17, 23)
+            pal = (PP["gold"], PP["bloom"], PP["leaf"], PP["flower"])[rng.randint(0, 3)]
+            pp_(img, dx, dy, pal["base"])
+            pp_(img, dx, dy + 1, pal["tip"])
+        for dx in range(-19, 20):                  # the awning
+            sag = abs(dx) // 7
+            for dy in range(28 - sag, 35 - sag):
+                band = ((dx + 60) // 5) % 2
                 c = PP["cloth"]["base"] if band else PP["pale"]["base"]
-                if dy > 23:
+                if dy < 30 - sag:
                     c = PP["cloth"]["dark"] if band else PP["pale"]["dark"]
-                pp_(img, dx, dy + (abs(dx) // 8), c)
-        for dx in range(-9, 10, 4):
-            pp_(img, dx, 14, PP["gold"]["base"])
-            pp_(img, dx + 1, 14, PP["bloom"]["base"])
+                pp_(img, dx, dy, c)
         return 15
     if kind == "lamppost":
         for dy in range(26):
@@ -2732,17 +2936,29 @@ def b_structure(img, rng, p):
             pp_(img, dx, 0, metal["mid"] if dx < 0 else metal["dark"])
         return 5
     if kind == "bench":
-        for side in (-1, 1):
-            for dy in range(7):
-                for dx in range(-1, 2):
-                    pp_(img, side * 9 + dx, dy, wood["dark"])
-        for dy in range(7, 10):
-            for dx in range(-12, 13):
-                pp_(img, dx, dy, wood["lit"] if dy > 8 else wood["base"])
-        for dy in range(10, 17):
-            for dx in range(-12, 13):
-                pp_(img, dx, dy, wood["base"] if dy % 3 else wood["dark"])
-        return 12
+        # One cell wide, drawn 31 px across it. Two of these side by side read as
+        # one long settle, which is how the hall gets a bench you could sit three
+        # people on without a (2, 1) footprint the anchor convention cannot draw.
+        for side in (-1, 1):                       # the legs, with floor between
+            for dy in range(10):
+                for k in range(3):
+                    pp_(img, side * 13 + k, dy, wood["deep"] if k < 1 else wood["dark"])
+        for dy in range(10, 14):                   # the seat rail, face on
+            for dx in range(-15, 16):
+                pp_(img, dx, dy, wood["deep"] if dy < 12 else
+                    (wood["base"] if dx < 0 else wood["dark"]))
+        _slab(img, -15, 15, 14, 24, wood)          # the seat, from above
+        for dx in (-6, 5):                         # the seat boards
+            for dy in range(15, 24):
+                pp_(img, dx, dy, wood["mid"])
+        for side in (-1, 1):                       # the back's uprights
+            for dy in range(24, 34):
+                for k in range(3):
+                    pp_(img, side * 13 + k, dy, wood["base"] if side < 0 else wood["dark"])
+        for dy in (25, 26, 30, 31, 32):            # and two rails, air between
+            for dx in range(-13, 14):
+                pp_(img, dx, dy, wood["mid"] if dy in (26, 32) else wood["base"])
+        return 15
     return 8
 
 
@@ -2952,7 +3168,7 @@ PROPS = [
     _p("bush", "bush", "grass_short", 0.026, pal="leaf", r=9, tips=12, sway=dict(amount=1.0, speed=0.7)),
     _p("bramble", "bush", "grass_tall", 0.020, solid=True, pal="leaf", r=11, tips=16, berries=8, sway=dict(amount=0.9, speed=0.65)),
     _p("stump", "stump", "grass_short", 0.012, solid=True, r=7, h=9),
-    _p("log_fallen", "log", "grass_short", 0.010, solid=True, foot=(2, 1), pal="bark", w=15, r=5, moss=8),
+    _p("log_fallen", "log", "grass_short", 0.010, solid=True, pal="bark", w=15, r=5, moss=8),
     _p("tree_lone", "tree", "grass_short", 0.014, solid=True, pal="leaf", trunk=13, crown=12, tw=2, sway=dict(amount=2.0, speed=0.42)),
     _p("fencepost", "post", "grass_tall", 0.012, h=19, rail=True),
     _p("gate", "post", "grass_tall", 0.004, solid=True, h=24, rail=True, board=(9, 8)),
@@ -2967,7 +3183,7 @@ PROPS = [
     _p("tree_broad", "tree", "grass_short", 0.028, solid=True, pal="leaf", trunk=15, crown=14, tw=3, sway=dict(amount=2.2, speed=0.38)),
     _p("tree_dead", "deadtree", "scree", 0.014, solid=True, h=30,
        branches=[(11, -1, 8), (17, 1, 9), (23, -1, 6)], sway=dict(amount=1.0, speed=0.5)),
-    _p("log_mossy", "log", "grass_tall", 0.014, solid=True, foot=(2, 1), pal="bark", w=17, r=6, moss=14),
+    _p("log_mossy", "log", "grass_tall", 0.014, solid=True, pal="bark", w=17, r=6, moss=14),
     _p("mushroom_ring", "mushroom", "grass_tall", 0.018, shadow=False, n=7, spread=12, cap="fungus"),
     _p("fern", "tuft", "grass_tall", 0.030, shadow=False, outline=False, pal="pine", n=12, spread=12, h=9, sway=dict(amount=1.5, speed=0.9)),
 
@@ -3015,23 +3231,33 @@ PROPS = [
     _p("wayside_shrine", "monument", "path_dirt", 0.004, solid=True, kind="shrine"),
     _p("rut_stone", "boulder", "path_dirt", 0.014, pal="stone", w=7, h=5, cracks=2),
 
-    # --- placed: the town -----------------------------------------------------
-    _p("barrel", "box", "placed", 0.0, solid=True, w=7, h=15, d=5, bands=True),
-    _p("crate", "box", "placed", 0.0, solid=True, w=8, h=14, d=5, slats=True),
-    _p("well", "structure", "placed", 0.0, solid=True, foot=(2, 2), kind="well"),
-    _p("cart", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="cart"),
-    _p("market_stall", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="stall"),
+    # FOOTPRINTS. `foot` is (east, north) cells anchored at the base cell, and the
+# only multi-cell shape that can be honoured is (1, k). The art is centred on the
+# anchor cell and the slot reaches 32 px either side of it, so a (2, 1) prop
+# declares a footprint whose second cell the art cannot even reach, let alone
+# fill: the collision box sits half a cell east of the picture. The well, the
+# cart, the market stall, the bench and the two fallen logs all declared (2, 1)
+# or (2, 2) and drew between 23 and 35 px into it. They are all (1, 1) now, drawn
+# to fill the cell they block. The bed and the table are (1, 2) -- one cell wide
+# and two long, growing north, which is the direction the art grows too.
+
+# --- placed: the town -----------------------------------------------------
+    _p("barrel", "box", "placed", 0.0, solid=True, w=12, h=20, d=9, bands=True),
+    _p("crate", "box", "placed", 0.0, solid=True, w=14, h=18, d=9, slats=True, square=True),
+    _p("well", "structure", "placed", 0.0, solid=True, kind="well"),
+    _p("cart", "structure", "placed", 0.0, solid=True, kind="cart"),
+    _p("market_stall", "structure", "placed", 0.0, solid=True, kind="stall"),
     _p("lamppost", "structure", "placed", 0.0, solid=True, kind="lamppost",
        light=dict(radius=6.0, color="#FFC880", flicker=0.12), sway=dict(amount=0.5, speed=1.55, mode='breathe')),
-    _p("bench", "structure", "placed", 0.0, solid=True, foot=(2, 1), kind="bench"),
+    _p("bench", "structure", "placed", 0.0, solid=True, kind="bench"),
     _p("standing_stone", "monument", "placed", 0.0, solid=True, kind="menhir", pal="stone", h=34, w=8, runes=8),
 
     # --- placed: interiors ----------------------------------------------------
     _p("bed", "furniture", "placed", 0.0, solid=True, foot=(1, 2), kind="bed"),
-    _p("table", "furniture", "placed", 0.0, solid=True, kind="table"),
+    _p("table", "furniture", "placed", 0.0, solid=True, foot=(1, 2), kind="table"),
     _p("chair", "furniture", "placed", 0.0, solid=True, kind="chair"),
     _p("bookshelf", "furniture", "placed", 0.0, solid=True, kind="shelf"),
-    _p("chest", "box", "placed", 0.0, solid=True, w=8, h=9, d=4, lid=True),
+    _p("chest", "box", "placed", 0.0, solid=True, w=13, h=13, d=8, lid=True, square=True),
     _p("floor_lamp", "furniture", "placed", 0.0, kind="lamp",
        light=dict(radius=4.5, color="#FFC880", flicker=0.08), sway=dict(amount=0.5, speed=1.8, mode='breathe')),
     _p("plant_pot", "furniture", "placed", 0.0, solid=True, kind="pot", sway=dict(amount=0.6, speed=0.55)),
@@ -3503,48 +3729,133 @@ def cliff_demo(tiles, sprites, cliffs, w=12, h=12, zoom=3):
 def interior_demo(tiles, sprites, zoom=3):
     """The house, drawn the way the game will draw it.
 
-    Not a decorative preview: this is the frame every judgement about the wall
-    set has to be made in, because a wall is only right or wrong in a room. It
-    exercises the whole of §2 and §5 at once -- cap and face, four floors, one
-    per room, doorways that are gaps in a wall rather than a tile with a door
-    painted on it, and the evidence-of-use props that are the difference between
-    a furnished room and an inhabited one.
+    Not a decorative preview: this is the frame every judgement about the
+    furniture has to be made in, because a chair is only the right size in a
+    room. It exercises the whole of §2 and §5 at once -- cap and face, four
+    floors, one per room, doorways that are gaps in a wall rather than a tile
+    with a door painted on it, and the evidence-of-use props that are the
+    difference between a furnished room and an inhabited one.
 
-    The layout is a stand-in for the real one, which lives in
-    tools/make_world.py's house_plan(); it is close enough to judge the art by
-    and it is not what ships."""
+    This is a TRANSCRIPTION of tools/make_world.py's house_plan(), which is the
+    single source of the shipped geometry -- kept here as a literal rather than
+    imported, because make_world.py reads the tiles.json this file writes and a
+    circular import would break a clean checkout. It is a picture of the plan,
+    not a second copy of the rule: nothing reads it back.
+    """
     plan = [
         "WWWWWWWWWWWWWWWWWWW",
-        "WppppppWttttttttttW",
-        "WprrrrpWttttttttttW",
-        "WprrrrpWttttttttttW",
-        "Wpppppp.ttttttttttW",
-        "WppppppWttttttttttW",
-        "WWW.WWWWWWWWW.WWWWW",
-        "WbbbbbbbbbbbbbbbbbW",
-        "WbbbbbbbbbbbbbbbbbW",
-        "WbbbbbbbbbbbbbbbbbW",
+        "WppppppppWttttttttW",
+        "WpppRRpppWttttttttW",
+        "WpppRRppp.ttttttttW",
+        "WpppRRpppWttttttttW",
+        "WppppppppWttttttttW",
+        "WppppppppWttttttttW",
+        "WW.WWWWWWWW.WWWWWWW",
+        "WbbbbbbbbbbbbWssssW",
+        "WbbbbbbbbbbbbWssssW",
+        "Wbbbbbbbbbbbb.ssssW",
+        "WRRRbbbbbbbbbWssssW",
+        "WRRRbbbbbbbbbWssssW",
+        "WRRRbbbbbbbbbWssssW",
         "WWWWWWWWWDWWWWWWWWW",
-        "ggggggggpggggggggg",
+        "gggggggggpggggggggg",
     ]
-    key = {"W": "wall_timber", "p": "floor_plank", "r": "floor_rug",
-           "t": "floor_tile", "b": "floor_boards", ".": "floor_boards",
-           "D": "door", "g": "grass_short"}
+    key = {"W": "wall_timber", "p": "floor_plank", "R": "floor_rug",
+           "t": "floor_tile", "b": "floor_boards", "s": "floor_stone",
+           ".": "floor_boards", "D": "door", "g": "grass_short"}
     w = max(len(row) for row in plan)
     grid = [[key[row[x]] if x < len(row) else "grass_short" for x in range(w)]
             for row in plan]
+    # (i, j) in house_plan's interior coordinates; +1 in each axis to land in
+    # the picture above, whose origin is the north-west wall cell.
     props = [
-        (2, 2, "bed"), (5, 1, "chest"), (1, 5, "boots"), (4, 5, "book_open"),
-        (6, 1, "window_lit"), (13, 0, "window_lit"),
-        (9, 1, "stove"), (12, 1, "counter"), (15, 1, "cup"),
-        (17, 2, "shelf_open"), (12, 4, "table"), (11, 5, "chair"),
-        (13, 4, "chair_pulled"), (14, 4, "candle"),
-        (2, 8, "bookshelf"), (16, 8, "plant_pot"), (8, 9, "boots"),
-        (5, 9, "floor_lamp"), (10, 8, "chair"),
+        ("bed", 5, 1), ("chest", 6, 0), ("bookshelf", 0, 0),
+        ("chest", 0, 2), ("shelf_open", 0, 4), ("plant_pot", 0, 5),
+        ("shelf_open", 7, 0), ("chair", 7, 3), ("chest", 7, 4),
+        ("floor_lamp", 7, 5), ("bench", 3, 5), ("counter", 4, 5),
+        ("counter", 5, 5), ("candle", 6, 1), ("book_open", 4, 2),
+        ("boots", 4, 3), ("cat", 3, 3),
+        ("barrel", 9, 0), ("bookshelf", 10, 0), ("counter", 11, 0),
+        ("counter", 12, 0), ("counter", 13, 0), ("stove", 14, 0),
+        ("counter", 15, 0), ("counter", 16, 0), ("shelf_open", 16, 2),
+        ("table", 12, 4), ("chair", 11, 3), ("chair", 11, 4),
+        ("chair", 13, 3), ("chair_pulled", 14, 4), ("bench", 9, 3),
+        ("crate", 9, 5), ("chest", 16, 3), ("plant_pot", 16, 5),
+        ("cup", 13, 2), ("bottle", 16, 1),
+        ("plant_pot", 0, 7), ("bookshelf", 3, 7), ("bookshelf", 4, 7),
+        ("bookshelf", 5, 7), ("chest", 6, 7), ("bench", 8, 7),
+        ("bench", 9, 7), ("chest", 11, 7), ("crate", 11, 8),
+        ("table", 8, 9), ("chair", 7, 9), ("chair_pulled", 9, 9),
+        ("table", 1, 11), ("chair", 2, 10), ("chair", 2, 11),
+        ("floor_lamp", 3, 12), ("book_open", 2, 12), ("barrel", 11, 11),
+        ("crate", 10, 12), ("bench", 6, 12), ("boots", 7, 12),
+        ("dog", 6, 11),
+        ("shelf_open", 13, 7), ("shelf_open", 14, 7), ("shelf_open", 15, 7),
+        ("barrel", 16, 7), ("crate", 16, 8), ("barrel", 13, 8),
+        ("chest", 16, 10), ("crate", 13, 11), ("barrel", 13, 12),
+        ("crate", 14, 12), ("chest", 15, 12), ("barrel", 16, 12),
+        ("cup", 14, 9), ("bottle", 15, 9),
     ]
-    placed = [(x, y, sprites[pid]) for (x, y, pid) in props if pid in sprites]
+    placed = [(i + 1, j + 1, sprites[pid]) for (pid, i, j) in props if pid in sprites]
+    placed += [(x, y, sprites["window_lit"]) for (x, y) in
+               ((4, 0), (13, 0), (18, 5), (0, 2), (0, 11), (18, 12))]
+    placed.sort(key=lambda e: e[1])
     img = render_patch(grid, tiles, seed=3, props=placed, zoom=1)
     return img.resize((img.size[0] * zoom, img.size[1] * zoom), Image.NEAREST)
+
+
+def furniture_sheet(sprites, scale=3, cols=6):
+    """Every placed prop over the cells it actually blocks.
+
+    The bug this exists to catch is the one the whole furniture set had: a
+    sprite drawn at half the size of the footprint it declares, which reads as a
+    doll's house and which no amount of looking at the sprite on its own will
+    show you. So the checker under each prop is the FOOTPRINT -- `foot` cells
+    anchored at the base cell, growing east and north -- picked out against the
+    surrounding floor, and the number under it is the art's bounding box against
+    the footprint in pixels. If the art does not reach the edges of the bright
+    rectangle, the prop is too small.
+    """
+    ids = [pid for pid in PROP_ORDER if PROP_BY_ID[pid]["biome"] == "placed"]
+    pad, label_h = 5, 11
+    cw, ch = PROP_W * scale, PROP_H * scale
+    rows = (len(ids) + cols - 1) // cols
+    sheet = Image.new("RGBA", (cols * (cw + pad) + pad,
+                               rows * (ch + label_h + pad) + pad),
+                      tuple(mix(C["bg"], BLACK, 0.3)) + (255,))
+    d = ImageDraw.Draw(sheet)
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        font = None
+    for i, pid in enumerate(ids):
+        p = PROP_BY_ID[pid]
+        fw, fh = p["foot"]
+        cx = pad + (i % cols) * (cw + pad)
+        cy = pad + (i // cols) * (ch + label_h + pad)
+        under = Image.new("RGBA", (PROP_W, PROP_H))
+        for ty in range(3):
+            for tx in range(2):
+                under.paste(fill("floor_boards", 0), (tx * N, ty * N))
+        # the footprint: base cell is the bottom-centre one, (32, 64)..(64, 96)
+        mark = Image.new("RGBA", (PROP_W, PROP_H), (0, 0, 0, 0))
+        md = ImageDraw.Draw(mark)
+        for fy in range(fh):
+            for fx in range(fw):
+                x = PROP_AX - N // 2 + fx * N
+                y = PROP_AY - N - fy * N
+                md.rectangle([x, y, x + N - 1, y + N - 1],
+                             fill=tuple(C["accent"]) + (70,),
+                             outline=tuple(C["accent"]) + (200,))
+        under.alpha_composite(mark)
+        under.alpha_composite(sprites[pid])
+        sheet.paste(under.resize((cw, ch), Image.NEAREST), (cx, cy))
+        bb = sprites[pid].getbbox() or (0, 0, 0, 0)
+        d.text((cx, cy + ch + 1), "%s %dx%d in %dx%d%s"
+               % (pid, bb[2] - bb[0], bb[3] - bb[1], fw * N, fh * N,
+                  "" if p["solid"] else " walk"),
+               fill=tuple(C["text"]) + (255,), font=font)
+    return sheet
 
 
 def contact_sheet(built, scale=4, cols=5):
@@ -3821,6 +4132,7 @@ def main():
     save(contact_sheet(built), "_sheet_x4.png")
     save(overlay_sheet(ov_tiles), "_overlays_x3.png")
     save(prop_sheet(pr_sprites), "_props_x2.png")
+    save(furniture_sheet(pr_sprites), "_furniture_x3.png")
     comps = build_compositions(ov_tiles, pr_sprites)
     comps["cliffs"] = cliff_demo(ov_tiles, pr_sprites, _cl)
     comps["interior"] = interior_demo(ov_tiles, pr_sprites)
