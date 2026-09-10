@@ -62,6 +62,14 @@ What changed in the rework, and why -- measured, not asserted:
 Colours are read from data/themes/firstlight.json and mixed. Nothing here is a
 free-floating hex -- see COOL / WARM / SKIN / SHADOW.
 
+The townsfolk builder also carries a STYLE LAYER -- see `STYLES` and the long
+comment above it. A style is a named set of numbers for the five axes the SNES
+field-sprite reference in AESTHETIC-SEEDS/ differs from this figure on
+(proportion, the face, the outline, the shading, the palette), and `current` is
+defined to reproduce the shipped cast byte for byte. Nothing here picks one:
+`tools/candidates.py --styles` renders the comparison into the curation gallery
+and a person decides.
+
     python3 tools/make_sprites.py      # writes assets/sprites/*.png
 """
 import hashlib
@@ -225,7 +233,7 @@ def sculpt(f, spans, keys, dy=0, hi=2, sh=3):
         f.px(x1, yy, cool(k + 2))
 
 
-def rim(img):
+def rim(img, S=None):
     """A hard rim in near-black around every opaque pixel.
 
     This is the single most important pass in the file, and it is the same pass
@@ -238,7 +246,17 @@ def rim(img):
 
     Derived from the alpha mask rather than drawn, so it can never disagree
     with the pose.
+
+    `S`, when a style hands one in, makes the rim LOCAL: each edge pixel takes
+    a darker step of the darkest material it touches instead of the one flat
+    OUTLINE. That is what the SNES reference does and it is why its figures sit
+    in their scenes rather than on them -- a single near-black line round a
+    pale linen apron is a sticker's die-cut, and the eye reads it as one. The
+    default is `rim_local = 0`, which is OUTLINE exactly, so the player, Spite,
+    the animals and the shipped town come out of here byte-identical.
     """
+    S = S or STYLES["current"]
+    local = S["rim_local"] or S["rim_deep"]
     w, h = img.size
     src = img.load()
     edge = []
@@ -246,14 +264,24 @@ def rim(img):
         for x in range(w):
             if src[x, y][3]:
                 continue
+            near = None
             for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0),
                            (1, 1), (-1, -1), (1, -1), (-1, 1)):
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < w and 0 <= ny < h and src[nx, ny][3] == 255:
-                    edge.append((x, y))
-                    break
-    for (x, y) in edge:
-        img.putpixel((x, y), tuple(OUTLINE) + (255,))
+                    c = src[nx, ny][:3]
+                    # The DARKEST neighbour, not the first or the average. A
+                    # contour lighter than the material inside it is a highlight
+                    # along the edge, which at 1:1 makes the figure look wet.
+                    if near is None or luma(c) < luma(near):
+                        near = c
+                    if not local:
+                        break
+            if near is not None:
+                edge.append((x, y, near))
+    for (x, y, near) in edge:
+        img.putpixel((x, y), tuple(_contour_px(near, S) if local else OUTLINE)
+                     + (255,))
     return img
 
 
@@ -861,6 +889,11 @@ def main():
     write_animals(save, grounds)
     spite_cels = write_spite(save, grounds, cels)
     write_town(save, grounds, cels, spite_cels)
+    # The style layer writes nothing into assets/ -- it is a comparison, not a
+    # decision, and `tools/candidates.py --styles` is where the pictures go.
+    # What it owes the build is proof that every style it offers still obeys
+    # the contracts, which is cheap and is checked on every run.
+    style_report(grounds)
 
     # Prove the contract rather than assert it.
     print()
@@ -2397,6 +2430,357 @@ def skin5(base):
             mix(C["bg"], BLACK, 0.30)]
 
 
+# --- the style layer ------------------------------------------------------------
+#
+# The figure above is drawn one way, and that way is an oil sketch: four heads
+# tall, a face that is a smudge at 1:1, no contour, many close mid-tones and a
+# palette that has had the chroma washed out of it by the same `_toward_bg()`
+# that keeps it off the ground. Kevin's note is "think more chrono trigger or
+# secret of mana era sprite characters", and the seeds those two games are in
+# AESTHETIC-SEEDS/ already -- they are what the MAP was drawn against, and the
+# characters are the part of the game that never followed.
+#
+# So this is a comparison, not a decision. `current` below is the control and is
+# byte-for-byte the figure that shipped; the others are readings of the SNES
+# field-sprite grammar, and they differ from each other on the five axes the
+# reference actually differs from us on. Every one of those axes is a number in
+# STYLE_DEFAULTS, not a hand-drawn alternative figure, because three hardcoded
+# figures would tell you which of three drawings you liked and nothing about
+# WHY -- and the point of the exercise is to learn which axis did the work.
+#
+#   PROPORTION  `heads` -- the figure's height measured in head-heights. Ours is
+#               3.8, which is near-realistic; a Chrono Trigger field sprite is
+#               2.5 to 3. The frame, the 44-row SOLE contract and each
+#               character's own total height are all untouched: the head grows
+#               and the torso and legs are shortened to pay for it, so the
+#               renderer's foot-anchoring cannot notice.
+#   THE FACE    `eye_w` / `eye_h` / `eye_lit` / `brow_gap`. At field scale CT
+#               gives you two unmistakable eyes and a mood; we give two dark
+#               pixels with a brow sitting directly on them, which merges into
+#               one smudge. Bigger, and with bare forehead between brow and eye.
+#   THE OUTLINE `rim_local` / `rim_deep` / `head_contour`. CT carries a hard 1px
+#               contour in a DARKER STEP OF THE ADJACENT MATERIAL. Pure black on
+#               this palette reads as a sticker, so the contour is mixed from
+#               the neighbour toward OUTLINE rather than set to it.
+#   THE SHADING `cel_up` / `cel_dn` / the band fractions / `edge_extra`. Ours is
+#               four tones in narrow strips, which at 20px across is a gradient.
+#               Cel shading is three tones, wide, with one big step at the turn.
+#   THE PALETTE `sat` / `spread` / `dark_mode`. Every hue still comes out of
+#               data/themes/firstlight.json -- nothing here invents a colour --
+#               but a ramp may be built with the chroma pushed away from its own
+#               grey and the light and dark ends pulled further apart.
+#
+# WHAT A STYLE MAY NOT DO. It may not move the sole, the centre line or the
+# frame; it may not put a value in the 43..90 hole that sand, ice, dune and snow
+# live in (`_sat_ramp` re-solves the two dark steps after saturating, for
+# exactly that reason); and it may not make the face the brightest thing on the
+# figure -- the beak that `town_report()` measures for. `style_report()` at the
+# bottom of this section measures all four on every style rather than trusting
+# that they were written carefully.
+
+STYLE_DEFAULTS = dict(
+    # --- proportion
+    heads=None,              # None == leave the character's own numbers alone
+    head_gain=1.0,           # the skull widens with it, or it is an egg
+    body_gain=1.0,           # ...and the body narrows, so the head OUTRANKS it
+    head_taper=(4, 2),       # rows knocked off the width at each end of the oval
+    hairline_frac=None,      # hair as a fraction of the skull, not of the old head
+    temple=0,                # rows of hair down the sides, below the hairline
+    eye_dy=0,                # eyes lower in the skull than the scale alone gives
+    # --- the face
+    notch=3,                 # how wide the face is cut out of the profile skull
+    eye_w=2, eye_h=1,        # the dark of one eye, in pixels
+    eye_lit=False,           # the bottom row is sclera with a pupil in it
+    brow_gap=0,              # bare forehead rows between the brow and the eye
+    brow_w=2, mouth_w=2, lip_shade=True,
+    # --- the outline
+    rim_local=0.0,           # 0 the one flat OUTLINE, 1 the neighbour's own dark
+    rim_deep=0.0,            # and then this far further toward black
+    head_contour=False,      # a contour where the head meets the body, not air
+    # --- the shading
+    cel_up=1, cel_dn=1,      # ramp steps to the lit and the shaded band
+    cel_hi_frac=None,        # band widths as a fraction of the row, not px
+    cel_sh_frac=None,
+    edge_extra=True,         # the fourth tone in the last column
+    crown_break=0.16, waist_break=0.66,
+    # --- the palette
+    sat=0.0, sat_hair=0.0, sat_skin=0.0,
+    spread=0.0,              # the lit end pushed up, the mid pushed down
+    dark_mode="bg",          # "bg" desaturates the folds; "black" keeps the hue
+)
+
+
+def style(**over):
+    """One style: the defaults, with the axes this style actually moves named.
+
+    Written this way round so that reading a style tells you what it is FOR --
+    `hard25` is four numbers, and they are the four claims it makes.
+    """
+    S = dict(STYLE_DEFAULTS)
+    unknown = [k for k in over if k not in S]
+    if unknown:
+        # A misspelled axis does not raise anywhere else: it would sit in the
+        # dict unread and the style would silently be the default with a
+        # confident name on it. That is the same failure candidates.py's
+        # `axes()` exists to prevent for crowns, and it is worth the four lines.
+        raise KeyError("style: no such axis %s" % ", ".join(sorted(unknown)))
+    S.update(over)
+    return S
+
+
+STYLES = {
+    # The control. Every axis at its default, which is defined to reproduce the
+    # figure that shipped -- if this one ever renders differently from a clean
+    # checkout, the style layer has leaked into the base and the comparison is
+    # worthless.
+    "current": style(),
+
+    # Three heads, and the contour is a suggestion rather than a line. This is
+    # the conservative reading of the reference: the proportion changes, the
+    # face gets big enough to hold two real eyes, and the shading goes to three
+    # wide tones -- but the outline keeps most of the local hue and the palette
+    # is barely touched, so the figure still belongs to this game's dusk.
+    # A two-wide eye with the sclera row still in it. Solid dark at two rows it
+    # is a bar across the socket, which on a small head is the goggles failure
+    # `hu_face_front` already records for the brows -- the eye has to have
+    # something INSIDE it or it is not an eye, however small it is.
+    "soft3": style(
+        heads=3.0, head_gain=1.16, body_gain=0.96, head_taper=(6, 3, 1),
+        hairline_frac=0.42, temple=2, eye_dy=0, notch=4,
+        eye_w=2, eye_h=2, eye_lit=True, brow_gap=1, mouth_w=3,
+        rim_local=0.55, rim_deep=0.20,
+        cel_hi_frac=0.30, cel_sh_frac=0.24, edge_extra=False,
+        crown_break=0.14, waist_break=0.60,
+        sat=0.18, sat_hair=0.12, sat_skin=0.06, spread=0.10,
+    ),
+
+    # Two and a half heads, a hard contour that also runs where the head meets
+    # the shoulders, and the biggest eyes in the file -- three pixels across,
+    # two down, with a catchlight. This is the closest reading of the grammar:
+    # in Secret of Mana the head-and-hair mass is very nearly two fifths of the
+    # whole figure and the eye is a legible object rather than a mark.
+    "hard25": style(
+        heads=2.5, head_gain=1.24, body_gain=0.88, head_taper=(6, 3, 1),
+        hairline_frac=0.48, temple=4, eye_dy=0, notch=6,
+        eye_w=3, eye_h=2, eye_lit=True, brow_gap=1, brow_w=3, mouth_w=4,
+        rim_local=0.35, rim_deep=0.30, head_contour=True,
+        cel_hi_frac=0.32, cel_sh_frac=0.28, edge_extra=False,
+        crown_break=0.12, waist_break=0.58,
+        sat=0.28, sat_hair=0.18, sat_skin=0.08, spread=0.16,
+    ),
+
+    # The loud one. Proportion between the other two, and everything else turned
+    # up: three tones with a TWO-step drop at the turn instead of one, the folds
+    # darkened toward black so they keep their hue instead of going grey-blue,
+    # and the chroma pushed until each garment holds a colour you could name
+    # from across the street. It is the test of whether this palette can carry
+    # SNES saturation at all, or whether First Light's dusk is the actual limit.
+    "bold": style(
+        heads=2.7, head_gain=1.22, body_gain=0.92, head_taper=(6, 3, 1),
+        hairline_frac=0.45, temple=3, eye_dy=0, notch=6,
+        eye_w=3, eye_h=2, eye_lit=True, brow_gap=1, brow_w=3, mouth_w=4,
+        rim_local=0.45, rim_deep=0.35, head_contour=True,
+        cel_up=1, cel_dn=2, cel_hi_frac=0.34, cel_sh_frac=0.30, edge_extra=False,
+        crown_break=0.12, waist_break=0.56,
+        sat=0.60, sat_hair=0.40, sat_skin=0.16, spread=0.30, dark_mode="black",
+    ),
+}
+
+
+def saturate(c, k):
+    """Push a colour away from its own grey, along the line it is already on.
+
+    This invents no hue: the result is the theme's own colour with the distance
+    from its luma multiplied, which is the difference between "desaturated
+    mush" and "each garment holds a clear local hue". k == 0 is the identity, so
+    the control is untouched.
+    """
+    if not k:
+        return tuple(c)
+    g = luma(c)
+    return tuple(int(round(max(0, min(255, g + (v - g) * (1.0 + k))))) for v in c)
+
+
+def _toward_black(base, target):
+    """A darker step of `base` at exactly `target` luma, hue intact.
+
+    The bracket's other darkener, `_toward_bg()`, mixes toward #12131C and so
+    takes the chroma out on the way down -- which is right for the shipped look
+    and wrong for a style whose whole claim is that the folds should still be
+    the garment's colour. Scaling toward black is linear in luma too, so it hits
+    the same targets FOLD_L and DEEP_L and the ground bracket still holds.
+    """
+    la = luma(base)
+    if la <= target:
+        return tuple(base)
+    return mix(base, BLACK, 1.0 - target / la)
+
+
+def _sat_ramp(ramp, S, k, bracket):
+    """One ramp, restyled: saturated, spread, and re-bracketed if it is cloth.
+
+    The re-bracket is not optional. Saturating a green cloak lifts its dark
+    steps by a dozen luma and drops them straight into the 43..90 band where
+    sand, ice, dune and snow live -- the exact failure `cloth5()` was written to
+    avoid -- so the two dark steps are solved back onto FOLD_L and DEEP_L after
+    the chroma has been pushed, not before.
+    """
+    out = [saturate(c, k) for c in ramp]
+    if S["spread"] and len(out) >= 3:
+        out[0] = mix(out[0], C["text"], S["spread"])
+        out[2] = mix(out[2], C["line"], S["spread"] * 0.6)
+    if bracket and len(out) >= 5:
+        dark = _toward_black if S["dark_mode"] == "black" else _toward_bg
+        out[3] = dark(out[3], FOLD_L)
+        out[4] = dark(out[4], DEEP_L)
+    return out
+
+
+def _restyle_ramps(P, S):
+    """Every ramp the character carries, through `_sat_ramp` exactly once.
+
+    Memoised on identity because the defaults in `townsperson()` alias: a vest's
+    `body_ramp` IS its `trim` list and a plain coat's IS its `cloth`, so without
+    the memo those characters would come out of here saturated twice and the
+    town would not be one town.
+    """
+    if not (S["sat"] or S["sat_hair"] or S["sat_skin"] or S["spread"]):
+        return
+    memo = {}
+
+    def go(ramp, k, bracket):
+        key = id(ramp)
+        if key not in memo:
+            memo[key] = _sat_ramp(ramp, S, k, bracket)
+        return memo[key]
+
+    for name in ("cloth", "trim", "trouser", "body_ramp", "shawl", "boots"):
+        if P.get(name):
+            P[name] = go(P[name], S["sat"], bracket=len(P[name]) >= 5)
+    P["hair"] = go(P["hair"], S["sat_hair"], bracket=False)
+    P["skin"] = go(P["skin"], S["sat_skin"], bracket=False)
+    if P.get("patch"):
+        P["patch"] = tuple(go(r, S["sat"], bracket=True) for r in P["patch"])
+
+
+def _restyle_build(P, S):
+    """Re-divide the vertical budget so the figure is `heads` heads tall.
+
+    THE THREE THINGS THIS MAY NOT MOVE are the frame, SOLE, and the character's
+    own total height -- a townsperson who is 34 rows tall is 34 rows tall in
+    every style, because that is her identity against the cast and because the
+    renderer anchors the sole to the cell. What changes is how those rows are
+    spent: the head takes rows/heads of them and the neck, torso and legs are
+    scaled down together to pay, IN THE CHARACTER'S OWN PROPORTIONS. Doing it
+    that way rather than from a table of absolutes is what keeps Mrs Ollard's
+    long skirt long and Bram's short legs short after the restyle -- a fixed
+    table would have made all six the same person at three different heights.
+    """
+    if not S["heads"]:
+        return
+    rows = SOLE - P["crown"] + 1
+    h0 = P["head_h"]
+    neck0 = P["neck_rows"]
+    sy0 = P["crown"] + h0 + neck0
+    torso0 = max(1, P["hem_y"] - sy0 + 1)
+    legs0 = max(1, SOLE - P["hem_y"])
+
+    head_h = max(8, int(round(rows / float(S["heads"]))))
+    rest = rows - head_h
+    scale = rest / float(max(1, neck0 + torso0 + legs0))
+    neck = max(1, int(round(neck0 * scale)))
+    left = max(2, rest - neck)
+    torso = max(6, int(round(left * torso0 / float(torso0 + legs0))))
+    # Six rows of leg is the floor: at five the boot IS the leg and the walk
+    # cycle has nothing left to lift, which reads as a figure sliding rather
+    # than a figure stepping.
+    if left - torso < 6:
+        torso = max(6, left - 6)
+
+    r = head_h / float(h0)
+    head_w = min(20, max(8, int(round(P["head_w"] * S["head_gain"]))))
+    # The head grows and the BODY GIVES WAY. Widening the skull on unchanged
+    # shoulders makes a bobblehead -- the head is bigger but it is not the
+    # subject, because the widest thing in the silhouette is still the chest.
+    # In the reference the head is very nearly as wide as the shoulders, and
+    # that ranking, not the head's absolute size, is what makes a figure read
+    # as a SNES field sprite rather than as a normal figure with a swollen
+    # skull. The shadow narrows with the body or the figure stands in a puddle.
+    if S["body_gain"] != 1.0:
+        for k in ("sh_w", "chest_w", "elbow_w", "waist_w", "hem_w"):
+            P[k] = max(8, int(round(P[k] * S["body_gain"])))
+        P["shadow"] = P["shadow"] * S["body_gain"]
+    # THE HAIR IS THE HEAD, at this scale. Scaling the old hairline with the
+    # skull keeps hair at the 36% of it that an eleven-row head had, and the
+    # first cut of this came out as six tan beach balls with a cap on top --
+    # the face was nine rows of flat skin and the eye had nothing to sit under.
+    # In the reference the hair-and-crown mass is very nearly half the head and
+    # it comes DOWN THE SIDES past the eye, which is what `temple` draws.
+    if S["hairline_frac"]:
+        hairline = max(2, min(head_h - 5, int(round(head_h * S["hairline_frac"]))))
+    else:
+        hairline = max(2, min(head_h - 5, int(round(P["hairline"] * r))))
+    # The eye sits two rows under the hairline and the mouth two under that,
+    # which puts both LOW in the skull -- where a face that is mostly forehead
+    # reads as a child and a face that is mostly jaw reads as a skull.
+    eye_y = max(hairline + 1, min(head_h - 3, hairline + 2 + S["eye_dy"]))
+    P.update(
+        head_h=head_h, head_w=head_w, hairline=hairline, eye_y=eye_y,
+        neck_rows=neck, hem_y=P["crown"] + head_h + neck + torso - 1,
+        # The mouth sits two rows under the nose and the nose directly under
+        # the eye, so the gap between them does not scale with the skull. Left
+        # to scale, a seventeen-row head puts three blank rows of cheek between
+        # eye and mouth and every character in the cast reads as sixty. The
+        # character's own delta survives as the offset from the base's three,
+        # which is what keeps a child's mouth high in the face.
+        mouth_dy=max(2, min(head_h - eye_y - 1,
+                            S["eye_h"] + 2 + P["mouth_dy"] - 3)),
+        # The eyes move apart with the skull. Held at the old separation on a
+        # head four pixels wider they crowd the middle of the face and the
+        # figure reads cross-eyed, which is the one expression nobody ordered.
+        eye_sep=max(2, P["eye_sep"] + (head_w - P["head_w"]) // 2),
+    )
+
+
+def _contour_px(c, S):
+    """The contour colour for a pixel of material `c`.
+
+    A darker step of the adjacent material rather than a colour of its own.
+    `rim_local` at 0 gives exactly OUTLINE and the shipped rim is unchanged; at
+    1 the contour is entirely the neighbour's own dark, which round a pale apron
+    is a warm brown line and round a blue cloak a cold one -- which is the whole
+    of why a CT figure does not look stickered onto its background.
+    """
+    dark = mix(c, OUTLINE, 0.62)
+    out = mix(OUTLINE, dark, S["rim_local"])
+    return mix(out, BLACK, S["rim_deep"]) if S["rim_deep"] else out
+
+
+def inner_contour(f, spans, S, ramp_for):
+    """A contour on the head where it meets the BODY rather than the air.
+
+    `rim()` closes the silhouette and nothing else, so a 17-row skull sitting on
+    a pair of shoulders has no line under the jaw and the two masses run
+    together into one blob -- which at 2.5 heads is most of the figure. This
+    draws the missing edge, and only the missing edge: a pixel is darkened only
+    where the pixel just outside the head is already opaque, so where the rim is
+    doing the job this adds nothing and the contour never doubles to two px.
+    """
+    src = f.img.load()
+
+    def opaque(x, y):
+        return 0 <= x < FW and 0 <= y < FH and src[x, y][3] == 255
+
+    for i, (y, x0, x1) in enumerate(spans):
+        last = i == len(spans) - 1
+        for x in ((x0, x1) if not last else range(x0, x1 + 1)):
+            if not opaque(x, y):
+                continue
+            nb = [(x - 1, y), (x + 1, y)] if not last else [(x, y + 1)]
+            if any(opaque(nx, ny) for nx, ny in nb):
+                f.px(x, y, _contour_px(ramp_for(y), S))
+
+
 # --- geometry from scalars ------------------------------------------------------
 
 def _row(y, w):
@@ -2408,12 +2792,19 @@ def _row(y, w):
     return (y, x0, x0 + w - 1)
 
 
-def oval(top, rows, w):
-    """A skull: full width through the middle, two rows of taper at each end."""
+def oval(top, rows, w, taper=(4, 2)):
+    """A skull: full width through the middle, tapered at each end.
+
+    `taper` is how many pixels come off the width on the outermost row, the one
+    inside it, and so on. Two rows of it is right for an eleven-row head and
+    wrong for a seventeen-row one -- at that size a two-row taper is a tin, and
+    a CT skull is a dome over a jaw. The style supplies the profile so that the
+    shipped figure keeps exactly the (4, 2) it was drawn with.
+    """
     out = []
     for i in range(rows):
         d = min(i, rows - 1 - i)
-        out.append(_row(top + i, w - (4 if d == 0 else 2 if d == 1 else 0)))
+        out.append(_row(top + i, w - (taper[d] if d < len(taper) else 0)))
     return out
 
 
@@ -2458,9 +2849,10 @@ def profile_keys(P, depth=1.0):
 
 def geometry(P, side=False):
     """Every span table one townsperson needs, from the scalars in P."""
+    S = P.get("_style") or STYLES["current"]
     top = P["crown"]
     hh, hw = P["head_h"], P["head_w"]
-    head = oval(top, hh, hw + (2 if side else 0))
+    head = oval(top, hh, hw + (2 if side else 0), S["head_taper"])
     if side:
         # The skull carries its mass BEHIND the ear, and the face is a notch cut
         # out of the front of it. Shifting the whole oval one pixel forward and
@@ -2497,16 +2889,18 @@ def body_keys(P, n):
     one barrel of cloth from the collar to the hem. Spite's SP_BODY_F_K is this
     table written out by hand; this is the rule it was written from.
     """
+    S = P.get("_style") or STYLES["current"]
     out = []
     for i in range(n):
         t = i / float(max(1, n - 1))
-        out.append(0 if t < 0.16 else (1 if t < 0.66 else 2))
+        out.append(0 if t < S["crown_break"] else
+                   (1 if t < S["waist_break"] else 2))
     return out
 
 
 # --- painting -------------------------------------------------------------------
 
-def paint_spans(f, spans, ramp, keys, dy=0, hi=2, sh=3):
+def paint_spans(f, spans, ramp, keys, dy=0, hi=2, sh=3, S=None):
     """sculpt(), for a figure that is not made of COOL.
 
     Identical light -- the leftmost `hi` pixels a step lighter, the rightmost
@@ -2514,7 +2908,16 @@ def paint_spans(f, spans, ramp, keys, dy=0, hi=2, sh=3):
     the one function that makes the whole town look like it is standing in the
     same weather as the traveller, so nothing below is allowed to paint a
     garment any other way.
+
+    The style, if there is one, decides how WIDE those two bands are and how
+    BIG the step is. Fixed at two and three pixels they are strips down the
+    edge of a twenty-pixel body, and four tones in strips that narrow is a soft
+    gradient however hard each individual edge is. Cel shading is the other
+    way round: a third of the row lit, a quarter shaded, one decisive step
+    between them, and no fourth tone in the last column at all -- the contour
+    is what carries the edge, and `edge_extra` is what hands it that job.
     """
+    S = S or STYLES["current"]
     if isinstance(keys, int):
         keys = [keys] * len(spans)
 
@@ -2523,10 +2926,14 @@ def paint_spans(f, spans, ramp, keys, dy=0, hi=2, sh=3):
 
     for (y, x0, x1), k in zip(spans, keys):
         yy = y + dy
+        w = x1 - x0 + 1
+        hb = hi if S["cel_hi_frac"] is None else max(hi, int(round(w * S["cel_hi_frac"])))
+        sb = sh if S["cel_sh_frac"] is None else max(sh, int(round(w * S["cel_sh_frac"])))
         f.row(yy, x0, x1, R(k))
-        f.row(yy, x0, min(x1, x0 + hi - 1), R(k - 1))
-        f.row(yy, max(x0, x1 - sh + 1), x1, R(k + 1))
-        f.px(x1, yy, R(k + 2))
+        f.row(yy, x0, min(x1, x0 + hb - 1), R(k - S["cel_up"]))
+        f.row(yy, max(x0, x1 - sb + 1), x1, R(k + S["cel_dn"]))
+        if S["edge_extra"]:
+            f.px(x1, yy, R(k + S["cel_dn"] + 1))
 
 
 # --- the crown ------------------------------------------------------------------
@@ -2538,6 +2945,7 @@ def paint_spans(f, spans, ramp, keys, dy=0, hi=2, sh=3):
 # already taken, they need a different one.
 
 def hu_hair_front(f, P, dy, back):
+    S = P.get("_style") or STYLES["current"]
     G, hr = P["_g"], P["hair"]
     head, hl, kind = G["head"], P["hairline"], P["crown_kind"]
     rows = head if back else head[:hl]
@@ -2592,6 +3000,14 @@ def hu_hair_front(f, P, dy, back):
                 f.row(yy + dy, a, a + (1 if i != 1 else 2), hr[3])
                 f.row(yy + dy, b - (1 if i != 1 else 2), b, hr[4])
             f.px(mid + 1, head[hl][0] + dy, hr[3])
+    if S["temple"] and kind not in ("bald", "horseshoe") and not back:
+        # Hair down the sides, below the hairline and past the eye. Two pixels
+        # each side and no more: three is a wimple, and a full column all the
+        # way to the jaw is a bob on every character in the cast at once.
+        for (y, x0, x1) in head[hl:hl + S["temple"]]:
+            f.row(y + dy, x0, x0 + 1, hr[2])
+            f.px(x0, y + dy, hr[1])
+            f.row(y + dy, x1 - 1, x1, hr[3])
     if kind == "bun":
         # A knob, two rows proud of the crown and set BACK -- offset toward the
         # right, which is behind her in the front view. Drawn centred and
@@ -2623,24 +3039,57 @@ def hu_face_front(f, P, dy):
         for (y, x0, x1) in head[1:P["hairline"] + 1]:           # and its far side,
             f.row(y + dy, x1 - 1, x1, sk[3])                    # so it is a ball
 
+    S = P.get("_style") or STYLES["current"]
     ey = top + P["eye_y"]
     sep = P["eye_sep"]
-    lx, rx = 16 - sep // 2 - 2, 16 + sep // 2
+    # The pair is centred on CX whatever the eye is wide, which it would not be
+    # if the left eye grew rightwards from a fixed corner: a face half a pixel
+    # off its own centre line reads as a figure turning away, in every frame.
+    lx, rx = 16 - sep // 2 - S["eye_w"], 16 + sep // 2
     tilt = P.get("brow_tilt", (0, 0))
     # Whichever of the two dark values is actually dark. A white-haired woman
     # drawn with hair-coloured brows has no brows, and a face with no brows at
     # 32px has no expression -- it is the one feature that reads at this size.
     brow = hr[3] if luma(hr[3]) < luma(sk[3]) else sk[3]
     for i, x in enumerate((lx, rx)):
-        f.row(ey - 1 + tilt[i] + dy, x, x + 1, brow)            # two pixels each.
-        f.row(ey + dy, x, x + 1, sk[4])                         # a bar is goggles
-    f.px(15, ey + 1 + dy, sk[0])                                # the nose: one lit
-    f.px(16, ey + 1 + dy, sk[2])                                # pixel and its shade
+        # `brow_gap` is bare forehead between the brow and the eye. At zero --
+        # which is what shipped -- the two dark marks touch and merge into one
+        # smudge per socket, and that smudge is the whole reason the current
+        # figure has no face at 1:1. One row of skin between them is what turns
+        # two marks into an eye with an expression over it.
+        f.row(ey - 1 - S["brow_gap"] + tilt[i] + dy, x, x + S["brow_w"] - 1,
+              brow)                                             # two pixels each.
+        for k in range(S["eye_h"]):
+            f.row(ey + k + dy, x, x + S["eye_w"] - 1, sk[4])    # a bar is goggles
+        if S["eye_lit"]:
+            # THE EYE AS AN OBJECT, not a mark: a dark lash row with a pale
+            # sclera under it and the pupil in the middle of that. It is what
+            # the SNES reference actually draws and it is the difference
+            # between a face you can read a mood off and two smudges.
+            #
+            # The sclera is a warm off-white and NOT C["text"]: a true white
+            # here is the brightest pixel on the whole figure, which is the
+            # beak failure town_report() measures for, and on a dark-skinned
+            # character it also reads as a stare. Mixed halfway to the text
+            # colour it clears the pupil by ninety luma, which is more than
+            # enough at 1:1, and still sits under the lit cloth.
+            ly = ey + S["eye_h"] - 1 + dy
+            f.row(ly, x, x + S["eye_w"] - 1, mix(sk[0], C["text"], 0.50))
+            f.px(x + (S["eye_w"] - 1) // 2, ly, sk[4])
+    # The nose goes UNDER the eyes, not beside them. Left on the old ey + 1 it
+    # lands inside a two-row eye and the two bright pixels either side of it
+    # read as nostrils -- a snout, which is this file's beak all over again.
+    nyy = ey + max(1, S["eye_h"])
+    f.px(15, nyy + dy, sk[0])                                   # the nose: one lit
+    f.px(16, nyy + dy, sk[2])                                   # pixel and its shade
     my = ey + P["mouth_dy"]
-    f.row(my + dy, 15, 16, sk[3])
-    f.px(17, my + dy, sk[3])                                    # a third at ONE
-    f.row(my + 1 + dy, 14, 17, sk[2])                           # corner; a wider
-                                                                # mouth is a moustache
+    ext = max(0, (S["mouth_w"] - 2) // 2)                       # symmetric, so the
+    f.row(my + dy, 15 - ext, 16 + ext, sk[3])                   # widening cannot
+    f.px(17 + ext, my + dy, sk[3])                              # become a sneer; a
+    if S["lip_shade"]:                                          # third at ONE
+        f.row(my + 1 + dy, 14 - ext, 17 + ext, sk[2])           # corner, and a
+                                                                # wider mouth is a
+                                                                # moustache
     if P.get("specs"):
         # Spectacles as the BOTTOM of two lenses and a bridge, never a rim all
         # the way round: a closed ring on a 12px head is goggles, which is the
@@ -2901,6 +3350,7 @@ def _front_edge(head, y):
 def hu_profile(P, pose):
     f = Frame()
     dy = 0 if pose == "neutral" else 1
+    S = P.get("_style") or STYLES["current"]
     G = geometry(P, side=True)
     P["_g"] = G
     cl, tr, sk, hr, bt = P["cloth"], P["trim"], P["skin"], P["hair"], P["boots"]
@@ -2908,9 +3358,9 @@ def hu_profile(P, pose):
     sy, hy, top = G["sy"], G["hy"], G["top"]
     kind, crown = P["garment"], P["crown_kind"]
 
-    paint_spans(f, G["neck"], cl, 2, dy, hi=1, sh=1)
-    paint_spans(f, body, P["body_ramp"], body_keys(P, len(body)), dy)
-    paint_spans(f, G["hem"], P["body_ramp"], 3, dy)
+    paint_spans(f, G["neck"], cl, 2, dy, hi=1, sh=1, S=S)
+    paint_spans(f, body, P["body_ramp"], body_keys(P, len(body)), dy, S=S)
+    paint_spans(f, G["hem"], P["body_ramp"], 3, dy, S=S)
 
     # --- the skull
     bare = crown in ("bald", "horseshoe")
@@ -2938,24 +3388,47 @@ def hu_profile(P, pose):
             f.row(y + dy, head[0][2] - 1, head[0][2] + 2, hr[1])
             f.px(head[0][2] + 2, y + 4 + dy, hr[4])
 
-    # --- the face, as a notch. Four pixels wide and no wider: the fix for the
-    # beak is to stop the skin before it becomes the silhouette.
+    # --- the face, as a notch. Three pixels wide on the shipped figure and no
+    # wider: the fix for the beak is to stop the skin before it becomes the
+    # silhouette. `notch` scales it with the skull, because three pixels of
+    # skin let into a nineteen-wide CT head is not a face, it is a scratch --
+    # the first cut of the restyle turned every profile into an undifferentiated
+    # brown boulder for exactly that reason.
+    nw = max(3, S["notch"])
     ey = top + P["eye_y"]
     jaw = head[-1][0]
     for y in range(ey - 1, jaw + 1):
         x0 = _front_edge(head, y)
-        f.row(y + dy, x0, x0 + 2, sk[1])
-        f.px(x0 + 2, y + dy, sk[2])
+        f.row(y + dy, x0, x0 + nw - 1, sk[1])
+        f.px(x0 + nw - 1, y + dy, sk[2])
+    if not bare and nw > 3:
+        # The hairline down the front of the notch. Without it the hair and the
+        # face are two flat masses meeting with no edge, and on a warm-haired,
+        # warm-skinned character -- half this cast -- they are the same value
+        # and the head has no features at all.
+        for y in range(ey - 1, min(jaw, ey + 1) + 1):
+            f.px(_front_edge(head, y) + nw, y + dy, hr[4])
     ex = _front_edge(head, ey)
-    f.px(ex, ey + dy, sk[4])                               # the eye
-    ny = ey + 1
+    ew = max(1, S["eye_w"] - 1)
+    for k in range(S["eye_h"]):                            # the eye, the same
+        f.row(ey + k + dy, ex, ex + ew - 1, sk[4])         # size it is in front,
+                                                           # or the figure blinks
+                                                           # when it turns
+    if S["eye_lit"]:
+        f.row(ey + S["eye_h"] - 1 + dy, ex, ex + ew - 1,
+              mix(sk[0], C["text"], 0.50))
+        f.px(ex + ew - 1, ey + S["eye_h"] - 1 + dy, sk[4])  # the pupil forward,
+                                                            # because he is
+                                                            # looking that way
+    ny = ey + max(1, S["eye_h"])
     nx = _front_edge(head, ny)
     f.row(ny + dy, nx - 1, nx + 1, sk[1])                  # the nose, out one px
     f.px(nx - 1, ny + dy, sk[0])
     f.px(nx, ny + 1 + dy, sk[2])                           # its own shade under it
     my = ey + P["mouth_dy"]
     f.px(_front_edge(head, my), my + dy, sk[3])
-    f.px(_front_edge(head, my) + 1, my + dy, sk[2])
+    f.row(my + dy, _front_edge(head, my) + 1,
+          _front_edge(head, my) + max(1, nw - 3), sk[2])
     if not bare:
         f.px(_front_edge(head, ey - 1) + 2, ey - 1 + dy, hr[4])     # fringe over brow
     if P.get("specs"):
@@ -3049,6 +3522,11 @@ def hu_profile(P, pose):
 
     leg(far, fl, 1, 0)
     leg(near, nl, 0, 2)
+    if S["head_contour"]:
+        hl = P["hairline"] if crown not in ("bald", "horseshoe") else 0
+        hairy = head[0][0] + hl
+        inner_contour(f, head, S,
+                      lambda y: P["hair"][3] if y < hairy else sk[2])
     return f
 
 
@@ -3160,14 +3638,24 @@ PROPS = {"stick": prop_stick, "jar": prop_jar,
 def hu_frontal(P, pose, back):
     f = Frame()
     dy = 0 if pose == "neutral" else 1
+    S = P.get("_style") or STYLES["current"]
     G = geometry(P, side=False)
     P["_g"] = G
-    paint_spans(f, G["neck"], P["cloth"], 2, dy, hi=1, sh=1)
-    paint_spans(f, G["body"], P["body_ramp"], body_keys(P, len(G["body"])), dy)
-    paint_spans(f, G["hem"], P["body_ramp"], 3, dy)
+    paint_spans(f, G["neck"], P["cloth"], 2, dy, hi=1, sh=1, S=S)
+    paint_spans(f, G["body"], P["body_ramp"], body_keys(P, len(G["body"])), dy,
+                S=S)
+    paint_spans(f, G["hem"], P["body_ramp"], 3, dy, S=S)
     hu_hair_front(f, P, dy, back)
     if not back:
         hu_face_front(f, P, dy)
+    if S["head_contour"]:
+        # Before the garment, not after: the collar and the shawl sit ON the
+        # jaw line, and a contour drawn over them cuts the neck off the body.
+        hl = P["hairline"] if P["crown_kind"] not in ("bald", "horseshoe") else 0
+        hairy = G["head"][0][0] + hl
+        inner_contour(f, G["head"], S,
+                      lambda y: (P["hair"][3] if y < hairy or back
+                                 else P["skin"][2]))
     hu_garment_front(f, P, dy, back)
     # The garment swings a column against the stride, as the traveller's cloak
     # and Spite's coat both do. Without it the legs walk and the body does not.
@@ -3204,8 +3692,10 @@ def hu_build_all(P):
     prof = recentre([hu_build(P, "left", po) for po in FRAMES])
     for po, im in zip(FRAMES, prof):
         cels[("left", po)] = im
+    S = P.get("_style") or STYLES["current"]
     for key in list(cels):
-        contact_shadow(rim(cels[key]), rx=P["shadow"], ry=P.get("shadow_y", 4.0))
+        contact_shadow(rim(cels[key], S), rx=P["shadow"],
+                       ry=P.get("shadow_y", 4.0))
     lb = [cels[("left", po)].getbbox() for po in FRAMES]
     lc = (min(b[0] for b in lb) + max(b[2] for b in lb) - 1) / 2.0
     for po in FRAMES:
@@ -3302,9 +3792,21 @@ ROSE = cloth5(mix(mix(C["danger"], C["muted"], 0.25), C["line"], 0.18))
 STOCKING = cloth5(mix(C["line"], C["bg"], 0.28))
 
 
-def townsperson(**delta):
+def townsperson(style="current", **delta):
+    """One character: the base, the character's deltas, and then the style.
+
+    THE ORDER IS THE CONTRACT. The deltas come first and the style last, over
+    all of them, so a style is a thing done to the WHOLE CAST and cannot be a
+    thing done to one townsperson -- which is what keeps Pell, Bird, Mrs
+    Ollard, Bram, Tobin and Cobb one town rather than a town with a guest in
+    it, exactly as `docs/CHARACTER-TOWNSFOLK.md` says they must be. Passing a
+    style is the only way to get one; there is no per-character override and
+    there should not be.
+    """
+    S = STYLES[style] if isinstance(style, str) else style
     P = dict(TOWNSPERSON)
     P.update(delta)
+    P["_style"] = S
     P.setdefault("skin", SKIN_PALE)
     P.setdefault("hair", HAIR_DARK)
     if P["boots"] is None:
@@ -3324,17 +3826,28 @@ def townsperson(**delta):
         # collar to boot -- at 32 px a figure needs a value break at the waist
         # and a hue break at the hip or it is a bollard in a hat.
         P["trouser"] = SLATE_DK
+    # Last, and after every default has resolved, because the style restyles
+    # what is actually there: a vest's body_ramp is its trim and a coat's is
+    # its cloth, and both have to come out of _restyle_ramps() the same colour
+    # they went in as relative to each other.
+    _restyle_ramps(P, S)
+    _restyle_build(P, S)
     return P
 
 
-TOWN = {}
+# The six are DELTAS, not built figures, so that any style can be applied to
+# the real cast rather than to a stand-in. `townsperson()` takes the style over
+# all six at once, which is the enforcement of the one-base-plus-deltas
+# relationship docs/CHARACTER-TOWNSFOLK.md locks: there is nowhere to write a
+# per-character style even if somebody wanted to.
+TOWN_DELTAS = {}
 
 # --- Pell. Eleven, in charge, and correct.
 # Short and top-heavy: a child is not a small adult, it is a big head on a
 # short body, so the skull stays 12 wide on 14-wide shoulders where an adult
 # runs 12 on 18. Crown at y10 against the traveller's y1 -- 34 rows of figure
 # against his 44, and that difference is readable before anything else is.
-TOWN["kid_pell"] = townsperson(
+TOWN_DELTAS["kid_pell"] = dict(
     crown=11, head_h=10, head_w=12, hairline=4, eye_y=6, mouth_dy=2,
     neck_w=5, neck_rows=2,
     sh_w=14, chest_w=14, elbow_w=15, waist_w=14, hem_w=15, hem_y=36,
@@ -3348,7 +3861,7 @@ TOWN["kid_pell"] = townsperson(
 # --- Bird. Younger, on the wall, keeping the count. Shorter again, a mop
 # instead of a crown, dark hair against Pell's straw, and the jar -- which is
 # the only pale object either of them carries, held where your eye lands.
-TOWN["kid_bird"] = townsperson(
+TOWN_DELTAS["kid_bird"] = dict(
     crown=13, head_h=10, head_w=12, hairline=4, eye_y=6, mouth_dy=2,
     neck_w=5, neck_rows=2,
     sh_w=13, chest_w=13, elbow_w=14, waist_w=13, hem_w=14, hem_y=37,
@@ -3365,7 +3878,7 @@ TOWN["kid_bird"] = townsperson(
 # actually is; drawing her shorter would only have made her a child.
 # Her bun is the brightest crown in the game and it is meant to be: you are
 # supposed to be able to spot her at a window from the other end of the street.
-TOWN["busybody"] = townsperson(
+TOWN_DELTAS["busybody"] = dict(
     crown=9, head_h=10, head_w=12, hairline=4, eye_y=6,
     neck_w=6, neck_rows=3,
     sh_w=16, chest_w=16, elbow_w=17, waist_w=17, hem_w=24, hem_y=38,
@@ -3380,7 +3893,7 @@ TOWN["busybody"] = townsperson(
 # and 24 at the hem, a barrel rather than a wedge, and a bundle that clears the
 # crown from behind. He is the only figure carrying four hues, which is the
 # whole of "he picks things up" said in the outline.
-TOWN["bram"] = townsperson(
+TOWN_DELTAS["bram"] = dict(
     crown=3, head_h=11, head_w=14, hairline=4, eye_y=6,
     neck_w=7, neck_rows=2,
     sh_w=26, chest_w=26, elbow_w=26, waist_w=25, hem_w=24, hem_y=33,
@@ -3395,7 +3908,7 @@ TOWN["bram"] = townsperson(
 # goes 26 to 24. Bald, so his crown is the one smooth dome in a cast of hoods,
 # caps, mops, buns and crowns -- and the apron is the brightest garment in the
 # game at 203 luma, against a world that tops out at 72.
-TOWN["tobin"] = townsperson(
+TOWN_DELTAS["tobin"] = dict(
     crown=2, head_h=11, head_w=13, hairline=3, eye_y=6,
     neck_w=8, neck_rows=2,
     sh_w=26, chest_w=25, elbow_w=26, waist_w=21, hem_w=18, hem_y=32,
@@ -3409,7 +3922,7 @@ TOWN["tobin"] = townsperson(
 # a belly and reads as one; the only horseshoe; and the only spectacles, drawn
 # as two pixels of glint and a bridge because a rim all the way round a 12px
 # head is goggles -- see hu_face_front.
-TOWN["cobb"] = townsperson(
+TOWN_DELTAS["cobb"] = dict(
     crown=4, head_h=10, head_w=12, hairline=4, eye_y=6,
     neck_w=7, neck_rows=3,
     sh_w=19, chest_w=20, elbow_w=21, waist_w=23, hem_w=21, hem_y=31,
@@ -3418,6 +3931,9 @@ TOWN["cobb"] = townsperson(
     cloth=BRASS, trim=LINEN, trouser=SLATE_DK, hair=HAIR_IRON, skin=SKIN_PALE,
     shadow=10.5, shadow_y=4.2,
 )
+
+
+TOWN = {k: townsperson(**d) for k, d in TOWN_DELTAS.items()}
 
 
 # --- output and the check sheets ------------------------------------------------
@@ -3604,6 +4120,94 @@ def write_town(save, grounds, player_cels, spite_cels):
     write_town_portraits()
     if not ok:
         raise SystemExit("TOWNSFOLK CONTRACT FAILED")
+
+
+def style_report(grounds):
+    """Every style, over the WHOLE cast, measured against the same contracts.
+
+    A style is offered to a curator, which means it has to be a real candidate
+    and not just a picture: if `bold` cannot keep its feet on SOLE or puts a
+    saturated fold in the middle of the sand, then finding that out here is
+    free and finding it out after somebody has picked it is not. So the four
+    things that are contracts rather than taste are checked for all of them:
+
+      the sole and the centre  -- the renderer anchors feet to the cell, so a
+                                  style that moves either is not shippable
+                                  whatever it looks like
+      the alpha values         -- 0, SHADOW_A, 255 and nothing else
+      the beak                 -- the face must not be the brightest thing on
+                                  the figure, `town_report()`'s own check
+      the ground               -- "lost" on the worst of the eighteen walkable
+                                  materials, which is what the value bracket in
+                                  cloth5() exists to hold down and what a
+                                  saturation pass is most likely to break
+
+    Everything else it prints is for the eye to argue with: head-count, opaque
+    pixels, and how many distinct colours the figure is made of -- which is the
+    cel-shading axis stated as a number, because "three tones per material"
+    either shows up in that count or did not happen.
+    """
+    print()
+    print("the style layer -- the same six characters, %d readings of them"
+          % len(STYLES))
+    print("  %-8s %5s %6s %6s %7s %-12s %s"
+          % ("style", "heads", "px", "hues", "lost", "worst ground", ""))
+    ok = True
+    for name, S in STYLES.items():
+        heads, npx, hues, worst, bad = [], [], set(), 0.0, []
+        wname = "-"
+        for key, delta in TOWN_DELTAS.items():
+            P = townsperson(style=name, **delta)
+            cels = hu_build_all(P)
+            im = cels[("down", "neutral")]
+            rowsy = [y for y in range(FH)
+                     if any(im.getpixel((x, y))[3] == 255 for x in range(FW))]
+            heads.append((max(rowsy) - min(rowsy) + 1) / float(P["head_h"]))
+            npx.append(sprite_stats(im)["n"])
+            hues |= {q[:3] for q in im.getdata() if q[3] == 255}
+            feet, centres = set(), []
+            for fa in FACINGS:
+                boxes = [cels[(fa, po)].getbbox() for po in FRAMES]
+                for po in FRAMES:
+                    c = cels[(fa, po)]
+                    ys = [y for y in range(FH)
+                          if any(c.getpixel((x, y))[3] == 255 for x in range(FW))]
+                    feet.add(max(ys))
+                x0, x1 = min(b[0] for b in boxes), max(b[2] for b in boxes) - 1
+                centres.append((x0 + x1) / 2.0)
+                if x0 < 1 or x1 > FW - 2 or abs((x0 + x1) / 2.0 - CX) > 0.5:
+                    bad.append("%s/%s frame" % (key, fa))
+            if len(feet) != 1:
+                bad.append("%s sole %s" % (key, sorted(feet)))
+            alphas = {q[3] for q in im.getdata()}
+            if alphas - {0, SHADOW_A, 255}:
+                bad.append("%s alpha %s" % (key, sorted(alphas)))
+            skins = {tuple(c) for c in P["skin"]}
+            lit = [luma(q) for q in im.getdata() if q[3] == 255]
+            skin_hi = max([luma(q) for q in im.getdata()
+                           if q[3] == 255 and q[:3] in skins] or [0.0])
+            if lit and skin_hi >= max(lit):
+                bad.append("%s beak" % key)
+            for gname, _i, gm, _t in grounds:
+                lost = sum(1 for v in lit if abs(v - gm) < 10) / float(len(lit))
+                if lost > worst:
+                    worst, wname = lost, gname
+        ok = ok and not bad
+        # The bar the skill file sets is "lost" under about a fifth on the
+        # worst ground, and it is NOT a hard failure here because it is taste
+        # against measurement: a local contour is the whole point of the CT
+        # grammar and it costs exactly this, because the shipped rim is luma 9
+        # and clear of every ground while a contour mixed from a mid-value
+        # garment lands at 25 to 36, which is inside grass_tall's ten-luma
+        # band. Printing it is how the curator gets to make that trade
+        # knowingly instead of finding out on a phone at dusk.
+        print("  %-8s %5.2f %6d %6d %6.0f%% %-12s %s"
+              % (name, sum(heads) / len(heads), sum(npx) // len(npx), len(hues),
+                 worst * 100, wname[:12],
+                 ("FAIL " + "; ".join(bad[:3])) if bad else
+                 ("ok" if worst <= 0.20 else "ok, over the 20% ground bar")))
+    if not ok:
+        raise SystemExit("STYLE CONTRACT FAILED")
 
 
 # --- the townsfolk portraits ------------------------------------------------------

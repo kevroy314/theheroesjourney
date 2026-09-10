@@ -13,6 +13,7 @@ this writes candidates and a manifest, the manifest goes into a gallery, and a
 person marks the ones worth keeping. `tools/curate.py` reads the verdicts back.
 
     python3 tools/candidates.py --count 48 --seed 7
+    python3 tools/candidates.py --styles            # the same few, every style
 
 Output lands in `.scratch/candidates/` -- deliberately not in the repo, because
 a rejected candidate is not an asset and should not be committed.
@@ -27,7 +28,8 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
-OUT = os.path.join(ROOT, ".scratch", "candidates")
+CANDIDATES = os.path.join(ROOT, ".scratch", "candidates")
+OUT = CANDIDATES          # overridden by --batch
 
 import make_sprites as ms  # noqa: E402  -- after sys.path, by necessity
 
@@ -127,6 +129,116 @@ def one(rng, crowns, garments):
     return recipe, delta
 
 
+# --- the style sweep -------------------------------------------------------------
+#
+# A different question from the one above, and it needs a different sweep. The
+# random batch asks "which of sixty townspeople is worth keeping"; this asks
+# "which of four ways of DRAWING a townsperson is the one we want", and the
+# only way to answer that is to hold everything else still. So `--styles` picks
+# a handful of recipes ONCE and renders each of them under every style in
+# `make_sprites.STYLES` -- same build, same crown, same garment, same palette
+# picks, one variable.
+#
+# The recipes are named and fixed rather than drawn from the seed, because the
+# comparison has to be repeatable across runs: a curator who comes back to it
+# tomorrow is comparing today's opinion to tomorrow's, and a re-roll would
+# throw that away. They are chosen to cover the axes a style is most likely to
+# break -- a child, whose head is already large and gets larger; a skirt, which
+# is the only silhouette in the cast that is wider at the hem than the shoulder;
+# a beard, which is where a bigger face has to put more hair; and a pale apron,
+# which is the brightest garment anybody owns and so the one a saturation pass
+# is most likely to blow out.
+
+STYLE_RECIPES = [
+    ("child", dict(build="child", crown="mop", garment="cloak",
+                   skin="warm", hair="straw", cloth="leaf", trouser="slate")),
+    ("skirt", dict(build="stooped", crown="bun", garment="dress",
+                   skin="ash", hair="white", cloth="dress", trouser="lilac")),
+    ("beard", dict(build="broad", crown="mop", garment="coat", beard=True,
+                   skin="deep", hair="dark", cloth="rust", trouser="slate")),
+    ("apron", dict(build="average", crown="bald", garment="apron",
+                   skin="pale", hair="iron", cloth="slate", trouser="slate")),
+    ("vest",  dict(build="slight", crown="cap", garment="vest",
+                   skin="warm", hair="dark", cloth="brass", trouser="moss")),
+]
+
+
+def style_delta(recipe):
+    """A recipe dict -- the same shape the random sweep records -- as a delta.
+
+    It WRITES BACK into `recipe` when it has to invent a parameter, which is
+    the same discipline `axes()` enforces for crowns: the manifest is the only
+    record of how a candidate was made, and a recipe that does not name the
+    two patch hues is a recipe that cannot be rebuilt from what the gallery
+    shows. `beard` is passed straight through for the same reason -- the random
+    sweep has no beard axis, but a bigger skull has more room to get facial
+    hair wrong, so this sweep needs one and needs it visible on the card.
+    """
+    delta = dict(BUILDS[recipe["build"]])
+    delta.update(crown_kind=recipe["crown"], garment=recipe["garment"],
+                 skin=SKINS[recipe["skin"]], hair=HAIRS[recipe["hair"]],
+                 cloth=CLOTHS[recipe["cloth"]], trouser=CLOTHS[recipe["trouser"]])
+    if recipe["garment"] == "layers":
+        pool = [c for c in sorted(CLOTHS)
+                if c not in (recipe["cloth"], recipe["trouser"])]
+        recipe["patch"] = "%s+%s" % (pool[0], pool[1])
+        delta["patch"] = (CLOTHS[pool[0]], CLOTHS[pool[1]])
+    if recipe.get("beard"):
+        delta["beard"] = True
+    return delta
+
+
+def styles_main():
+    """Every fixed recipe, under every style, into the gallery's own manifest.
+
+    Same file, same four keys, so `tools/curate_server.py` on 8095 needs no
+    change and neither does the page it serves: the style is just another
+    entry in the recipe dict, which the gallery already renders as a chip.
+    """
+    os.makedirs(OUT, exist_ok=True)
+    axes()
+    rows = []
+    for name, base in STYLE_RECIPES:
+        for st in ms.STYLES:
+            recipe = dict(base)
+            # First key in the dict, so it is the first chip on the card. The
+            # whole point of this mode is that the style is the variable, and a
+            # curator scanning forty cards should not have to hunt for it.
+            recipe = dict([("style", st), ("recipe", name)] + list(recipe.items()))
+            cid = "s_%s_%s" % (name, st)
+            try:
+                P = ms.townsperson(style=st, **style_delta(recipe))
+                cels = ms.hu_build_all(P)
+            except Exception as exc:                  # noqa: BLE001
+                rows.append({"id": cid, "recipe": recipe, "error": str(exc)})
+                continue
+            big = ms.spite_contact(ms.town_sheet(cels))
+            small = cels[("down", "neutral")]
+            small = small.resize((small.width * 3, small.height * 3),
+                                 ms.Image.NEAREST)
+            with open(os.path.join(OUT, "%s.png" % cid), "wb") as fh:
+                fh.write(png_bytes(big))
+            rows.append({
+                "id": cid,
+                "recipe": recipe,
+                "big": base64.b64encode(png_bytes(big)).decode("ascii"),
+                "small": base64.b64encode(png_bytes(small)).decode("ascii"),
+            })
+    manifest = {
+        "batch": os.path.basename(OUT), "kind": "style", "layout": "wide",
+        "note": "the same five recipes drawn in each style — pick the grammar",
+        "count": len(rows), "candidates": rows,
+    }
+    with open(os.path.join(OUT, "manifest.json"), "w") as fh:
+        json.dump(manifest, fh)
+    built = sum(1 for r in rows if "error" not in r)
+    print("candidates: %d recipes x %d styles -- %d built, %d failed -> %s"
+          % (len(STYLE_RECIPES), len(ms.STYLES), built, len(rows) - built, OUT))
+    for r in rows:
+        if "error" in r:
+            print("  x %s: %s" % (r["id"], r["error"]))
+
+
 def png_bytes(img):
     buf = io.BytesIO()
     img.save(buf, format="PNG")
@@ -137,7 +249,25 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--count", type=int, default=48)
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--styles", action="store_true",
+                    help="the same few recipes under every style, for an "
+                         "apples-to-apples comparison of how they are DRAWN")
+    ap.add_argument("--batch", default=None,
+                    help="directory under .scratch/candidates to write into; "
+                         "one batch per question, so a style comparison and a "
+                         "variability sweep can both be open at once")
     args = ap.parse_args()
+
+    # A batch per question. Writing both modes to the same file meant the
+    # style comparison silently replaced forty-eight already-generated figures,
+    # which is exactly the kind of quiet loss the gallery exists to avoid.
+    global OUT
+    OUT = os.path.join(CANDIDATES, args.batch or
+                       ("styles" if args.styles else "townsfolk"))
+
+    if args.styles:
+        styles_main()
+        return
 
     os.makedirs(OUT, exist_ok=True)
     rng = random.Random(args.seed)
@@ -184,7 +314,11 @@ def main():
             "small": base64.b64encode(png_bytes(small)).decode("ascii"),
         })
 
-    manifest = {"seed": args.seed, "count": len(rows), "candidates": rows}
+    manifest = {
+        "batch": os.path.basename(OUT), "kind": "townsperson", "layout": "grid",
+        "note": "build, crown, garment and palette varied at random",
+        "seed": args.seed, "count": len(rows), "candidates": rows,
+    }
     with open(os.path.join(OUT, "manifest.json"), "w") as fh:
         json.dump(manifest, fh)
     built = sum(1 for r in rows if "error" not in r)
