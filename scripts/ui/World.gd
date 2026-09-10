@@ -55,6 +55,12 @@ var w: int = 0
 var h: int = 0
 var tiles: PackedByteArray = PackedByteArray()
 var regions: Dictionary = {}          ## area id -> Vector2i
+## The area ids that claim a whole rectangle rather than only an anchor, and the
+## rectangle each one claims. A point cannot describe a valley: `the_town` was
+## one anchor at (128, 128) and place_id() gave up beyond 24 tiles, so the
+## tavern, the mill and the whole west bank answered "Outside" and every
+## conversation held in them was drawn against the wrong backdrop plate.
+var region_rects: Dictionary = {}     ## area id -> Rect2i
 ## Rectangles the tutorial treats as "inside". The Boon of the White Room makes
 ## walking free indoors and breaks the moment the player crosses out, and that
 ## crossing also unlocks the Hearth and puts Spite on the doorstep — so the
@@ -101,9 +107,18 @@ func load_world() -> void:
 		push_error("HJWorld: decoded %d cells, expected %d" % [tiles.size(), w * h])
 		return
 
+	region_rects.clear()
 	for id in parsed.get("regions", {}):
 		var cell: Dictionary = parsed["regions"][id]
 		regions[String(id)] = Vector2i(int(cell.get("x", 0)), int(cell.get("y", 0)))
+		# A region may also say how far it reaches. Optional, because most of
+		# them are a spot on a hillside and a spot is the honest answer for
+		# those; a town is not a spot.
+		var box: Variant = cell.get("rect", null)
+		if box is Dictionary:
+			region_rects[String(id)] = Rect2i(
+				int(box.get("x", 0)), int(box.get("y", 0)),
+				int(box.get("w", 0)), int(box.get("h", 0)))
 	props = _plane(parsed, "props_b64_deflate")
 	blocked = _plane(parsed, "blocked_b64_deflate")
 	cliffs = _plane(parsed, "cliffs_b64_deflate")
@@ -246,6 +261,26 @@ func place_name(cell: Vector2i) -> String:
 ## only question anyone asked was which *anomaly* the run was in, and standing
 ## in the town you are in none.
 func place_id(cell: Vector2i) -> String:
+	# A CONTAINING RECTANGLE BEATS THE NEAREST ANCHOR, and the smallest
+	# containing rectangle beats a bigger one. Nearest-anchor alone cannot say
+	# "this whole valley is the town" without also claiming the mountain, and
+	# widening its radius until the town fits swallows the house that stands at
+	# the edge of it. Rects nest instead: the vale is the town, the plot around
+	# the house is inside the vale, and the smaller claim wins where they
+	# overlap, which is why a player on their own doorstep is still at home.
+	var claimed := ""
+	var claimed_area := 1 << 30
+	for id in region_rects:
+		var box: Rect2i = region_rects[id]
+		if not box.has_point(cell):
+			continue
+		var area: int = box.size.x * box.size.y
+		if area < claimed_area:
+			claimed_area = area
+			claimed = String(id)
+	if claimed != "":
+		return claimed
+
 	var best := ""
 	var best_d := 1 << 30
 	for id in regions:

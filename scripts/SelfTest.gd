@@ -854,6 +854,44 @@ static func _layout_checks(host: Node, failures: Array) -> void:
 	Meta.ui_toast_pos = was_pos
 	host.call("_place_toasts")
 
+	# Standing at a door in the town must mean you are in the town.
+	#
+	# A single anchor cannot describe a valley: `the_town` was one point at
+	# (128,128) and the nearest-anchor lookup gives up beyond 24 tiles, so the
+	# tavern and the mill read "Outside" and a conversation held in them was
+	# drawn against the wrong plate. Region rects fixed that, and this is what
+	# says so — it fails if the rects stop being read, which is a whole file
+	# going missing from a commit rather than a subtle logic slip.
+	var doors := 0
+	var homeless := ""
+	for entry in HJWorld.shared().interactables:
+		var it: Dictionary = entry
+		if not String(it.get("type", "")).begins_with("door_"):
+			continue
+		doors += 1
+		# The *street* outside the door, not the door itself. A door cell sits
+		# inside its own building's `indoors` rect, so it answers with the
+		# building's name and never reaches the region lookup at all — which is
+		# how the first version of this check passed with the region rects
+		# switched off. Step away from the building until out of its rect.
+		var at := Vector2i(int(it.get("x", 0)), int(it.get("y", 0)))
+		var step := Vector2i(0, 1)
+		var idx := HJWorld.shared().indoor_index(at)
+		if idx >= 0:
+			var box: Rect2i = HJWorld.shared().indoors[idx]
+			step = Vector2i(0, 1) if at.y >= box.end.y - 1 else Vector2i(0, -1)
+			if at.x <= box.position.x:
+				step = Vector2i(-1, 0)
+			elif at.x >= box.end.x - 1:
+				step = Vector2i(1, 0)
+		var street := at + step
+		while HJWorld.shared().indoor_index(street) == idx and idx >= 0:
+			street += step
+		if HJWorld.shared().place_name(street) == "Outside":
+			homeless = "%s: street at %d,%d" % [it.get("type", ""), street.x, street.y]
+	_check(failures, "every town door knows which place it is in",
+		doors > 0 and homeless == "", "%d doors, %s" % [doors, homeless])
+
 	# Walking into a building must change what the header says it is.
 	#
 	# The header named the place once, at build, and then never again — so you
