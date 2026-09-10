@@ -78,6 +78,16 @@ HAIRS = {
     "straw": ms.HAIR_STRAW, "dark": ms.HAIR_DARK,
     "white": ms.HAIR_WHITE, "iron": ms.HAIR_IRON,
 }
+# Eye colour is an axis because it is a character trait in all three
+# references, not a shading decision -- see `eye5()` in make_sprites. It is
+# read by the BLOCK base only: the taper base punches its eye straight out of
+# the skin ramp and has no sclera to put an iris beside, so a card for a taper
+# style does not carry the chip. A recipe that named a colour the drawing
+# ignored would be exactly the lying manifest `axes()` exists to prevent.
+EYES = {
+    "brown": ms.EYE_BROWN, "blue": ms.EYE_BLUE, "green": ms.EYE_GREEN,
+    "grey": ms.EYE_GREY, "amber": ms.EYE_AMBER,
+}
 CLOTHS = {
     "leaf": ms.LEAF, "moss": ms.MOSS, "lilac": ms.LILAC, "shawl": ms.SHAWL,
     "sack": ms.SACK, "rust": ms.RUST, "linen": ms.LINEN, "brass": ms.BRASS,
@@ -107,16 +117,18 @@ def one(rng, crowns, garments):
     garment = rng.choice(garments)
     skin = rng.choice(sorted(SKINS))
     hair = rng.choice(sorted(HAIRS))
+    eyes = rng.choice(sorted(EYES))
     cloth = rng.choice(sorted(CLOTHS))
     trouser = rng.choice(sorted(CLOTHS))
     recipe = {
         "build": build, "crown": crown, "garment": garment,
-        "skin": skin, "hair": hair, "cloth": cloth, "trouser": trouser,
+        "skin": skin, "hair": hair, "eyes": eyes,
+        "cloth": cloth, "trouser": trouser,
     }
     delta = dict(BUILDS[build])
     delta.update(
         crown_kind=crown, garment=garment,
-        skin=SKINS[skin], hair=HAIRS[hair],
+        skin=SKINS[skin], hair=HAIRS[hair], eyes=EYES[eyes],
         cloth=CLOTHS[cloth], trouser=CLOTHS[trouser],
     )
     # `layers` is the only garment that demands a parameter of its own: it is
@@ -153,15 +165,16 @@ def one(rng, crowns, garments):
 # is most likely to blow out.
 
 STYLE_RECIPES = [
-    ("child", dict(build="child", crown="mop", garment="cloak",
+    ("child", dict(build="child", crown="mop", garment="cloak", eyes="green",
                    skin="warm", hair="straw", cloth="leaf", trouser="slate")),
-    ("skirt", dict(build="stooped", crown="bun", garment="dress",
+    ("skirt", dict(build="stooped", crown="bun", garment="dress", eyes="grey",
                    skin="ash", hair="white", cloth="dress", trouser="lilac")),
     ("beard", dict(build="broad", crown="mop", garment="coat", beard=True,
+                   eyes="amber",
                    skin="deep", hair="dark", cloth="rust", trouser="slate")),
-    ("apron", dict(build="average", crown="bald", garment="apron",
+    ("apron", dict(build="average", crown="bald", garment="apron", eyes="blue",
                    skin="pale", hair="iron", cloth="slate", trouser="slate")),
-    ("vest",  dict(build="slight", crown="cap", garment="vest",
+    ("vest",  dict(build="slight", crown="cap", garment="vest", eyes="brown",
                    skin="warm", hair="dark", cloth="brass", trouser="moss")),
 ]
 
@@ -181,6 +194,11 @@ def style_delta(recipe):
     delta.update(crown_kind=recipe["crown"], garment=recipe["garment"],
                  skin=SKINS[recipe["skin"]], hair=HAIRS[recipe["hair"]],
                  cloth=CLOTHS[recipe["cloth"]], trouser=CLOTHS[recipe["trouser"]])
+    # `eyes` may have been stripped from the recipe for a taper style (see
+    # `styles_main`), in which case the builder falls back to its own default
+    # and the card claims nothing.
+    if recipe.get("eyes"):
+        delta["eyes"] = EYES[recipe["eyes"]]
     if recipe["garment"] == "layers":
         pool = [c for c in sorted(CLOTHS)
                 if c not in (recipe["cloth"], recipe["trouser"])]
@@ -204,6 +222,11 @@ def styles_main():
     for name, base in STYLE_RECIPES:
         for st in ms.STYLES:
             recipe = dict(base)
+            if ms.STYLES[st]["base"] != "block":
+                # The eye colour is read by the block base and by nothing
+                # else. What must not happen is a CHIP on a card advertising a
+                # colour that is not on the figure, so a taper card drops it.
+                recipe.pop("eyes", None)
             # First key in the dict, so it is the first chip on the card. The
             # whole point of this mode is that the style is the variable, and a
             # curator scanning forty cards should not have to hunt for it.

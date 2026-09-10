@@ -2481,6 +2481,17 @@ def skin5(base):
 # --styles` renders the sweep into the curation gallery and a person decides.
 
 STYLE_DEFAULTS = dict(
+    # --- WHICH BASE FIGURE. "taper" is everything below this line: one
+    # continuous silhouette from `sculpt()` over an anatomical span curve --
+    # shoulder, chest, elbow, waist, hem -- shaded as a solid. "block" is the
+    # other model entirely (see `bl_geometry()`), assembled from separate
+    # masses that each carry their own flat fill and share one contour. The
+    # axes marked `bl_` below belong to it and are read by nothing else; the
+    # axes above belong to `taper` and the block base ignores them. Two bases
+    # rather than one restyled base, because two attempts at re-parameterising
+    # the taper both failed for the same reason: a taper is an anatomy and the
+    # reference figures are not anatomies, they are stacks of blocks.
+    base="taper",
     # --- proportion
     heads=None,              # None == leave the character's own numbers alone
     head_gain=1.0,           # the skull widens with it, or it is an egg
@@ -2525,6 +2536,52 @@ STYLE_DEFAULTS = dict(
     sat=0.0, sat_hair=0.0, sat_skin=0.0,
     spread=0.0,              # the lit end pushed up, the mid pushed down
     dark_mode="bg",          # "bg" desaturates the folds; "black" keeps the hue
+    # --- the block base. Every one of these is measured off the three
+    # reference frames rather than chosen; `bl_geometry()` carries the sums.
+    bl_head=0.45,            # head INCLUDING hair, as a fraction of the figure
+    bl_legs=0.19,            # legs including the feet, ditto -- Stardew's
+                             # Abigail is 5 leg rows in 27, which is 0.185
+    bl_face_pad=3,           # face rows BELOW the eye: cheek, mouth, chin.
+                             # The hairline is derived from this and from the
+                             # eye rather than set as a fraction, because all
+                             # three references put the eye a fixed three rows
+                             # off the jaw whatever the head's height -- a
+                             # bigger head is a bigger HAIR MASS, not a longer
+                             # forehead. Stardew: lash row 13, eyes 14-15,
+                             # cheek 16, mouth 17, chin 18
+    bl_head_vs_body=1.00,    # the HAIR mass's width over the torso's. 1.00 is
+                             # Stardew; the skull inside it is two narrower,
+                             # which is the 83-90% CT and SoM measure
+    bl_max_w=22,             # ...and the cap. All three references are about
+                             # half as wide as they are tall -- 14/27, 13/24,
+                             # 16/30 -- so a 44-row figure wants ~23 px across
+                             # INCLUDING its arms and its rim, and a torso of
+                             # 22 plus one proud arm column a side plus the rim
+                             # is exactly that
+    bl_hair_vol=1,           # px the hair block stands proud of the skull
+    bl_hair_rise=1,          # ...and rows it rises above it
+    bl_hair_drop=2,          # ...and rows it falls PAST the jaw onto the
+                             # shoulders, which is most of what says "hair"
+                             # rather than "hat" at this size
+    bl_temple=3,             # columns of hair down each side of the face
+    bl_eye_w=3, bl_eye_h=3,  # ONE eye, in pixels, on the smallest head in the
+                             # cast. Nine px of eye on a face of
+                             # about a hundred is the single largest identity
+                             # carrier the figure has -- see `bl_eyes()`
+    bl_eye_sep=2,            # bare skin between the two of them
+    bl_eye_gap=1,            # bare forehead between the hairline and the lash
+                             # row. Abigail's is zero -- her hair ends on row
+                             # 12 and her lash row is 13 -- but her hair is
+                             # violet against a 236-luma face and half this
+                             # cast is brown hair over brown skin, where a
+                             # hairline landing straight on the lash row makes
+                             # one dark mass and the head reads as a helmet.
+                             # One row. Not the old figure's four
+    bl_mouth_gap=2,          # ...and cheek rows between the eye and the mouth
+    bl_arm_w=3,              # a thin arm, of which one column is proud of the
+                             # torso -- the rest lies on it, so the silhouette
+                             # stays a block and the arm reads by its contour
+    bl_hand=2,               # rows of hand at the bottom of the arm
 )
 
 
@@ -2615,6 +2672,46 @@ STYLES = {
         sat=0.60, sat_hair=0.40, sat_skin=0.16, spread=0.30, dark_mode="black",
     ),
 }
+
+
+# --- the block base, as three readings of one number ----------------------------
+#
+# The three above restyle the taper. These three REPLACE it, and they differ
+# from each other in exactly one axis -- `bl_head` -- because the question
+# Kevin is being asked is "what proportion", and a comparison with two
+# variables in it answers nothing. Everything else is identical, deliberately,
+# including the colour budget and the eye.
+#
+# 24 hues is the Chrono Trigger doorway NPC's whole count including its
+# background, and the block base can afford it where the taper could not: a
+# flat mass costs two tones, a sculpted one costs five.
+#
+# `sat` stays at the `soft` reading rather than `bold`'s. The base model is the
+# variable under test and the palette is not; a saturation difference between
+# these and the three above would make the curator's answer un-attributable.
+
+def _block(head):
+    """One block style. Only `bl_head` moves -- see the paragraph above."""
+    return style(
+        base="block", bl_head=head,
+        face_bright=True, skin_lift=0.26,
+        rim_local=0.45, rim_deep=0.25,
+        tones=(0, 1, 3), hair_tones=(0, 1, 3), face_tones=(0, 1, 4),
+        max_hues=24,
+        sat=0.22, sat_hair=0.16, sat_skin=0.06, spread=0.14,
+    )
+
+
+# 18 rows of head on a 44-row figure. The bottom of the reference band and the
+# closest of the three to Chrono Trigger's 42%.
+STYLES["block40"] = _block(0.40)
+# 20 rows. The middle reading, and the one nearest Stardew's 52% without
+# going past a head that is half the person.
+STYLES["block45"] = _block(0.45)
+# 22 rows -- exactly half the figure, which is Abigail. The furthest from
+# anything this game has drawn before and the most likely to read as a child;
+# that is the risk the sweep exists to price.
+STYLES["block50"] = _block(0.50)
 
 
 def saturate(c, k):
@@ -2859,6 +2956,15 @@ def flatten(img, P):
     # by the contact shadow -- but the shadow is not opaque, and the count that
     # matters is the opaque one, so only the contour is held back.
     cap = max(2, cap - 1)
+    # RAREST-FIRST IS THE WRONG RULE FOR A FEATURE WHOSE JOB IS TO BE SMALL.
+    # The Secret of Mana girl spends four pixels on a white sclera and four on
+    # an iris out of twenty colours, and they are the two that make her a
+    # person rather than a doll -- fed to the loop below they are the first two
+    # things it throws away, because they are the two rarest colours on the
+    # figure. So a builder may name colours the merge is not allowed to
+    # consume; other colours may still merge INTO them. Empty for every style
+    # that predates the block base, so nothing already shipped moves.
+    keep = {tuple(c) for c in (P.get("_keep") or ())}
     while True:
         counts = {}
         for q in img.get_flattened_data():
@@ -2866,7 +2972,14 @@ def flatten(img, P):
                 counts[q[:3]] = counts.get(q[:3], 0) + 1
         if len(counts) <= cap:
             return img
-        rare = min(sorted(counts), key=lambda c: (counts[c], c))
+        movable = [c for c in sorted(counts) if c not in keep]
+        if not movable:
+            # Everything left is load-bearing. Returning over budget is the
+            # honest failure: `style_report()`'s hard cap of 32 is the thing
+            # that catches it, and silently eating an eye to hit a soft budget
+            # is exactly the outcome this branch exists to refuse.
+            return img
+        rare = min(movable, key=lambda c: (counts[c], c))
         rest = [c for c in sorted(counts) if c != rare]
         near = min(rest, key=lambda c: (sum((c[i] - rare[i]) ** 2 for i in range(3)), c))
         px = img.load()
@@ -3848,7 +3961,7 @@ def prop_bundle(f, P, facing, pose, dy):
     G = P["_g"]
     sk = hue5(mix(C["accent"], C["bg"], 0.30))
     b = G["body"][1]
-    y = G["sy"] + dy
+    y = G["sy"] + dy + G.get("prop_dy", 0)
     if facing == "up":
         # TWO LOBES EITHER SIDE OF HIS HEAD, not one box over it. There is no
         # depth here: a bundle drawn across the shoulders and up to the crown
@@ -3930,12 +4043,19 @@ def hu_frontal(P, pose, back):
 
 
 def hu_build(P, facing, pose):
+    # The base is a fork here and nowhere else, so everything downstream --
+    # recentring, the tone map, the rim, the contact shadow, the mirror and
+    # the sole/centre contract in `hu_build_all()` -- is shared between the two
+    # models rather than reimplemented for the second one. A block figure that
+    # broke the sole contract would be caught by the same check that catches a
+    # taper one.
+    block = (P.get("_style") or STYLES["current"])["base"] == "block"
     if facing == "down":
-        f = hu_frontal(P, pose, False)
+        f = bl_frontal(P, pose, False) if block else hu_frontal(P, pose, False)
     elif facing == "up":
-        f = hu_frontal(P, pose, True)
+        f = bl_frontal(P, pose, True) if block else hu_frontal(P, pose, True)
     else:
-        f = hu_profile(P, pose)
+        f = bl_profile(P, pose) if block else hu_profile(P, pose)
     dy = 0 if pose == "neutral" else 1
     for name in P.get("props", []):
         PROPS[name](f, P, facing if facing != "right" else "left", pose, dy)
@@ -3998,6 +4118,778 @@ def prop_crown(f, P, facing, pose, dy):
 PROPS["crown"] = prop_crown
 
 
+# --- the BLOCK base -------------------------------------------------------------
+#
+# A second base model, beside the taper rather than instead of it. Everything
+# from `geometry()` down to `hu_profile()` builds one continuous silhouette
+# from an anatomical span curve -- shoulder, chest, elbow, waist, hem -- and
+# then shades it as a solid. Two attempts to make that read as a SNES field
+# sprite by re-parameterising it failed, and the verdict on both was the same:
+# "the base models are the issue". They are. A taper is an anatomy. The three
+# references are not anatomies.
+#
+# WHAT THE REFERENCES ACTUALLY ARE, decoded rather than remembered. Three
+# frames, all on disk, all gitignored, none of them copied:
+#
+#   .scratch/ref/abigail-sheet.png crop (0,0,16,32)   -- a 16x32 Stardew idle.
+#       Figure 27 rows in the 32, 14 px across. Head INCLUDING hair rows 5..18,
+#       14 of 27 = 52%. Torso rows 19..26, 12-14 px across -- so the head is
+#       100% of the body's width. No neck: the jaw row is row 18 and row 19 is
+#       collar. Legs rows 27..31, two 3-px stubs with a foot blob on each. 29
+#       colours in the whole frame, of which the sclera is 2 pixels and the
+#       iris 4.
+#
+#   AESTHETIC-SEEDS/props/chrono-trigger-0.png crop (31,0,45,24) -- 14x24.
+#       Figure 24 rows. Hair rows 0..4, face rows 5..10, so head 11 of 24 =
+#       46%; taking the jaw at row 9 instead gives the 42% this file's style
+#       layer already quotes -- the boundary is a judgement call and the band
+#       is what matters. Head 10 px on a 13-px body = 77%. No neck. 24 colours
+#       INCLUDING the doorway behind him. Eyes: two single dark pixels punched
+#       into a 225-luma skin field, nothing else on the face.
+#
+#   .scratch/ref/som.png crop (112,124,128,156) -- 16x32, background flood-
+#       filled off. Figure rows 2..31, 30 rows, 16 across. Hair rows 2..13,
+#       face rows 14..18: head 17 of 30 = 57%. (The 38% in the brief is the
+#       skull alone from its widest row; the hair mass is most of this head and
+#       the mass is what the eye reads.) Torso 14-16 across, so head 87-100%.
+#       No neck. 17 figure colours. Eyes rows 15-16, 2 px each, an outer
+#       (240,240,240) sclera column against a (0,88,112) iris -- four pixels of
+#       each, and the largest local contrast in the frame.
+#
+# Against all three, the shipped figure measures: 44 rows, ~18 across, head 11
+# rows = 25%, head 60% of the body's width, and THREE ROWS OF NECK, which not
+# one of the references has. Those are the three structural facts, and none of
+# them is reachable by re-weighting a taper.
+#
+# SO THIS BUILDS THE OTHER THING. Seven masses, each a flat fill in its own
+# ramp, composited in a fixed order and closed by one shared dark contour:
+#
+#   hair mass    its own silhouette, allowed to be wider than the skull it
+#                sits on and to fall past the jaw onto the shoulders
+#   head mass    a skin block, two narrower than the hair, no taper worth the
+#                name -- four px off the crown row and two off the jaw
+#   torso block  ONE WIDTH from shoulder to hip. Not a curve. This is the line
+#                the taper cannot cross
+#   two arms     three px wide, one of them proud of the torso, hanging
+#   two hands    a skin blob at the bottom of each arm
+#   two legs     stubs, of trouser
+#   two feet     blobs, of boot, one px proud on the outside
+#
+# WHAT IS SHARED WITH THE TAPER, on purpose: the frame, CX, SOLE, GROUND, the
+# ramps, `paint_spans`' light direction, `_tone_map`, `flatten`, `rim`,
+# `contact_shadow`, `recentre`, the mirror, and every contract in
+# `style_report()`. The fork is in `hu_build()` and nowhere else, so a block
+# figure that floats, drifts off centre or blows the colour budget fails the
+# same check a taper figure would.
+#
+# WHAT THE CAST RELATIONSHIPS BECOME. "One base plus deltas" survives intact:
+# the block base reads `crown` (where the figure's head starts, so a child is
+# still 34 rows against an adult's 44), `sh_w` (mass), `crown_kind`, `garment`,
+# `leg_w`, `leg_gap`, `stride`, `depth`, `lean`, `hem_w`, every ramp, `beard`,
+# `specs`, `sleeveless`, `shawl` and `props` -- so all six TOWN_DELTAS express
+# the same people. What it deliberately DOES NOT read is `head_h`, `head_w`,
+# `hairline`, `eye_y`, `neck_w`, `neck_rows` and `hem_y`: the head is derived
+# from the figure's height by `bl_head`, the head's width from the body's, and
+# there is no neck to have a width. A delta that sets those is not honoured
+# rather than silently half-honoured, and this comment is the record of it.
+# "Spite is the player's coat, not his face" is untouched -- it is a statement
+# about ramps and a garment silhouette, both of which are still axes here.
+
+
+def bl_even(w):
+    """Widths are even, for the reason `_row()` gives: an odd width is a figure
+    half a pixel off its own tile, and the mirror will not match it."""
+    return max(2, int(round(w)) + (int(round(w)) % 2))
+
+
+def bl_geometry(P, side=False):
+    """The whole vertical and horizontal plan, from four scalars and a style.
+
+    THE SUMS ARE THE DESIGN. `rows` is the character's own height -- SOLE minus
+    their crown row -- and it does not move, because the renderer anchors feet
+    to the cell and because a child's 34 rows against an adult's 44 is the
+    first thing the eye reads. What the style decides is how those rows are
+    SPENT, and the whole argument of this base is that the reference spends
+    them 45/36/19 on head/torso/legs where we spend them 25/41/34.
+    """
+    S = P.get("_style") or STYLES["current"]
+    top = P["crown"]
+    rows = SOLE - top + 1
+
+    head_n = max(10, int(round(rows * S["bl_head"])))
+    leg_n = max(6, int(round(rows * S["bl_legs"])))
+    torso_n = rows - head_n - leg_n
+    if torso_n < 8:
+        # Eight rows of torso is the floor: below it there is nowhere to put an
+        # arm, and a figure with no arm is a skittle. The head gives way rather
+        # than the legs, because six rows of leg is already the walk cycle's
+        # own floor -- at five the boot IS the leg and the step reads as a
+        # slide, which `_restyle_build()` learned the same way.
+        head_n = max(10, rows - 8 - leg_n)
+        torso_n = rows - head_n - leg_n
+
+    if not bl_has_hair(P):
+        # Most of a reference head's HEIGHT is hair -- twelve of the SoM
+        # girl's seventeen rows. Give a bald man the same total and he is not
+        # a bald man, he is an egg; the rows go to his torso instead, which is
+        # also where a bartender's mass belongs.
+        head_n = max(10, int(round(head_n * 0.86)))
+    sy = top + head_n            # the first torso row. THERE IS NO NECK: the
+    hy = sy + torso_n - 1        # jaw is at sy-1 and the shoulder at sy, and
+    ly = hy + 1                  # not one of the three references has a gap
+
+    # The torso is one width, and the head's hair mass matches it. The skull
+    # inside the hair is two narrower, which lands the SKULL/body ratio at the
+    # 83-90% Chrono Trigger and Secret of Mana measure while the visible head
+    # -- hair included, which is what a reader actually sees -- ties with the
+    # body exactly as Stardew's does.
+    # ONE OUTER WIDTH for the whole figure, and the head and the body-with-its-
+    # arms both fill it. The first cut sized the torso at `sh_w` and then hung
+    # an arm a pixel proud of each side, which made the SHOULDERS two px wider
+    # than the head -- and that ranking is backwards. `_restyle_build()` says
+    # it for the taper base and it is truer here: the head is not supposed to
+    # win the silhouette, it is supposed to TIE with it, and a body that wins
+    # is a fridge with a face on top, which is what came out.
+    outer = bl_even(min(P["sh_w"], S["bl_max_w"]) * S["bl_head_vs_body"])
+    tw = bl_even(outer - 2)
+    if side:
+        # A person is narrower edge-on. The HEAD is not, or not much: a skull
+        # is round, and shrinking it with the body is the commonest way a
+        # turned sprite stops being the same person. So only the torso takes
+        # `depth`.
+        tw = bl_even(max(10, tw * P["depth"]))
+    hair_w = outer
+    skull_w = bl_even(max(8, hair_w - 2 * S["bl_hair_vol"]))
+
+    # MEASURED OFF THE SECRET OF MANA HEAD, whose rows run 6, 10, 12, then 14
+    # for the next six -- deltas of 8, 4, 2, 0. That is a dome over a block,
+    # and it is three rows of taper, not two. The first cut of this base used
+    # two and every figure came out flat-topped, reading as a bread bin: the
+    # crown is the first thing the eye resolves on a 32px figure and a straight
+    # line across the top of it is a container.
+    crown_t = (8, 4, 2) if skull_w >= 16 else (4, 2)
+    jaw_t = (4, 2)          # ...and the chin, which the same frame narrows by
+    head = []               # four over its last two rows
+    for i in range(head_n):
+        d = crown_t[i] if i < len(crown_t) else 0
+        k = head_n - 1 - i
+        if k < len(jaw_t):
+            d = max(d, jaw_t[k])
+        head.append(_row(top + i, skull_w - d))
+
+    body = [_row(sy + i, tw) for i in range(torso_n)]
+
+    hem_w = tw
+    if P["garment"] in ("dress", "cloak"):
+        # The one silhouette in the cast that is wider at the hem than at the
+        # shoulder. A skirt is a block too -- it is just a wider one that
+        # starts partway down, which is why it is a second block and not a
+        # taper on the first.
+        hem_w = bl_even(max(tw, min(P.get("hem_w", tw), S["bl_max_w"] + 2)))
+    skirt_n = min(len(body) // 2, 5) if hem_w > tw else 0
+    hem = []
+    for i in range(skirt_n):
+        w = tw + int(round((hem_w - tw) * (i + 1) / float(skirt_n)))
+        hem.append(_row(hy - skirt_n + 1 + i, w))
+
+    if side and P.get("lean"):
+        # A stoop is not a shorter person, it is a person whose head is in
+        # front of their feet, and it only exists in the side view.
+        lean = P["lean"]
+        head = [(y, x0 + lean, x1 + lean) for (y, x0, x1) in head]
+        n = max(1, len(body) - 1)
+        body = [(y, x0 + int(round(lean * (1.0 - i / float(n)))),
+                 x1 + int(round(lean * (1.0 - i / float(n)))))
+                for i, (y, x0, x1) in enumerate(body)]
+    if side:
+        # The skull carries its mass behind the ear and the face is a notch cut
+        # out of the front, so the whole head shifts one px forward. Spite's
+        # file spends a paragraph on the same two pixels.
+        head = [(y, x0 - 1, x1 - 1) for (y, x0, x1) in head]
+
+    # THE EYE SCALES WITH THE HEAD. Abigail's is 3 rows on a 14-row head; at
+    # 22 rows the same eye is a pinhole, and a pinhole is the shipped figure's
+    # problem restated one size up. So the height comes off the head rather
+    # than off the style, and the three block variants still differ in exactly
+    # one declared axis.
+    eye_h = max(2, S["bl_eye_h"] + (1 if head_n >= 21 else 0))
+    jaw = top + head_n - 1
+    # `bl_face_pad` is cheek + mouth + chin, so the mouth sits pad-2 rows off
+    # the jaw: Abigail's mouth is row 17 under a chin at 18.
+    mouth_y = jaw - max(1, S["bl_face_pad"] - 2)
+    eye_y = mouth_y - max(1, S["bl_mouth_gap"]) - eye_h + 1
+    hairline = max(2, min(head_n - eye_h - 2, eye_y - top - S["bl_eye_gap"]))
+    eye_y = top + hairline + S["bl_eye_gap"]
+    if P.get("beard"):
+        # A beard eats the bottom third of the face, so the eye has to move up
+        # to leave it somewhere to be. Held where an unbearded character's eye
+        # sits, the beard starts under the lash row and the face is a slit.
+        eye_y -= 2
+        hairline = max(2, eye_y - top - S["bl_eye_gap"])
+    if not bl_has_hair(P):
+        # A BALD HEAD IS NOT A HAIRED ONE WITH THE HAIR REMOVED. The eye sits
+        # three rows off the jaw in the references because most of what is
+        # above it is HAIR; leave it there on a bare skull and the forehead is
+        # fourteen rows of blank skin, which is an egg with a face printed at
+        # the bottom -- which is exactly how the bartender came out the first
+        # time. On a bare head the eye belongs a little over halfway down the
+        # skull, and the mouth follows it up rather than staying at the chin.
+        eye_y = top + max(2, int(round(head_n * 0.52)))
+        mouth_y = min(jaw - 1, eye_y + eye_h + max(1, S["bl_mouth_gap"]) - 1)
+        hairline = eye_y - top
+
+    # A value break at the waist, or the figure is one barrel of cloth from
+    # collar to hem however it is shaped -- the finding `body_keys()` records
+    # for the taper base, which a flat block needs more than a shaded one does.
+    # Here it is not a shading step but the trousers: the bottom of the torso
+    # IS the top of them, which is what the Chrono Trigger NPC does (tunic
+    # rows 11-17, trousers 18-23) and it costs no colour that is not already
+    # on the figure.
+    hip = 0 if skirt_n else max(2, torso_n // 4)
+    return {"head": head, "body": body, "hem": hem, "neck": [],
+            # A prop written against the taper base assumes three rows of neck
+            # between the jaw and the shoulder and reaches up into them. There
+            # are none here, so anything anchored that way lands on the chin --
+            # Bram's bundle sat across his jaw the first time. The offset is
+            # published on the geometry rather than hard-coded into the prop,
+            # so a prop that does not need it is unaffected.
+            "prop_dy": 3,
+            "sy": sy, "hy": hy, "ly": ly, "top": top,
+            "head_n": head_n, "torso_n": torso_n, "leg_n": leg_n,
+            "hairline": hairline, "tw": tw, "hair_w": hair_w,
+            "eye_h": eye_h, "eye_y": eye_y, "mouth_y": mouth_y, "hip": hip,
+            "skull_w": skull_w, "skirt": skirt_n}
+
+
+def bl_flat(f, spans, ramp, base=1, shade=3, dy=0, cols=2):
+    """A MASS: one flat fill and one band of shade down its shaded side.
+
+    Two tones, not five. `paint_spans()` gives a garment its base, a lit band,
+    a shaded band and a darker last column, and four tones in bands that narrow
+    with the row is a soft gradient however hard each individual edge is --
+    which is the whole of what "a little uncanny" was. The reference draws the
+    Secret of Mana girl's entire dress in two. The light still comes from the
+    north-west, so the shade is on the right and this figure stands in the same
+    weather as the traveller.
+    """
+    for (y, x0, x1) in spans:
+        f.row(y + dy, x0, x1, ramp[base])
+        f.row(y + dy, max(x0, x1 - cols + 1), x1, ramp[shade])
+
+
+def bl_legs(f, P, G, pose, dy):
+    """Two stubs and two foot blobs. Same contract as every other figure here:
+    the planted sole ends on SOLE in every frame and the lifted foot is drawn
+    SHORT rather than drawn somewhere else, so the idle does not bounce."""
+    cl, bt = P["trouser"], P["boots"]
+    w = max(3, min(P["leg_w"], 6))
+    gap = max(2, P["leg_gap"])
+    (_y, sx0, sx1) = _row(0, 2 * w + gap)
+    lift = max(2, min(P["stride"], 4))
+
+    def leg(x0, up, out):
+        top = G["ly"] + dy
+        bot = SOLE - up
+        foot = max(top, bot - 1)
+        for y in range(top, foot):
+            f.row(y, x0, x0 + w - 1, cl[1])
+            f.row(y, x0 + w - 2, x0 + w - 1, cl[3])
+        # The foot is a BLOB, not the end of the leg: one px proud on the
+        # outside and its own ramp. In all three references the foot is a
+        # separate lump under the stub, and it is what stops two trouser
+        # columns reading as a pair of chair legs.
+        for y in range(foot, bot + 1):
+            f.row(y, x0 - out, x0 + w - 1, bt[1])
+            f.px(x0 + w - 1, y, bt[3])
+        f.row(bot, x0 - out, x0 + w - 1, bt[3])
+
+    if pose == "neutral":
+        leg(sx0, 0, 1)
+        leg(sx1 - w + 1, 0, 0)
+    elif pose == "step_left":
+        leg(sx0 - 1, 0, 1)
+        leg(sx1 - w + 2, lift, 0)
+    else:
+        leg(sx0 - 1, lift, 1)
+        leg(sx1 - w + 2, 0, 0)
+
+
+def bl_arms(f, P, G, pose, dy, side=False):
+    """Two thin arms hanging outside the torso, each ending in a hand.
+
+    Three px wide, of which ONE is proud of the torso block and two lie on it.
+    Proud by three -- an arm swinging clear of the body, which is what the
+    traveller does -- would put a gap of air in the middle of a figure whose
+    whole claim is that it is made of solid blocks. Proud by nothing would make
+    the arm an invisible stripe of the same colour as the coat. One px plus the
+    contour is exactly the reference: Abigail's arms are inside her 12-px torso
+    until her hands push it to 14.
+    """
+    S = P.get("_style") or STYLES["current"]
+    aw = max(2, S["bl_arm_w"])
+    sl = P["skin"] if P.get("sleeveless") else P["cloth"]
+    sk = P["skin"]
+    body = G["body"]
+    # Below the hair that falls on the shoulders, or the arm starts inside it
+    # and the two masses have no edge between them.
+    y0 = G["sy"] + (S["bl_hair_drop"] if bl_has_hair(P) else 0) + 1
+    y1 = G["hy"] - (G["skirt"] and 1 or 0)
+    hand = max(1, S["bl_hand"])
+    swing = {"neutral": 0, "step_left": 1, "step_right": -1}[pose]
+
+    def arm(x0, out, back):
+        # `back` swings this arm against the stride, so the walk is a walk and
+        # not a pair of legs under a statue.
+        d = swing if back else -swing
+        ax0 = x0 - out
+        ax1 = ax0 + aw - 1
+        inner = ax1 if out > 0 else ax0
+        for y in range(y0, y1 + 1 - hand):
+            f.row(y + dy, ax0, ax1, sl[1])
+            f.px(ax1, y + dy, sl[3])
+            # AN ARM IN THE COAT'S OWN RAMP IS INVISIBLE, which is what the
+            # first cut of this drew on every figure wearing one hue: the
+            # sleeve is the same cloth as the chest, so with no line between
+            # them there is no arm, only a wider chest. One column of the
+            # figure's shared contour is what the reference does, and it costs
+            # no colour, because that contour is already in the palette.
+            f.px(inner, y + dy, P["_contour"])
+        for y in range(y1 + 1 - hand, y1 + 1):
+            f.row(y + dy + d, ax0, ax1, sk[1])
+            f.px(ax1, y + dy + d, sk[2])
+            f.px(inner, y + dy + d, P["_contour"])
+
+    if side:
+        # One arm, at the front edge, because the far one is behind the body.
+        arm(body[0][1], 1, False)
+        return
+    arm(body[0][1], 1, False)
+    arm(body[0][2] - aw + 1, -1, True)
+
+
+def bl_has_hair(P):
+    return P["crown_kind"] not in ("bald", "horseshoe")
+
+
+def bl_hair(f, P, G, dy, back, side=False):
+    """The hair as its OWN mass, with its own silhouette.
+
+    This is item three of the style layer's list and the block base is the
+    first thing in the file that can honour it: the hair is not a cap painted
+    on a dome, it is a block one px wider than the skull, standing above it,
+    falling past the jaw onto the shoulders, and cut into a fringe over the
+    forehead. In Stardew the hair is more of the head than the face is.
+
+    A CLEAN EDGE ALL THE WAY ROUND IS A HELMET -- make_sprites already paid for
+    that lesson on the traveller's hood -- so the fringe steps down a row in
+    two places, chosen by the crown kind rather than at random so the same
+    character comes out the same every run.
+    """
+    S = P.get("_style") or STYLES["current"]
+    hr = P["hair"]
+    head, top, hl = G["head"], G["top"], G["hairline"]
+    n = len(head)
+    vol, rise = S["bl_hair_vol"], S["bl_hair_rise"]
+    kind = P["crown_kind"]
+    if back and bl_has_hair(P):
+        # THE BACK OF A HEAD IS ALL HAIR. Drawn with the same hairline the
+        # front uses, the bare skull under it shows through as a pale slab in
+        # the middle of the crown -- which is what the first `up` frame was: a
+        # face-shaped hole in the back of everybody's head.
+        for (y, x0, x1) in head:
+            f.row(y + dy, x0, x1, hr[1])
+            f.row(y + dy, x1 - 1, x1, hr[3])
+    if not bl_has_hair(P):
+        # A dome with no hair on it is an egg unless something says where the
+        # skull turns away. Two px of shade at each temple, from the hairline
+        # down, plus a shaded jaw row, is the whole of it -- and the temple
+        # doubles as the ear, which is the only feature a bare head has spare.
+        for i in range(hl, n):
+            y, hx0, hx1 = head[i]
+            f.px(hx0, y + dy, P["skin"][1])
+            f.row(y + dy, hx1 - 1, hx1, P["skin"][1])
+        f.row(head[-1][0] + dy, head[-1][1], head[-1][2], P["skin"][1])
+        if kind == "horseshoe":
+            # A horseshoe is the temples with nothing joining them, and it only
+            # reads as one if the bare crown between them is a real gap.
+            for i in range(hl, n - 1):
+                y, x0, x1 = head[i]
+                f.row(y + dy, x0 - vol, x0 + 1, hr[1])
+                f.row(y + dy, x1 - 1, x1 + vol, hr[3])
+        return
+
+    x0b, x1b = head[n // 2][1], head[n // 2][2]
+    # THE HAIR FOLLOWS THE SKULL ROW BY ROW, one px proud of it, rather than
+    # being one flat block of the skull's widest row. Drawn the second way --
+    # which is how this was first written -- the dome the geometry carefully
+    # cut is covered straight back up and every character wears a box.
+    for i in range(-rise, hl):
+        if i < 0:
+            y = top + i
+            x0, x1 = head[0][1] + 1, head[0][2] - 1
+        else:
+            y, x0, x1 = head[i]
+            x0, x1 = x0 - vol, x1 + vol
+        f.row(y + dy, x0, x1, hr[1])
+        f.row(y + dy, x1 - 1, x1, hr[3])
+        if i < 3:
+            # A HIGHLIGHT ON THE CROWN, three rows of it, two px wide. Fourteen
+            # rows of one flat colour is a bonnet however well the silhouette
+            # is cut, and this is the cheapest thing in the file that says the
+            # mass is round: the same north-west light every other part of the
+            # figure is lit by, spent on the one surface big enough to show it.
+            f.row(y + dy, x0 + 1, x0 + 2, hr[0])
+    # THE FRINGE. A clean edge all the way round is a helmet -- the traveller's
+    # uneven hood is in this file because of that finding -- and a hair mass
+    # fourteen rows tall with a ruled line across the bottom of it is the same
+    # failure at twice the size, which is what every haired character here
+    # looked like before this block: a motorcycle helmet with a face in it.
+    # Each crown cuts its own, in whole rows and at fixed fractions of the
+    # skull, so the same character comes out the same every run.
+    #
+    # A positive row hangs the hair one row LOWER over that span; a negative
+    # one takes a row off, drawn in skin because the skull underneath is
+    # already painted. A bun is hair pulled back, so it is the only one that
+    # goes up.
+    fringe = {"mop": ((0.00, 0.32, 1), (0.54, 0.80, 1)),
+              "bun": ((0.28, 0.72, -1),)}.get(kind, ((0.00, 0.44, 1),))
+    fw = x1b - x0b + 1
+    for (a, b, r) in fringe:
+        ax = x0b + int(round(a * fw))
+        bx = x0b + int(round(b * fw)) - 1
+        if bx < ax:
+            continue
+        if r > 0:
+            f.row(top + hl + dy, ax, bx, hr[1])
+            if bx >= x1b - 1:
+                f.row(top + hl + dy, x1b - 1, bx, hr[3])
+        else:
+            f.row(top + hl - 1 + dy, ax, bx, P["skin"][0])
+    if kind == "mop":
+        # ...and ONE tuft that breaks the crown itself, off to one side. Two
+        # of them, symmetrically placed, is a pair of ears -- which is exactly
+        # what the first version of this drew on Bram, and it is the same
+        # class of failure as the goggles and the beak: at this resolution the
+        # shape you did not intend is as legible as the one you did, and the
+        # unintended one usually wins.
+        if top - rise - 1 >= 1:
+            # Row 1 is the floor: `rim()` needs a row above the topmost figure
+            # pixel to close the silhouette, and a tuft on row 0 comes out of
+            # the sheet with a hole in the top of the head.
+            f.row(top - rise - 1 + dy, x0b + 3, x0b + 5, hr[1])
+    # Temples: the hair comes DOWN THE SIDES past the eye. Without them the
+    # face is a slab of skin the full width of the head and the eyes have
+    # nothing to sit between. THEY NARROW towards the chin -- held at full
+    # width all the way down, which is how this was first drawn, two solid
+    # vertical bars down a big head read as a pair of headphones, which is
+    # `hu_face_front()`'s goggles turned ninety degrees.
+    # The crown is the axis the cast is separated on, and at this size that
+    # difference has to live in the MASS -- how far the hair comes down the
+    # sides -- rather than in one notch nobody can see. A bun is hair pulled
+    # BACK, so its temples are one px; a mop is hair nobody has cut, so its
+    # are four and they reach the chin.
+    tp = max(1, S["bl_temple"] + {"bun": -2, "mop": 1}.get(kind, 0))
+    span = max(1, n - 1 - hl)
+    for i in range(hl, n):
+        y, hx0, hx1 = head[i]
+        w = max(1, int(round(tp - (tp - 1) * (i - hl) / float(span))))
+        f.row(y + dy, hx0 - (vol if i < n - 1 else 0), hx0 + w - 1, hr[1])
+        f.row(y + dy, hx1 - w + 1, hx1 + (vol if i < n - 1 else 0), hr[3])
+    # ...and past the jaw onto the shoulders, which is the single cheapest
+    # thing that says "hair" rather than "hat" at this size. Only where there
+    # is a shoulder under it: on a skirt-narrow figure it would hang in air.
+    drop = S["bl_hair_drop"] if not side else max(1, S["bl_hair_drop"] - 1)
+    for i in range(drop):
+        y = G["sy"] + i
+        bx0, bx1 = G["body"][min(i, len(G["body"]) - 1)][1:]
+        f.row(y + dy, max(bx0, head[-1][1] - vol), head[-1][1] + tp - 2, hr[1])
+        f.row(y + dy, head[-1][2] - tp + 2, min(bx1, head[-1][2] + vol), hr[3])
+    if kind == "bun":
+        # The brightest crown in the cast, and it is meant to be: you are
+        # supposed to spot her at a window from the other end of the street.
+        # WIDER THAN TALL, and overlapping the crown it grows out of -- a tall
+        # narrow one standing clear of the head is a chimney, which is what
+        # the first cut drew.
+        bx = (x0b + x1b) // 2
+        by = top - rise - 1
+        f.row(by, bx - 2, bx + 2, hr[0])
+        f.row(by + 1, bx - 3, bx + 3, hr[1])
+        f.row(by + 1, bx + 2, bx + 3, hr[3])
+        f.row(by + 2, bx - 2, bx + 2, hr[1])
+        f.row(by + 2, bx + 1, bx + 2, hr[3])
+
+
+def bl_beard(f, P, G, dy, front=None):
+    """A block of hair under the eye, in the hair's own ramp.
+
+    Under the EYE and not under the mouth: the mouth is one row off the jaw,
+    so a beard hung from it is two rows and reads as a chinstrap. It goes on
+    after the face and before the contour, so it takes the jaw line with it.
+    It lives out here rather than in `bl_hair()` because a bald man can have
+    one -- putting it at the tail of the hair meant Tobin, who is both, got
+    neither.
+    """
+    hr, head = P["hair"], G["head"]
+    my = G["eye_y"] + G["eye_h"]
+    for i in range(max(0, my - G["top"]), len(head)):
+        y, x0, x1 = head[i]
+        # Edge-on, only the front of the jaw is beard: painted across the
+        # whole skull it is the back of his head going furry.
+        if front:
+            x1 = min(x1 - 1, x0 + front)
+        else:
+            x1 = x1 - 1
+        f.row(y + dy, x0 + 1, x1, hr[1])
+        f.row(y + dy, max(x0 + 1, x1 - 1), x1, hr[3])
+
+
+def bl_eyes(f, P, G, dy, side=False):
+    """LARGE EYES, as a first-class part of the head.
+
+    The single biggest identity carrier the figure has, and the shipped one has
+    two dark pixels. Measured: Abigail's eye is 2 px wide and 3 rows tall with
+    a lash row over a light sclera and a coloured iris; the SoM girl's is 2 by
+    2, an outer (240,240,240) column against a (0,88,112) iris; the CT NPC's is
+    one dark dot in a 225-luma field -- and his head is 10 px across against
+    our skull's 16, so one of his dots is two-and-a-half of ours.
+
+    The shape drawn here is Stardew's, because it is the one that carries a
+    COLOUR, and eye colour is a character trait in all three references:
+
+        row 0    lash, the full width, in the skin ramp's near-black
+        row 1    sclera on the OUTER column, iris across the rest
+        row 2..  the same, with the innermost pixel dropped to the iris deep
+
+    Outer-column sclera rather than centred, because two eyes with a light
+    pixel each on the inside read as a nose bridge with a highlight on it, and
+    the eye that results looks crossed.
+    """
+    S = P.get("_style") or STYLES["current"]
+    sk, ey = P["skin"], P["eyes"]
+    head = G["head"]
+    ew, eh = max(2, S["bl_eye_w"]), G["eye_h"]
+    y0 = G["eye_y"]
+
+    def one(x, mirror):
+        for k in range(eh):
+            yy = y0 + k + dy
+            if k == 0:
+                f.row(yy, x, x + ew - 1, sk[4])
+                continue
+            for i in range(ew):
+                j = ew - 1 - i if mirror else i
+                if j == 0:
+                    c = ey[0]
+                elif j == ew - 1 and k == eh - 1:
+                    c = ey[4]
+                elif k == eh - 1:
+                    c = ey[3]
+                else:
+                    c = ey[2]
+                f.px(x + i, yy, c)
+
+    if side:
+        # One eye, at the front of the notch, the same size it is in front --
+        # or the figure blinks when it turns.
+        # `mirror=False` puts the sclera on the leading column, and the
+        # figure is looking that way -- mirrored, the white sits at the back of
+        # the socket and the eye reads as looking over its own shoulder.
+        x = _front_edge(head, y0) + 1
+        one(x, False)
+        return
+    total = 2 * ew + max(1, S["bl_eye_sep"])
+    (_y, ex0, ex1) = _row(0, total)
+    one(ex0, False)
+    one(ex1 - ew + 1, True)
+    if P.get("specs"):
+        # Two pixels of glint and a bridge. A rim all the way round a head this
+        # size is goggles -- `hu_face_front()` records the same failure.
+        gl = mix(C["text"], C["muted"], 0.30)
+        f.px(ex0 - 1, y0 + 1 + dy, gl)
+        f.px(ex1 + 1, y0 + 1 + dy, gl)
+        f.row(y0 + 1 + dy, ex0 + ew, ex1 - ew, gl)
+
+
+def bl_face(f, P, G, dy):
+    """The skin field, the eyes and the mouth. In that order and no nose.
+
+    In two of the three references the face is a single flat bright field with
+    dark punched into it and NOTHING else -- no nose, no cheek shading, no
+    brow. A full-width horizontal band on a small head is eyewear, a raised
+    half-mouth is facial hair, and a row of shade beside the nose is a muzzle;
+    this file has paid for all three already. So: a flat field, two large eyes,
+    and two pixels of mouth.
+    """
+    S = P.get("_style") or STYLES["current"]
+    sk = P["skin"]
+    head, hl = G["head"], G["hairline"]
+    tp = max(1, S["bl_temple"])
+    span = max(1, len(head) - 1 - hl)
+    for i in range(hl, len(head)):
+        y, x0, x1 = head[i]
+        w = max(1, int(round(tp - (tp - 1) * (i - hl) / float(span))))
+        f.row(y + dy, x0 + w, x1 - w, sk[0])
+        f.px(x1 - w, y + dy, sk[1])
+    bl_eyes(f, P, G, dy)
+    my = G["mouth_y"]
+    jaw = head[-1][0]
+    if my <= jaw and not P.get("beard"):
+        # ONE row, and in the skin's own shade rather than its near-black:
+        # anything lit below a dark mouth line is teeth, and a two-row mouth on
+        # this head is a grin nobody ordered.
+        f.row(my + dy, 15, 16, sk[1])
+
+
+def bl_garment(f, P, G, dy, back):
+    """What the torso block is WEARING, as flat panels on a flat block.
+
+    Every one of these is a rectangle or two. A garment drawn as shading
+    vanishes at this size -- the lesson `docs/CHARACTER-SPITE.md` records as
+    "at this size a lapel is its seams" -- so each of the six is a shape with
+    an edge, in a ramp that is not the body's.
+    """
+    kind = P["garment"]
+    cl, tr = P["cloth"], P["trim"]
+    body, sy, hy = G["body"], G["sy"], G["hy"]
+    x0, x1 = body[0][1], body[0][2]
+    mid = (x0 + x1) // 2
+
+    if P.get("shawl") and not back:
+        rows = min(P.get("shawl_rows", 4), len(body))
+        for i in range(rows):
+            y, bx0, bx1 = body[i]
+            f.row(y + dy, bx0, bx1, P["shawl"][1])
+            f.row(y + dy, bx1 - 1, bx1, P["shawl"][3])
+    if kind == "coat":
+        # The one vertical line on the torso, two px of the coat's own dark.
+        # Without it a coat and a smock are the same rectangle.
+        for y in range(sy + 1, hy + 1):
+            f.px(mid, y + dy, cl[3])
+        f.row(sy + dy, x0, x1, tr[1])
+    elif kind == "cloak":
+        for y in range(sy, hy + 1):
+            f.row(y + dy, x0, x0 + 1, cl[3])
+            f.row(y + dy, x1 - 1, x1, cl[3])
+        f.row(sy + dy, x0, x1, tr[1])
+    elif kind == "dress":
+        f.row(sy + 1 + dy, x0 + 2, x1 - 2, tr[1])
+    elif kind == "apron":
+        # The brightest garment anybody owns, and it is a panel with an edge
+        # rather than a lighter version of the shirt.
+        for y in range(sy + 3, hy + 1):
+            f.row(y + dy, x0 + 2, x1 - 2, tr[1])
+            f.px(x1 - 2, y + dy, tr[3])
+        f.px(mid - 1, sy + 2 + dy, tr[1])
+        f.px(mid + 1, sy + 2 + dy, tr[1])
+    elif kind == "vest":
+        for y in range(sy + 1, hy + 1):
+            f.row(y + dy, x0 + 1, x0 + 3, tr[1])
+            f.row(y + dy, x1 - 3, x1 - 1, tr[1])
+            f.px(x1 - 1, y + dy, tr[3])
+    elif kind == "layers":
+        # Everything he owns and some of it somebody else's. Two patches, in
+        # two hues that are not the coat's, placed rather than scattered so the
+        # figure is the same man every run.
+        pa, pb = (P.get("patch") or (tr, tr))
+        h = max(2, len(body) // 4)
+        f.box(x0 + 1, sy + 2 + dy, x0 + 4, sy + 1 + h + dy, pa[1])
+        f.box(x1 - 4, hy - h - 1 + dy, x1 - 1, hy - 1 + dy, pb[1])
+        f.row(sy + dy, x0, x1, tr[1])
+
+
+def bl_frontal(P, pose, back):
+    """Front and back. The composite order IS the model, so it is written out
+    here in one place rather than emerging from where the calls happen to sit.
+    """
+    f = Frame()
+    dy = 0 if pose == "neutral" else 1
+    S = P.get("_style") or STYLES["current"]
+    G = bl_geometry(P, side=False)
+    P["_g"] = G
+    P["_keep"] = (P["eyes"][0], P["eyes"][2], P["eyes"][3], P["eyes"][4])
+
+    bl_legs(f, P, G, pose, dy)
+    bl_flat(f, G["body"], P["body_ramp"], dy=dy)
+    if G["hip"]:
+        bl_flat(f, G["body"][-G["hip"]:], P["trouser"], dy=dy)
+    bl_flat(f, G["hem"], P["body_ramp"], dy=dy)
+    bl_garment(f, P, G, dy, back)
+    bl_arms(f, P, G, pose, dy)
+    # The head goes on LAST of the masses, over the shoulders it sits on, so
+    # the jaw is an edge between two blocks rather than a join between two
+    # tapers. There is nothing between them: no neck, in any reference.
+    bl_flat(f, G["head"], P["skin"], base=0, shade=1, dy=dy)
+    bl_hair(f, P, G, dy, back)
+    if not back:
+        bl_face(f, P, G, dy)
+        if P.get("beard"):
+            bl_beard(f, P, G, dy)
+    # The contour under the jaw. `rim()` closes the silhouette and nothing
+    # else, and at 40-50% of the figure a head with no line under it merges
+    # into the shoulders and the whole top half is one blob.
+    inner_contour(f, G["head"], S, P["_contour"])
+    return f
+
+
+def bl_profile(P, pose):
+    """Edge-on. Same seven masses, one arm, and the face as a NOTCH.
+
+    The face is cut out of the front of the skull rather than stuck on it, for
+    the reason Spite's profile taught this file: a lit skin wedge sticking out
+    of a pale dome is a bird's head at any zoom.
+    """
+    f = Frame()
+    dy = 0 if pose == "neutral" else 1
+    S = P.get("_style") or STYLES["current"]
+    G = bl_geometry(P, side=True)
+    P["_g"] = G
+    P["_keep"] = (P["eyes"][0], P["eyes"][2], P["eyes"][3], P["eyes"][4])
+    sk, hr = P["skin"], P["hair"]
+    head = G["head"]
+    bare = not bl_has_hair(P)
+
+    bl_legs(f, P, G, pose, dy)
+    bl_flat(f, G["body"], P["body_ramp"], dy=dy)
+    if G["hip"]:
+        bl_flat(f, G["body"][-G["hip"]:], P["trouser"], dy=dy)
+    bl_flat(f, G["hem"], P["body_ramp"], dy=dy)
+    bl_garment(f, P, G, dy, False)
+    bl_arms(f, P, G, pose, dy, side=True)
+    # The whole skull in hair, then the face cut back out of the front of it.
+    bl_flat(f, head, sk if bare else hr, base=0 if bare else 1,
+            shade=1 if bare else 3, dy=dy)
+    bl_hair(f, P, G, dy, False, side=True)
+
+    # The notch scales with the skull -- three px of skin let into a twenty-
+    # wide head is a scratch, which is `hu_profile()`'s finding -- but it is
+    # still a NOTCH. Run from the hairline to the jaw at 36% of the skull, as
+    # the first cut did, it is a seven-by-eight slab of flat skin on the side
+    # of the head, which is the beak all over again at four times the area.
+    # From one row above the eye, and narrower.
+    nw = max(5, int(round(G["skull_w"] * 0.32)))
+    y0 = G["eye_y"]
+    jaw = head[-1][0]
+    for y in range(y0 - 1, jaw + 1):
+        x0 = _front_edge(head, y)
+        # The chin pulls back a pixel on the last row, so the notch is a
+        # profile and not a rectangle bitten out of the side of the skull.
+        w = nw - (1 if y == jaw else 0)
+        f.row(y + dy, x0, x0 + w - 1, sk[0])
+        f.px(x0 + w - 1, y + dy, sk[1])
+    if P.get("beard"):
+        bl_beard(f, P, G, dy, front=nw + 1)
+    bl_eyes(f, P, G, dy, side=True)
+    ny = y0 + G["eye_h"]
+    nx = _front_edge(head, ny)
+    f.row(ny + dy, nx - 1, nx, sk[0])              # the nose, one px proud
+    f.px(nx - 1, ny + 1 + dy, sk[1])
+    my = G["mouth_y"]
+    if my <= jaw and not P.get("beard"):
+        f.px(_front_edge(head, my), my + dy, sk[1])
+    inner_contour(f, head, S, P["_contour"])
+    return f
+
+
 # --- the cast -------------------------------------------------------------------
 #
 # Every townsperson is TOWNSPERSON plus a handful of overrides. That is the
@@ -4021,6 +4913,15 @@ TOWNSPERSON = dict(
     crown_kind="cap", garment="coat",
     shadow=9.5, shadow_y=4.0, props=(),
     boots=None, trim=None, trouser=None, body_ramp=None,
+    # EYE COLOUR IS A CHARACTER TRAIT, not a shading decision. Abigail's are
+    # violet, the Secret of Mana girl's are a dark teal against a 240-luma
+    # sclera, and in both cases the iris is one of about twenty colours the
+    # whole frame gets to spend. It is an axis here for the same reason hair
+    # is: it is one of the very few things a 32px figure can say about a person
+    # that a silhouette cannot. Only the block base reads it -- the taper base
+    # has no sclera and punches its eye straight out of the skin ramp, which is
+    # a fact about that base, not an oversight here.
+    eyes=None,
 )
 
 # Skins. Three of them, because a town of one complexion is a decision nobody
@@ -4031,6 +4932,35 @@ SKIN_PALE = skin5(mix(mix(_SKIN, C["muted"], 0.30), C["bg"], 0.16))
 SKIN_ASH = skin5(mix(mix(_SKIN, C["muted"], 0.45), C["bg"], 0.34))
 SKIN_WARM = skin5(mix(mix(C["accent"], C["danger"], 0.40), C["bg"], 0.34))
 SKIN_DEEP = skin5(mix(mix(C["accent"], C["danger"], 0.30), C["bg"], 0.60))
+
+def eye5(base):
+    """An eye: sclera, iris lit, iris, iris deep, lash.
+
+    Not `hue5`, because an eye is the one place on the figure where the two
+    ends of the ramp are supposed to be as far apart as the palette allows.
+    Measured: the SoM girl's sclera is (240, 240, 240) at 240 luma against an
+    iris at 64 -- a ratio of nearly four inside four pixels, and the largest
+    local contrast anywhere in that frame. So index 0 is pulled almost all the
+    way to `text` and index 4 almost all the way to black, and the three in
+    between are the iris the character is actually described by.
+
+    The sclera is `text` tinted 12% toward the iris rather than pure white:
+    First Light's white IS `text` at (239, 231, 218), and a pure #FFFFFF in a
+    palette that has no other pure white reads as a hole rather than as an eye.
+    """
+    return [mix(C["text"], base, 0.12), mix(base, C["text"], 0.38), base,
+            mix(base, C["bg"], 0.42), mix(C["bg"], BLACK, 0.35)]
+
+
+# Five, so a town of six does not repeat one, and each of them is mixed from a
+# theme hue so that an eye is the same family of colour as everything else in
+# the world -- an off-palette iris is four pixels, and four pixels is all it
+# takes for a face to look pasted on.
+EYE_BROWN = eye5(mix(mix(C["accent"], C["danger"], 0.35), C["line"], 0.52))
+EYE_BLUE = eye5(mix(C["accent_2"], C["line"], 0.46))
+EYE_GREEN = eye5(mix(C["good"], C["line"], 0.48))
+EYE_GREY = eye5(mix(C["muted"], C["line"], 0.42))
+EYE_AMBER = eye5(mix(C["warn"], C["line"], 0.38))
 
 HAIR_STRAW = hue5(mix(C["warn"], C["muted"], 0.40))
 HAIR_DARK = hue5(mix(C["accent"], C["bg"], 0.55))
@@ -4072,6 +5002,8 @@ def townsperson(style="current", **delta):
     P["_style"] = S
     P.setdefault("skin", SKIN_PALE)
     P.setdefault("hair", HAIR_DARK)
+    if P["eyes"] is None:
+        P["eyes"] = EYE_BROWN
     if P["boots"] is None:
         P["boots"] = LEATHER
     if P["trim"] is None:
@@ -4118,7 +5050,7 @@ TOWN_DELTAS["kid_pell"] = dict(
     leg_w=4, leg_gap=2, stride=3,
     crown_kind="cap", garment="cloak",
     cloth=LEAF, trim=cloth5(mix(C["accent"], C["bg"], 0.30)),
-    trouser=SLATE_DK, hair=HAIR_DARK, skin=SKIN_WARM,
+    trouser=SLATE_DK, hair=HAIR_DARK, skin=SKIN_WARM, eyes=EYE_GREEN,
     props=("crown", "stick"), shadow=7.5, shadow_y=3.4,
 )
 
@@ -4132,7 +5064,7 @@ TOWN_DELTAS["kid_bird"] = dict(
     leg_w=4, leg_gap=2, stride=3,
     crown_kind="mop", garment="cloak",
     cloth=MOSS, trim=LEAF, trouser=SLATE_DK,
-    hair=HAIR_STRAW, skin=SKIN_DEEP,
+    hair=HAIR_STRAW, skin=SKIN_DEEP, eyes=EYE_BROWN,
     props=("jar",), shadow=7.0, shadow_y=3.2,
 )
 
@@ -4149,7 +5081,7 @@ TOWN_DELTAS["busybody"] = dict(
     leg_w=4, leg_gap=2, stride=2, lean=2, depth=0.80,
     crown_kind="bun", garment="dress",
     cloth=DRESS, trim=ROSE, shawl=ROSE, shawl_rows=5,
-    trouser=STOCKING, hair=HAIR_WHITE, skin=SKIN_ASH,
+    trouser=STOCKING, hair=HAIR_WHITE, skin=SKIN_ASH, eyes=EYE_GREY,
     shadow=12.0, shadow_y=4.2,
 )
 
@@ -4164,7 +5096,7 @@ TOWN_DELTAS["bram"] = dict(
     leg_w=5, leg_gap=2, stride=4, depth=0.80,
     crown_kind="mop", garment="layers", beard=True,
     cloth=SACK, trim=MOSS, patch=(RUST, SLATE), trouser=SLATE_DK,
-    hair=HAIR_DARK, skin=SKIN_WARM,
+    hair=HAIR_DARK, skin=SKIN_WARM, eyes=EYE_AMBER,
     props=("bundle",), shadow=12.5, shadow_y=4.4,
 )
 
@@ -4179,7 +5111,7 @@ TOWN_DELTAS["tobin"] = dict(
     leg_w=5, leg_gap=2, stride=4, depth=0.90,
     crown_kind="bald", garment="apron", beard=True, sleeveless=True,
     cloth=SLATE, trim=LINEN, trouser=SLATE_DK, hair=HAIR_DARK, skin=SKIN_WARM,
-    props=("towel",), shadow=12.0, shadow_y=4.4,
+    eyes=EYE_BLUE, props=("towel",), shadow=12.0, shadow_y=4.4,
 )
 
 # --- Ansel Cobb. The only figure whose waist is wider than his chest, which is
@@ -4193,7 +5125,7 @@ TOWN_DELTAS["cobb"] = dict(
     leg_w=4, leg_gap=2, stride=4, depth=0.94,
     crown_kind="horseshoe", garment="vest", specs=True,
     cloth=BRASS, trim=LINEN, trouser=SLATE_DK, hair=HAIR_IRON, skin=SKIN_PALE,
-    shadow=10.5, shadow_y=4.2,
+    eyes=EYE_GREEN, shadow=10.5, shadow_y=4.2,
 )
 
 
