@@ -233,7 +233,7 @@ def sculpt(f, spans, keys, dy=0, hi=2, sh=3):
         f.px(x1, yy, cool(k + 2))
 
 
-def rim(img, S=None):
+def rim(img, S=None, col=None):
     """A hard rim in near-black around every opaque pixel.
 
     This is the single most important pass in the file, and it is the same pass
@@ -247,16 +247,15 @@ def rim(img, S=None):
     Derived from the alpha mask rather than drawn, so it can never disagree
     with the pose.
 
-    `S`, when a style hands one in, makes the rim LOCAL: each edge pixel takes
-    a darker step of the darkest material it touches instead of the one flat
-    OUTLINE. That is what the SNES reference does and it is why its figures sit
-    in their scenes rather than on them -- a single near-black line round a
-    pale linen apron is a sticker's die-cut, and the eye reads it as one. The
-    default is `rim_local = 0`, which is OUTLINE exactly, so the player, Spite,
-    the animals and the shipped town come out of here byte-identical.
+    `S`, when a style hands one in, tints the rim toward the figure's own hue
+    instead of using the one flat near-black OUTLINE -- see `figure_contour()`,
+    which explains why it is ONE colour for the whole figure and not one per
+    material. The default is `rim_local = 0`, which is OUTLINE exactly, so the
+    player, Spite, the animals and the shipped town come out of here
+    byte-identical.
     """
     S = S or STYLES["current"]
-    local = S["rim_local"] or S["rim_deep"]
+    col = tuple(col) if col is not None else OUTLINE
     w, h = img.size
     src = img.load()
     edge = []
@@ -264,24 +263,14 @@ def rim(img, S=None):
         for x in range(w):
             if src[x, y][3]:
                 continue
-            near = None
             for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0),
                            (1, 1), (-1, -1), (1, -1), (-1, 1)):
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < w and 0 <= ny < h and src[nx, ny][3] == 255:
-                    c = src[nx, ny][:3]
-                    # The DARKEST neighbour, not the first or the average. A
-                    # contour lighter than the material inside it is a highlight
-                    # along the edge, which at 1:1 makes the figure look wet.
-                    if near is None or luma(c) < luma(near):
-                        near = c
-                    if not local:
-                        break
-            if near is not None:
-                edge.append((x, y, near))
-    for (x, y, near) in edge:
-        img.putpixel((x, y), tuple(_contour_px(near, S) if local else OUTLINE)
-                     + (255,))
+                    edge.append((x, y))
+                    break
+    for (x, y) in edge:
+        img.putpixel((x, y), col + (255,))
     return img
 
 
@@ -2432,51 +2421,64 @@ def skin5(base):
 
 # --- the style layer ------------------------------------------------------------
 #
-# The figure above is drawn one way, and that way is an oil sketch: four heads
-# tall, a face that is a smudge at 1:1, no contour, many close mid-tones and a
-# palette that has had the chroma washed out of it by the same `_toward_bg()`
-# that keeps it off the ground. Kevin's note is "think more chrono trigger or
-# secret of mana era sprite characters", and the seeds those two games are in
-# AESTHETIC-SEEDS/ already -- they are what the MAP was drawn against, and the
-# characters are the part of the game that never followed.
+# The figure above is drawn one way, and Kevin's verdict on the first four
+# readings of the SNES grammar was "lol they're all a little uncanny". He was
+# right, and the reason is measurable rather than a matter of taste. Two native
+# frames, decoded rather than remembered:
 #
-# So this is a comparison, not a decision. `current` below is the control and is
-# byte-for-byte the figure that shipped; the others are readings of the SNES
-# field-sprite grammar, and they differ from each other on the five axes the
-# reference actually differs from us on. Every one of those axes is a number in
-# STYLE_DEFAULTS, not a hand-drawn alternative figure, because three hardcoded
-# figures would tell you which of three drawings you liked and nothing about
-# WHY -- and the point of the exercise is to learn which axis did the work.
+#   AESTHETIC-SEEDS/props/chrono-trigger-0.png, the doorway NPC at
+#   (31, 0, 45, 24): 14x24 px, 24 distinct colours INCLUDING the doorway
+#   behind him, head 42% of the figure, one flat outline at (48, 48, 48).
 #
-#   PROPORTION  `heads` -- the figure's height measured in head-heights. Ours is
-#               3.8, which is near-realistic; a Chrono Trigger field sprite is
-#               2.5 to 3. The frame, the 44-row SOLE contract and each
-#               character's own total height are all untouched: the head grows
-#               and the torso and legs are shortened to pay for it, so the
-#               renderer's foot-anchoring cannot notice.
-#   THE FACE    `eye_w` / `eye_h` / `eye_lit` / `brow_gap`. At field scale CT
-#               gives you two unmistakable eyes and a mood; we give two dark
-#               pixels with a brow sitting directly on them, which merges into
-#               one smudge. Bigger, and with bare forehead between brow and eye.
-#   THE OUTLINE `rim_local` / `rim_deep` / `head_contour`. CT carries a hard 1px
-#               contour in a DARKER STEP OF THE ADJACENT MATERIAL. Pure black on
-#               this palette reads as a sticker, so the contour is mixed from
-#               the neighbour toward OUTLINE rather than set to it.
-#   THE SHADING `cel_up` / `cel_dn` / the band fractions / `edge_extra`. Ours is
-#               four tones in narrow strips, which at 20px across is a gradient.
-#               Cel shading is three tones, wide, with one big step at the turn.
-#   THE PALETTE `sat` / `spread` / `dark_mode`. Every hue still comes out of
-#               data/themes/firstlight.json -- nothing here invents a colour --
-#               but a ramp may be built with the chroma pushed away from its own
-#               grey and the light and dark ends pulled further apart.
+#   .scratch/ref/som.png, the girl at (112, 124, 128, 156): 16x32, 20 colours
+#   including the grass, head 38%, one flat outline at (72, 56, 48), a face at
+#   219 luma with two dark pixels in it, and a dress in exactly two tones.
 #
-# WHAT A STYLE MAY NOT DO. It may not move the sole, the centre line or the
-# frame; it may not put a value in the 43..90 hole that sand, ice, dune and snow
-# live in (`_sat_ramp` re-solves the two dark steps after saturating, for
-# exactly that reason); and it may not make the face the brightest thing on the
-# figure -- the beak that `town_report()` measures for. `style_report()` at the
-# bottom of this section measures all four on every style rather than trusting
-# that they were written carefully.
+# Against that, the shipped figure is 23 to 32 colours -- not far off -- and the
+# FIRST cut of this style layer was 38 to 51, because it chased proportion and
+# a local per-material contour and spent the whole colour budget doing it. That
+# is what "uncanny" was: soft blends of near-neighbours where the reference has
+# flat blocks with hard edges. So the axes below are ordered by what actually
+# moves the needle, and the first one is now a hard contract in
+# `style_report()`.
+#
+#   1. THE COLOUR COUNT. `tones` / `hair_tones` / `face_tones` / `max_hues`.
+#      Three steps of a ramp per material, total, applied by `flatten()` as an
+#      exact map off the character's own ramps -- no dithering and no re-mixing,
+#      a removed tone is replaced by one that was already there. `rim()` is one
+#      colour for the whole figure rather than one per material, for the same
+#      budget reason and because that is what both frames measure.
+#
+#   2. THE FACE IS THE BRIGHTEST THING. `face_bright` / `skin_lift`. In both
+#      references the skin is a bright flat field and the eyes are dark pixels
+#      punched into it, and that maximum local contrast is the whole reason a
+#      face reads at 1:1. This is the opposite of what `town_report()` asserts
+#      and the two are reconciled in `style_report()`'s docstring -- the beak
+#      was never about brightness, it was about skin in the silhouette.
+#
+#   3. HAIR IS HALF THE HEAD AND IT IS A BLOCK. `hair_vol` / `hair_rows` /
+#      `temple` / `ears`, drawn by `hu_hair_mass()`: its own flat colour, its
+#      own contour, and a silhouette allowed to be wider than the skull. Ours
+#      was a thin cap painted on a dome, which is why bald and horseshoe read
+#      as eggs -- not a bald problem, an absence of any hair mass to be bald of.
+#
+#   4. PROPORTION. `heads` / `head_gain` / `head_vs_sh` / `body_gain`. 2.4 to
+#      2.6 heads, matching the two frames. The head is a little NARROWER than
+#      the shoulders (10 px on 12 in CT); making it wider is the bobblehead
+#      that the first cut overshot into. The frame, SOLE and each character's
+#      own total height are untouched -- the head grows and the torso and legs
+#      shorten to pay for it, so the renderer's foot-anchoring cannot notice.
+#
+#   5. THE SHADING AND THE PALETTE. `cel_*`, `sat`, `spread`, `dark_mode`.
+#      Every hue still comes out of data/themes/firstlight.json; a ramp may be
+#      built with the chroma pushed away from its own grey and the ends pulled
+#      apart, and `_sat_ramp()` re-solves the two dark steps onto FOLD_L and
+#      DEEP_L afterwards so the 43..90 ground hole still holds.
+#
+# `current` is the control and is byte-for-byte the figure that shipped. If it
+# ever renders differently, the style layer has leaked into the base and the
+# comparison is worthless. Nothing here picks a winner: `tools/candidates.py
+# --styles` renders the sweep into the curation gallery and a person decides.
 
 STYLE_DEFAULTS = dict(
     # --- proportion
@@ -2484,13 +2486,25 @@ STYLE_DEFAULTS = dict(
     head_gain=1.0,           # the skull widens with it, or it is an egg
     body_gain=1.0,           # ...and the body narrows, so the head OUTRANKS it
     head_taper=(4, 2),       # rows knocked off the width at each end of the oval
+    head_vs_sh=None,         # cap on head width as a fraction of the shoulders
     hairline_frac=None,      # hair as a fraction of the skull, not of the old head
     temple=0,                # rows of hair down the sides, below the hairline
+    hair_vol=0,              # px the hair block stands PROUD of the skull, each side
+    hair_rows=0,             # ...and how far it rises above the crown
+    ears=False,              # two px at the temple, for a crown with no hair there
     eye_dy=0,                # eyes lower in the skull than the scale alone gives
     # --- the face
     notch=3,                 # how wide the face is cut out of the profile skull
+    face_bright=False,       # the skin field is the LIT step, eyes punched into it
+    skin_lift=0.0,           # ...and lifted this far toward C["text"] first
     eye_w=2, eye_h=1,        # the dark of one eye, in pixels
-    eye_lit=False,           # the bottom row is sclera with a pupil in it
+    eye_lit=False,           # the bottom row is sclera with a pupil in it.
+                             # OFF in every style below: the measurement says
+                             # neither reference frame has a sclera at this
+                             # size, and on a face lifted bright enough the
+                             # lash row above it swamps the eye entirely. Kept
+                             # as an axis because it is the right answer one
+                             # scale up, in a portrait.
     brow_gap=0,              # bare forehead rows between the brow and the eye
     brow_w=2, mouth_w=2, lip_shade=True,
     # --- the outline
@@ -2503,6 +2517,10 @@ STYLE_DEFAULTS = dict(
     cel_sh_frac=None,
     edge_extra=True,         # the fourth tone in the last column
     crown_break=0.16, waist_break=0.66,
+    tones=None,              # the three ramp steps a garment is allowed, total
+    hair_tones=None,         # ...and the three the hair is
+    face_tones=None,         # ...and the three the face is
+    max_hues=None,           # the hard cap on opaque colours in one cel
     # --- the palette
     sat=0.0, sat_hair=0.0, sat_skin=0.0,
     spread=0.0,              # the lit end pushed up, the mid pushed down
@@ -2514,7 +2532,7 @@ def style(**over):
     """One style: the defaults, with the axes this style actually moves named.
 
     Written this way round so that reading a style tells you what it is FOR --
-    `hard25` is four numbers, and they are the four claims it makes.
+    `hard` is a dozen numbers, and they are the claims it makes.
     """
     S = dict(STYLE_DEFAULTS)
     unknown = [k for k in over if k not in S]
@@ -2535,53 +2553,65 @@ STYLES = {
     # worthless.
     "current": style(),
 
-    # Three heads, and the contour is a suggestion rather than a line. This is
-    # the conservative reading of the reference: the proportion changes, the
-    # face gets big enough to hold two real eyes, and the shading goes to three
-    # wide tones -- but the outline keeps most of the local hue and the palette
-    # is barely touched, so the figure still belongs to this game's dusk.
-    # A two-wide eye with the sclera row still in it. Solid dark at two rows it
-    # is a bar across the socket, which on a small head is the goggles failure
-    # `hu_face_front` already records for the brows -- the eye has to have
-    # something INSIDE it or it is not an eye, however small it is.
-    "soft3": style(
-        heads=3.0, head_gain=1.16, body_gain=0.96, head_taper=(6, 3, 1),
-        hairline_frac=0.42, temple=2, eye_dy=0, notch=4,
-        eye_w=2, eye_h=2, eye_lit=True, brow_gap=1, mouth_w=3,
+    # Secret of Mana's reading: 2.6 heads, a warm contour rather than a hard
+    # one, hair with real volume, and a face that keeps one step of shading in
+    # it. The gentlest of the three and the one that still looks like this
+    # game's dusk -- 26 colours, against the reference's 20.
+    "soft": style(
+        heads=2.6, head_gain=1.24, head_vs_sh=0.90, head_taper=(6, 3, 1),
+        hairline_frac=0.46, temple=3, hair_vol=1, hair_rows=2, ears=True,
+        face_bright=True, skin_lift=0.28, eye_dy=0, notch=5,
+        eye_w=2, eye_h=2, brow_gap=1, mouth_w=3,
         rim_local=0.55, rim_deep=0.20,
-        cel_hi_frac=0.30, cel_sh_frac=0.24, edge_extra=False,
+        cel_hi_frac=0.30, cel_sh_frac=0.26, edge_extra=False,
         crown_break=0.14, waist_break=0.60,
-        sat=0.18, sat_hair=0.12, sat_skin=0.06, spread=0.10,
+        tones=(0, 1, 3), hair_tones=(0, 1, 3), face_tones=(0, 1, 4),
+        max_hues=26,
+        sat=0.20, sat_hair=0.14, sat_skin=0.06, spread=0.12,
     ),
 
-    # Two and a half heads, a hard contour that also runs where the head meets
-    # the shoulders, and the biggest eyes in the file -- three pixels across,
-    # two down, with a catchlight. This is the closest reading of the grammar:
-    # in Secret of Mana the head-and-hair mass is very nearly two fifths of the
-    # whole figure and the eye is a legible object rather than a mark.
-    "hard25": style(
-        heads=2.5, head_gain=1.24, body_gain=0.88, head_taper=(6, 3, 1),
-        hairline_frac=0.48, temple=4, eye_dy=0, notch=6,
-        eye_w=3, eye_h=2, eye_lit=True, brow_gap=1, brow_w=3, mouth_w=4,
+    # Chrono Trigger's, and the strictest: 2.4 heads -- the doorway NPC's 42%
+    # head share exactly -- a hard contour that also runs where the head meets
+    # the shoulders, and a 24-colour budget, which is that frame's whole count
+    # INCLUDING its background. The face is one flat lit field with two dark
+    # pixels punched into it and nothing else, which is what both references
+    # actually do and what the sclera row in the first cut was drowning.
+    # Its eye is one row, not two: the CT NPC's eyes are single dark dots and
+    # a two-row block on a face this pale reads as a skull. Its darkest skin
+    # step is the shade rather than the near-black, because the SoM eye
+    # measures 64 luma against a 219 face -- a ratio of three, where sk[4] on
+    # a lifted face is a ratio of twelve and looks punched THROUGH rather than
+    # into.
+    "hard": style(
+        heads=2.4, head_gain=1.28, head_vs_sh=0.90, head_taper=(6, 3, 1),
+        hairline_frac=0.50, temple=3, hair_vol=1, hair_rows=2, ears=True,
+        face_bright=True, skin_lift=0.3, eye_dy=0, notch=6,
+        eye_w=2, eye_h=1, brow_gap=1, brow_w=0, mouth_w=3,
         rim_local=0.35, rim_deep=0.30, head_contour=True,
         cel_hi_frac=0.32, cel_sh_frac=0.28, edge_extra=False,
         crown_break=0.12, waist_break=0.58,
+        tones=(0, 1, 3), hair_tones=(0, 1, 3), face_tones=(0, 1, 3),
+        max_hues=24,
         sat=0.28, sat_hair=0.18, sat_skin=0.08, spread=0.16,
     ),
 
-    # The loud one. Proportion between the other two, and everything else turned
-    # up: three tones with a TWO-step drop at the turn instead of one, the folds
-    # darkened toward black so they keep their hue instead of going grey-blue,
-    # and the chroma pushed until each garment holds a colour you could name
-    # from across the street. It is the test of whether this palette can carry
-    # SNES saturation at all, or whether First Light's dusk is the actual limit.
+    # The loud one. Proportion between the other two and everything else turned
+    # up: a TWO-step drop at the turn instead of one, the folds darkened toward
+    # black so they keep their hue instead of going grey-blue, and the chroma
+    # pushed until each garment holds a colour you could name from across the
+    # street. It is the test of whether this palette can carry SNES saturation
+    # at all, or whether First Light's dusk is the actual limit -- and it buys
+    # the extra chroma with four more colours than `hard` gets.
     "bold": style(
-        heads=2.7, head_gain=1.22, body_gain=0.92, head_taper=(6, 3, 1),
-        hairline_frac=0.45, temple=3, eye_dy=0, notch=6,
-        eye_w=3, eye_h=2, eye_lit=True, brow_gap=1, brow_w=3, mouth_w=4,
+        heads=2.5, head_gain=1.26, head_vs_sh=0.92, head_taper=(6, 3, 1),
+        hairline_frac=0.48, temple=3, hair_vol=2, hair_rows=3, ears=True,
+        face_bright=True, skin_lift=0.3, eye_dy=0, notch=6,
+        eye_w=2, eye_h=2, brow_gap=1, brow_w=0, mouth_w=3,
         rim_local=0.45, rim_deep=0.35, head_contour=True,
         cel_up=1, cel_dn=2, cel_hi_frac=0.34, cel_sh_frac=0.30, edge_extra=False,
         crown_break=0.12, waist_break=0.56,
+        tones=(0, 1, 3), hair_tones=(0, 1, 3), face_tones=(0, 1, 4),
+        max_hues=28,
         sat=0.60, sat_hair=0.40, sat_skin=0.16, spread=0.30, dark_mode="black",
     ),
 }
@@ -2616,7 +2646,7 @@ def _toward_black(base, target):
     return mix(base, BLACK, 1.0 - target / la)
 
 
-def _sat_ramp(ramp, S, k, bracket):
+def _sat_ramp(ramp, S, k, bracket, lift=0.0):
     """One ramp, restyled: saturated, spread, and re-bracketed if it is cloth.
 
     The re-bracket is not optional. Saturating a green cloak lifts its dark
@@ -2626,6 +2656,14 @@ def _sat_ramp(ramp, S, k, bracket):
     the chroma has been pushed, not before.
     """
     out = [saturate(c, k) for c in ramp]
+    if lift and len(out) >= 2:
+        # The face has to be able to BE the brightest thing on the figure, and
+        # at 161 luma on the palest skin in the cast it cannot: the reference
+        # faces measure 175 (Chrono Trigger) and 219 (Secret of Mana), against
+        # a lit garment. Lifting the top two steps toward C["text"] is what
+        # buys the flat bright field that two dark pixels get punched into.
+        out[0] = mix(out[0], C["text"], lift)
+        out[1] = mix(out[1], C["text"], lift)
     if S["spread"] and len(out) >= 3:
         out[0] = mix(out[0], C["text"], S["spread"])
         out[2] = mix(out[2], C["line"], S["spread"] * 0.6)
@@ -2644,21 +2682,22 @@ def _restyle_ramps(P, S):
     the memo those characters would come out of here saturated twice and the
     town would not be one town.
     """
-    if not (S["sat"] or S["sat_hair"] or S["sat_skin"] or S["spread"]):
+    if not (S["sat"] or S["sat_hair"] or S["sat_skin"] or S["spread"]
+            or S["skin_lift"]):
         return
     memo = {}
 
-    def go(ramp, k, bracket):
+    def go(ramp, k, bracket, lift=0.0):
         key = id(ramp)
         if key not in memo:
-            memo[key] = _sat_ramp(ramp, S, k, bracket)
+            memo[key] = _sat_ramp(ramp, S, k, bracket, lift)
         return memo[key]
 
     for name in ("cloth", "trim", "trouser", "body_ramp", "shawl", "boots"):
         if P.get(name):
             P[name] = go(P[name], S["sat"], bracket=len(P[name]) >= 5)
     P["hair"] = go(P["hair"], S["sat_hair"], bracket=False)
-    P["skin"] = go(P["skin"], S["sat_skin"], bracket=False)
+    P["skin"] = go(P["skin"], S["sat_skin"], bracket=False, lift=S["skin_lift"])
     if P.get("patch"):
         P["patch"] = tuple(go(r, S["sat"], bracket=True) for r in P["patch"])
 
@@ -2699,6 +2738,15 @@ def _restyle_build(P, S):
 
     r = head_h / float(h0)
     head_w = min(20, max(8, int(round(P["head_w"] * S["head_gain"]))))
+    if S["head_vs_sh"]:
+        # MEASURED, not remembered: the CT doorway NPC's head is 10 px across
+        # on 12 px of shoulder and the SoM girl's SKULL is 8 on 10 -- the head
+        # is a little narrower than the body, and it is the HAIR that is
+        # allowed to be wider (see `hair_vol`). The first cut of this restyle
+        # made the skull itself wider than the shoulders, which overshoots into
+        # bobblehead: the head is not supposed to win the silhouette, it is
+        # supposed to tie with it.
+        head_w = min(head_w, max(8, int(round(P["sh_w"] * S["head_vs_sh"]))))
     # The head grows and the BODY GIVES WAY. Widening the skull on unchanged
     # shoulders makes a bobblehead -- the head is bigger but it is not the
     # subject, because the widest thing in the silhouette is still the chest.
@@ -2742,6 +2790,117 @@ def _restyle_build(P, S):
     )
 
 
+def _tone_map(P):
+    """Every colour this character can draw, mapped down to three per material.
+
+    THE COLOUR COUNT IS THE WHOLE OF "UNCANNY". Measured off two native frames
+    rather than remembered: the Chrono Trigger NPC at (31, 0, 45, 24) of
+    AESTHETIC-SEEDS/props/chrono-trigger-0.png is 24 colours INCLUDING its
+    background, and the Secret of Mana girl is 20. Both draw a complete person
+    -- hair, face, two garments, boots, outline -- in about a dozen. Ours draws
+    one in forty-odd, because a five-step ramp painted with a per-row base key
+    and a lit and a shaded band uses every step it has, and the eye reads all
+    those near-neighbours as a soft blend where the reference has a flat block
+    with a hard edge.
+
+    So a style may declare that a garment gets exactly three steps of its ramp
+    and no more. The map is built from P's own ramps, which is why it can be
+    exact rather than a quantiser's guess: every colour on the figure came from
+    one of these lists, and index 0 goes to the lit step, 1 and 2 to the mid,
+    and 3 and 4 to the dark. Nothing is dithered and nothing is re-mixed -- a
+    tone that is removed is replaced by another tone that was already there.
+    """
+    S = P.get("_style") or STYLES["current"]
+    m = {}
+
+    def add(ramp, tones):
+        if not ramp or tones is None:
+            return
+        for i, c in enumerate(ramp):
+            j = 0 if i <= 0 else (1 if i <= 2 else 2)
+            m[tuple(c)] = tuple(ramp[max(0, min(len(ramp) - 1, tones[j]))])
+
+    for key in ("cloth", "trim", "trouser", "body_ramp", "shawl", "boots"):
+        add(P.get(key), S["tones"])
+    add(P.get("hair"), S["hair_tones"] if S["hair_tones"] else S["tones"])
+    add(P.get("skin"), S["face_tones"])
+    for r in P.get("patch") or ():
+        add(r, S["tones"])
+    return m
+
+
+def flatten(img, P):
+    """Apply the tone map, then merge whatever is left until the cel fits.
+
+    The map covers everything painted out of the character's own ramps, which
+    is most of the figure. What it does not cover is the props -- a stick, a
+    jar, a bundle each mix a private ramp inside their own function -- so after
+    the map there is a second pass that merges the rarest remaining colour into
+    its nearest neighbour, over and over, until the cel is inside the style's
+    budget. Rarest-first and nearest-by-RGB, with the tie broken on the colour
+    itself so a re-run is byte-identical; no dithering, because a dither at
+    1:1 on a 32px figure is noise, and the reference has none.
+    """
+    S = P.get("_style") or STYLES["current"]
+    if S["tones"] is None and S["max_hues"] is None:
+        return img
+    m = _tone_map(P)
+    if m:
+        px = img.load()
+        for y in range(img.size[1]):
+            for x in range(img.size[0]):
+                q = px[x, y]
+                if q[3] == 255 and q[:3] in m:
+                    px[x, y] = m[q[:3]] + (255,)
+    cap = S["max_hues"]
+    if cap is None:
+        return img
+    # One colour of the budget is spent by rim() after this runs, and one more
+    # by the contact shadow -- but the shadow is not opaque, and the count that
+    # matters is the opaque one, so only the contour is held back.
+    cap = max(2, cap - 1)
+    while True:
+        counts = {}
+        for q in img.get_flattened_data():
+            if q[3] == 255:
+                counts[q[:3]] = counts.get(q[:3], 0) + 1
+        if len(counts) <= cap:
+            return img
+        rare = min(sorted(counts), key=lambda c: (counts[c], c))
+        rest = [c for c in sorted(counts) if c != rare]
+        near = min(rest, key=lambda c: (sum((c[i] - rare[i]) ** 2 for i in range(3)), c))
+        px = img.load()
+        for y in range(img.size[1]):
+            for x in range(img.size[0]):
+                if px[x, y][3] == 255 and px[x, y][:3] == rare:
+                    px[x, y] = near + (255,)
+
+
+def figure_contour(P, S):
+    """ONE contour colour for the whole character, not one per material.
+
+    The first cut of this took a darker step of each edge pixel's own
+    neighbour, which is what the grammar felt like from memory and is not what
+    the reference does: the CT NPC's outline is (48, 48, 48) everywhere and the
+    SoM girl's is (72, 56, 48) everywhere -- a single dark, slightly warm
+    colour, not black, used for the whole silhouette. Per-material was also
+    sixteen of the extra colours all by itself, which is the budget in finding
+    one. So the hue comes from the figure as a whole and the contour is one
+    entry in its palette, which is both cheaper and more accurate.
+    """
+    if not (S["rim_local"] or S["rim_deep"]):
+        return OUTLINE
+    # Mixed from the character's ramps rather than measured off a finished cel,
+    # because `inner_contour()` needs the same colour halfway through drawing
+    # one. Two contours a shade apart is two entries of the budget and, worse,
+    # a jaw line that does not match the silhouette it meets.
+    parts = [P["cloth"][1], P["cloth"][3], P["trouser"][1], P["hair"][2],
+             P["skin"][1]]
+    mean = tuple(int(round(sum(c[i] for c in parts) / float(len(parts))))
+                 for i in range(3))
+    return _contour_px(mean, S)
+
+
 def _contour_px(c, S):
     """The contour colour for a pixel of material `c`.
 
@@ -2756,7 +2915,7 @@ def _contour_px(c, S):
     return mix(out, BLACK, S["rim_deep"]) if S["rim_deep"] else out
 
 
-def inner_contour(f, spans, S, ramp_for):
+def inner_contour(f, spans, S, col):
     """A contour on the head where it meets the BODY rather than the air.
 
     `rim()` closes the silhouette and nothing else, so a 17-row skull sitting on
@@ -2765,6 +2924,10 @@ def inner_contour(f, spans, S, ramp_for):
     draws the missing edge, and only the missing edge: a pixel is darkened only
     where the pixel just outside the head is already opaque, so where the rim is
     doing the job this adds nothing and the contour never doubles to two px.
+
+    One colour, the same one `rim()` uses, for the reason `figure_contour()`
+    gives: in both reference frames the jaw line and the silhouette are the
+    same dark, and two more contour hues is two more of a budget of twenty-four.
     """
     src = f.img.load()
 
@@ -2777,8 +2940,15 @@ def inner_contour(f, spans, S, ramp_for):
             if not opaque(x, y):
                 continue
             nb = [(x - 1, y), (x + 1, y)] if not last else [(x, y + 1)]
-            if any(opaque(nx, ny) for nx, ny in nb):
-                f.px(x, y, _contour_px(ramp_for(y), S))
+            # A contour is only wanted where two MATERIALS meet. Drawn wherever
+            # the outside pixel is merely opaque, the skull's own sides get
+            # contoured inside the hair mass that covers them, and the result
+            # is a dark bar down each side of the head that reads as a pair of
+            # headphones -- which is what the first cut of the mass did to
+            # every haired character at once.
+            here = src[x, y][:3]
+            if any(opaque(nx, ny) and src[nx, ny][:3] != here for nx, ny in nb):
+                f.px(x, y, col)
 
 
 # --- geometry from scalars ------------------------------------------------------
@@ -2944,6 +3114,85 @@ def paint_spans(f, spans, ramp, keys, dy=0, hi=2, sh=3, S=None):
 # horseshoe and a shorn crop. If a seventh townsperson needs a crown that is
 # already taken, they need a different one.
 
+def hu_hair_mass(f, P, dy, back, side=False):
+    """The hair as a BLOCK with its own outline, standing proud of the skull.
+
+    Measured off the two native frames: in both, the hair is about half the
+    head, it is a flat colour of its own with a hard edge, and its silhouette
+    is WIDER than the skull -- the SoM girl's skull is 8 px across and her hair
+    is 14. Ours had hair as a thin cap painted onto the top of a dome, which is
+    why every crown read as a scalp and why bald and horseshoe read as eggs:
+    there was no hair MASS anywhere in the grammar for a bald head to be the
+    absence of.
+
+    It is drawn before the skull and the face and it is allowed to break the
+    outline, which is the point -- `rim()` runs afterwards and gives the mass
+    its own contour, so the hair reads as a separate object rather than as a
+    colour on the head.
+    """
+    S = P.get("_style") or STYLES["current"]
+    vol, rise = S["hair_vol"], S["hair_rows"]
+    if not (vol or rise) or P["crown_kind"] == "bald":
+        return
+    G, hr = P["_g"], P["hair"]
+    head, hl = G["head"], P["hairline"]
+    # A horseshoe has hair round the back and sides and none on top, so it gets
+    # the volume and not the rise. Drawn with the rise it is a wig, which is
+    # the failure `hu_hair_front` already records for the closed horseshoe.
+    ring = P["crown_kind"] == "horseshoe"
+    top = head[0][0] - (0 if ring else rise)
+    low = hl + S["temple"] if not back else len(head)
+    crown_y = head[0][0]
+    for i in range(top, crown_y + min(low, len(head))):
+        row = head[max(0, min(len(head) - 1, i - crown_y))]
+        # THE MASS HUGS THE SKULL AS IT DESCENDS. Held at full width all the
+        # way down to the temple it is two rectangular tabs either side of the
+        # head, which at 1:1 is a pair of headphones -- the same class of error
+        # as the goggles and the beak, an unintended shape that wins. So it
+        # stands proud only where the hair actually is, above the hairline, and
+        # gives back a pixel a row below it.
+        out = vol if i - crown_y < hl else max(0, vol - (i - crown_y - hl) - 1)
+        # Seen edge-on the mass is BEHIND the face, not around it: grown
+        # forward it buries the notch that is the only face the profile has.
+        x0, x1 = (row[1] if side else row[1] - out), row[2] + out
+        if i < crown_y:
+            # The rise narrows as it goes up, or the mass is a box on a head.
+            k = crown_y - i
+            x0, x1 = x0 + k, x1 - k
+        if x1 <= x0:
+            continue
+        f.row(i + dy, x0, x1, hr[2])
+        f.row(i + dy, x0, x0 + 1, hr[1])
+        f.px(x0, i + dy, hr[0])
+        f.row(i + dy, x1 - 1, x1, hr[3])
+    if ring and not back:
+        # ...and the front of the ring is scalp, not hair: the mass is cut back
+        # to the temples so the dome shows between them.
+        for (y, x0, x1) in head[:hl]:
+            f.row(y + dy, x0 + 1, x1 - 1, P["skin"][1])
+
+
+def hu_ears(f, P, dy):
+    """Two pixels at the temple, one px proud of the skull.
+
+    The other half of "give the bald crowns something to be". A dome with no
+    ears is an egg at any size; the SoM figures all have them and they are the
+    cheapest thing on the sprite. Drawn outside the head so `rim()` contours
+    them and they read in the silhouette, which is where they have to read.
+    """
+    S = P.get("_style") or STYLES["current"]
+    if not S["ears"]:
+        return
+    G, sk = P["_g"], P["skin"]
+    head = G["head"]
+    ey = G["top"] + P["eye_y"]
+    for i in range(2):
+        y = ey + i
+        row = head[max(0, min(len(head) - 1, y - head[0][0]))]
+        f.px(row[1] - 1, y + dy, sk[1])
+        f.px(row[2] + 1, y + dy, sk[2])
+
+
 def hu_hair_front(f, P, dy, back):
     S = P.get("_style") or STYLES["current"]
     G, hr = P["_g"], P["hair"]
@@ -3046,19 +3295,34 @@ def hu_face_front(f, P, dy):
     # if the left eye grew rightwards from a fixed corner: a face half a pixel
     # off its own centre line reads as a figure turning away, in every frame.
     lx, rx = 16 - sep // 2 - S["eye_w"], 16 + sep // 2
+    # THE EYE MAY NOT TOUCH THE HAIR. On a skull only thirteen wide with two
+    # pixels of temple hair down each side, an eye at the old separation lands
+    # against that hair and the two darks fuse into one band across the face --
+    # goggles, which is the failure `hu_hair_front` and the brows already
+    # record, arriving by a third route. Moved inward symmetrically, so the
+    # pair stays centred on CX.
+    brow_row = G["head"][max(0, min(len(head) - 1, P["eye_y"]))]
+    pad = max(0, brow_row[1] + S["temple"] + 1 - lx)
+    lx, rx = lx + pad, rx - pad
     tilt = P.get("brow_tilt", (0, 0))
     # Whichever of the two dark values is actually dark. A white-haired woman
     # drawn with hair-coloured brows has no brows, and a face with no brows at
     # 32px has no expression -- it is the one feature that reads at this size.
     brow = hr[3] if luma(hr[3]) < luma(sk[3]) else sk[3]
     for i, x in enumerate((lx, rx)):
+        # A brow is optional at this size. Both reference frames have none:
+        # the socket is two dark pixels and nothing above them, and a brow
+        # stacked over a two-row eye is a three-row vertical dash rather than
+        # an expression. `brow_w = 0` is how a style says so.
+        #
         # `brow_gap` is bare forehead between the brow and the eye. At zero --
         # which is what shipped -- the two dark marks touch and merge into one
         # smudge per socket, and that smudge is the whole reason the current
         # figure has no face at 1:1. One row of skin between them is what turns
         # two marks into an eye with an expression over it.
-        f.row(ey - 1 - S["brow_gap"] + tilt[i] + dy, x, x + S["brow_w"] - 1,
-              brow)                                             # two pixels each.
+        if S["brow_w"]:
+            f.row(ey - 1 - S["brow_gap"] + tilt[i] + dy, x,
+                  x + S["brow_w"] - 1, brow)                    # two px each.
         for k in range(S["eye_h"]):
             f.row(ey + k + dy, x, x + S["eye_w"] - 1, sk[4])    # a bar is goggles
         if S["eye_lit"]:
@@ -3362,6 +3626,8 @@ def hu_profile(P, pose):
     paint_spans(f, body, P["body_ramp"], body_keys(P, len(body)), dy, S=S)
     paint_spans(f, G["hem"], P["body_ramp"], 3, dy, S=S)
 
+    hu_hair_mass(f, P, dy, False, side=True)
+
     # --- the skull
     bare = crown in ("bald", "horseshoe")
     for (y, x0, x1) in head:
@@ -3523,10 +3789,7 @@ def hu_profile(P, pose):
     leg(far, fl, 1, 0)
     leg(near, nl, 0, 2)
     if S["head_contour"]:
-        hl = P["hairline"] if crown not in ("bald", "horseshoe") else 0
-        hairy = head[0][0] + hl
-        inner_contour(f, head, S,
-                      lambda y: P["hair"][3] if y < hairy else sk[2])
+        inner_contour(f, head, S, P["_contour"])
     return f
 
 
@@ -3645,17 +3908,15 @@ def hu_frontal(P, pose, back):
     paint_spans(f, G["body"], P["body_ramp"], body_keys(P, len(G["body"])), dy,
                 S=S)
     paint_spans(f, G["hem"], P["body_ramp"], 3, dy, S=S)
+    hu_ears(f, P, dy)
+    hu_hair_mass(f, P, dy, back)
     hu_hair_front(f, P, dy, back)
     if not back:
         hu_face_front(f, P, dy)
     if S["head_contour"]:
         # Before the garment, not after: the collar and the shawl sit ON the
         # jaw line, and a contour drawn over them cuts the neck off the body.
-        hl = P["hairline"] if P["crown_kind"] not in ("bald", "horseshoe") else 0
-        hairy = G["head"][0][0] + hl
-        inner_contour(f, G["head"], S,
-                      lambda y: (P["hair"][3] if y < hairy or back
-                                 else P["skin"][2]))
+        inner_contour(f, G["head"], S, P["_contour"])
     hu_garment_front(f, P, dy, back)
     # The garment swings a column against the stride, as the traveller's cloak
     # and Spite's coat both do. Without it the legs walk and the body does not.
@@ -3694,8 +3955,10 @@ def hu_build_all(P):
         cels[("left", po)] = im
     S = P.get("_style") or STYLES["current"]
     for key in list(cels):
-        contact_shadow(rim(cels[key], S), rx=P["shadow"],
-                       ry=P.get("shadow_y", 4.0))
+        # Flatten BEFORE the rim, so the contour is not itself a candidate for
+        # the merge pass and the budget arithmetic in flatten() holds.
+        contact_shadow(rim(flatten(cels[key], P), S, P.get("_contour")),
+                       rx=P["shadow"], ry=P.get("shadow_y", 4.0))
     lb = [cels[("left", po)].getbbox() for po in FRAMES]
     lc = (min(b[0] for b in lb) + max(b[2] for b in lb) - 1) / 2.0
     for po in FRAMES:
@@ -3832,6 +4095,7 @@ def townsperson(style="current", **delta):
     # they went in as relative to each other.
     _restyle_ramps(P, S)
     _restyle_build(P, S)
+    P["_contour"] = figure_contour(P, S)
     return P
 
 
@@ -4126,35 +4390,51 @@ def style_report(grounds):
     """Every style, over the WHOLE cast, measured against the same contracts.
 
     A style is offered to a curator, which means it has to be a real candidate
-    and not just a picture: if `bold` cannot keep its feet on SOLE or puts a
-    saturated fold in the middle of the sand, then finding that out here is
-    free and finding it out after somebody has picked it is not. So the four
-    things that are contracts rather than taste are checked for all of them:
+    and not just a picture. Five things are contracts rather than taste:
 
       the sole and the centre  -- the renderer anchors feet to the cell, so a
                                   style that moves either is not shippable
                                   whatever it looks like
       the alpha values         -- 0, SHADOW_A, 255 and nothing else
-      the beak                 -- the face must not be the brightest thing on
-                                  the figure, `town_report()`'s own check
+      THE COLOUR COUNT         -- the primary criterion, and the one the first
+                                  cut of this layer got backwards. Measured off
+                                  two native frames: the Chrono Trigger doorway
+                                  NPC is 24 colours including its background
+                                  and the Secret of Mana girl is 20, against
+                                  our shipped 23-32 and that first cut's 38-51.
+                                  A figure made of forty near-neighbours reads
+                                  as a soft blend where the reference reads as
+                                  flat blocks, and "a little uncanny" is what
+                                  that looks like from the outside. Hard cap 32.
+      the face                 -- and this one is now TWO contracts, because
+                                  the measurement overturned the old one. See
+                                  below.
       the ground               -- "lost" on the worst of the eighteen walkable
-                                  materials, which is what the value bracket in
-                                  cloth5() exists to hold down and what a
-                                  saturation pass is most likely to break
+                                  materials; printed, not enforced, because a
+                                  local contour costs exactly this and the
+                                  trade is the curator's to make.
 
-    Everything else it prints is for the eye to argue with: head-count, opaque
-    pixels, and how many distinct colours the figure is made of -- which is the
-    cel-shading axis stated as a number, because "three tones per material"
-    either shows up in that count or did not happen.
+    THE FACE, AND WHY THE CHECK CHANGED. `town_report()` asserts that the face
+    must not be the brightest thing on the figure, which this file learned from
+    Spite's profile reading as a beak. The reference does the opposite: in both
+    frames the skin is a bright flat field and the eyes are dark pixels punched
+    into it, and that maximum local contrast is the entire reason a face is
+    legible at 1:1. Both are true, and the thing that reconciles them is that
+    the beak was never about brightness -- it was about SKIN IN THE SILHOUETTE,
+    a lit wedge sticking out of the skull where the outline should have been.
+    So a `face_bright` style is held to the two checks that actually say that:
+    no skin above the shoulders outside the skull, and at least 80 luma between
+    the darkest and the lightest skin so the punched eye really is punched.
+    A style that does not claim `face_bright` is held to the original.
     """
     print()
     print("the style layer -- the same six characters, %d readings of them"
           % len(STYLES))
-    print("  %-8s %5s %6s %6s %7s %-12s %s"
-          % ("style", "heads", "px", "hues", "lost", "worst ground", ""))
+    print("  %-8s %5s %6s %5s %6s %7s %-12s %s"
+          % ("style", "heads", "px", "hues", "worst", "lost", "ground", ""))
     ok = True
     for name, S in STYLES.items():
-        heads, npx, hues, worst, bad = [], [], set(), 0.0, []
+        heads, npx, hues, worst, bad = [], [], [], 0.0, []
         wname = "-"
         for key, delta in TOWN_DELTAS.items():
             P = townsperson(style=name, **delta)
@@ -4162,9 +4442,15 @@ def style_report(grounds):
             im = cels[("down", "neutral")]
             rowsy = [y for y in range(FH)
                      if any(im.getpixel((x, y))[3] == 255 for x in range(FW))]
-            heads.append((max(rowsy) - min(rowsy) + 1) / float(P["head_h"]))
+            # The head is the head AND ITS HAIR, which is how the reference
+            # measures 42%: the crown row is where the hair starts, not where
+            # the skull does, and a mass that rises two rows above the skull is
+            # two rows of head.
+            jaw = P["_g"]["head"][-1][0]
+            heads.append((max(rowsy) - min(rowsy) + 1) / float(jaw - min(rowsy) + 1))
             npx.append(sprite_stats(im)["n"])
-            hues |= {q[:3] for q in im.getdata() if q[3] == 255}
+            hues.append(len({q[:3] for q in im.get_flattened_data()
+                             if q[3] == 255}))
             feet, centres = set(), []
             for fa in FACINGS:
                 boxes = [cels[(fa, po)].getbbox() for po in FRAMES]
@@ -4179,32 +4465,51 @@ def style_report(grounds):
                     bad.append("%s/%s frame" % (key, fa))
             if len(feet) != 1:
                 bad.append("%s sole %s" % (key, sorted(feet)))
-            alphas = {q[3] for q in im.getdata()}
-            if alphas - {0, SHADOW_A, 255}:
-                bad.append("%s alpha %s" % (key, sorted(alphas)))
+            if hues[-1] > 32:
+                bad.append("%s %d hues" % (key, hues[-1]))
+            for fa in FACINGS:
+                a = {q[3] for q in cels[(fa, "neutral")].get_flattened_data()}
+                if a - {0, SHADOW_A, 255}:
+                    bad.append("%s alpha %s" % (key, sorted(a)))
             skins = {tuple(c) for c in P["skin"]}
-            lit = [luma(q) for q in im.getdata() if q[3] == 255]
-            skin_hi = max([luma(q) for q in im.getdata()
-                           if q[3] == 255 and q[:3] in skins] or [0.0])
-            if lit and skin_hi >= max(lit):
-                bad.append("%s beak" % key)
+            lit = [luma(q) for q in im.get_flattened_data() if q[3] == 255]
+            sk_l = [luma(q) for q in im.get_flattened_data()
+                    if q[3] == 255 and q[:3] in skins]
+            if not S["face_bright"]:
+                if lit and sk_l and max(sk_l) >= max(lit):
+                    bad.append("%s beak" % key)
+            else:
+                if sk_l and max(sk_l) - min(sk_l) < 80:
+                    bad.append("%s eye punch %.0f" % (key, max(sk_l) - min(sk_l)))
+                # The beak proper: skin above the shoulder line that is not on
+                # the skull. One pixel of slack each side, because `hu_ears()`
+                # deliberately puts two there.
+                sy = P["_g"]["sy"]
+                span = {y: (x0, x1) for (y, x0, x1) in P["_g"]["head"]}
+                for y in range(FH):
+                    if y >= sy or y not in span:
+                        continue
+                    for x in range(FW):
+                        q = im.getpixel((x, y))
+                        if q[3] == 255 and q[:3] in skins and not (
+                                span[y][0] - 1 <= x <= span[y][1] + 1):
+                            bad.append("%s beak at %d,%d" % (key, x, y))
+                            break
             for gname, _i, gm, _t in grounds:
                 lost = sum(1 for v in lit if abs(v - gm) < 10) / float(len(lit))
                 if lost > worst:
                     worst, wname = lost, gname
         ok = ok and not bad
-        # The bar the skill file sets is "lost" under about a fifth on the
-        # worst ground, and it is NOT a hard failure here because it is taste
-        # against measurement: a local contour is the whole point of the CT
-        # grammar and it costs exactly this, because the shipped rim is luma 9
-        # and clear of every ground while a contour mixed from a mid-value
-        # garment lands at 25 to 36, which is inside grass_tall's ten-luma
-        # band. Printing it is how the curator gets to make that trade
-        # knowingly instead of finding out on a phone at dusk.
-        print("  %-8s %5.2f %6d %6d %6.0f%% %-12s %s"
-              % (name, sum(heads) / len(heads), sum(npx) // len(npx), len(hues),
-                 worst * 100, wname[:12],
-                 ("FAIL " + "; ".join(bad[:3])) if bad else
+        # The bar the skill file sets for "lost" is a fifth on the worst
+        # ground, and it is NOT a hard failure here because it is taste against
+        # measurement: the shipped rim is luma 9 and clear of every ground,
+        # while a contour tinted toward the figure's own hue lands at 25 to 36,
+        # inside grass_tall's ten-luma band. Printing it is how the curator gets
+        # to make that trade knowingly.
+        print("  %-8s %5.2f %6d %5d %6d %6.0f%% %-12s %s"
+              % (name, sum(heads) / len(heads), sum(npx) // len(npx),
+                 sum(hues) // len(hues), max(hues), worst * 100, wname[:12],
+                 ("FAIL " + "; ".join(sorted(set(bad))[:3])) if bad else
                  ("ok" if worst <= 0.20 else "ok, over the 20% ground bar")))
     if not ok:
         raise SystemExit("STYLE CONTRACT FAILED")

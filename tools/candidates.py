@@ -12,11 +12,14 @@ and silhouette width; it cannot tell you that a figure reads as a bailiff. So
 this writes candidates and a manifest, the manifest goes into a gallery, and a
 person marks the ones worth keeping. `tools/curate.py` reads the verdicts back.
 
-    python3 tools/candidates.py --count 48 --seed 7
-    python3 tools/candidates.py --styles            # the same few, every style
+    python3 tools/candidates.py --count 48 --seed 7   -> .../candidates/townsfolk
+    python3 tools/candidates.py --styles             -> .../candidates/styles
 
-Output lands in `.scratch/candidates/` -- deliberately not in the repo, because
-a rejected candidate is not an asset and should not be committed.
+Output lands in a batch directory under `.scratch/candidates/` -- deliberately
+not in the repo, because a rejected candidate is not an asset and should not be
+committed, and one directory per QUESTION, because a style comparison and a
+variability sweep are two different questions and writing both to one manifest
+loses the older one without saying so.
 """
 import argparse
 import base64
