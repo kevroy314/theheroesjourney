@@ -443,6 +443,47 @@ def solid_ids():
     return {T[n] for n in names if n in T}
 
 
+# --- the two prop planes ------------------------------------------------------
+#
+# #83. `props` holds what OCCUPIES a cell -- it stands up in the 96px slot and
+# it may be solid. `clutter` holds what does NOT -- it lies on the floor, or it
+# sits on the thing that is standing there, and it is never solid. Two byte
+# planes over the same grid, each indexing its own catalogue, so a cell can
+# carry one of each and the catalogue's budget is 255 per plane rather than 255
+# in total. Everything below that places anything says which plane it means by
+# looking the id up, so no pass carries its own list of what goes where.
+
+PLANE_NAMES = ("props", "clutter")
+
+
+def catalogues():
+    """{plane name: {id: entry}}, both prop catalogues, read fresh.
+
+    Read rather than cached for the same reason every other reader here reads
+    it: tools/add_prop.py appends to this file and a stale copy would silently
+    drop whatever it added.
+    """
+    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
+    return {name: {p["id"]: p for p in manifest[name]["list"]}
+            for name in PLANE_NAMES}
+
+
+def plane_index():
+    """id -> (plane name, entry) across both catalogues.
+
+    Ids are unique across the two planes (make_tiles.py asserts it), so a hand
+    placement names a thing and this says which plane it lands on. The
+    alternative -- every furniture list saying "cup, on the clutter plane" --
+    would be the same fact written down in fifteen interior plans and wrong in
+    one of them.
+    """
+    out = {}
+    for name, by_id in catalogues().items():
+        for pid, entry in by_id.items():
+            out[pid] = (name, entry)
+    return out
+
+
 def standing_planes():
     """Prop plane ids that DRAW ABOVE THEIR OWN CELL.
 
@@ -459,6 +500,9 @@ def standing_planes():
     """
     path = os.path.join(ROOT, "assets", "tiles", "tiles.json")
     catalogue = json.load(open(path))["props"]["list"]
+    # The props plane only. Nothing on the clutter plane draws above its own
+    # cell -- that is what makes it clutter rather than a prop -- so a cup on
+    # the counter south of the cat buries nothing.
     return {p["plane"] for p in catalogue if not p.get("flat")}
 
 
@@ -1865,7 +1909,16 @@ def house_plan(cells):
             ("table", 12, 4), ("chair", 11, 3), ("chair", 11, 4),
             ("chair", 13, 3), ("chair_pulled", 14, 4),
             ("bench", 9, 3), ("crate", 9, 5), ("chest", 16, 3),
-            ("plant_pot", 16, 5), ("cup", 13, 2), ("bottle", 16, 1),
+            # ON THE COUNTER, not on the floor beside it (#83). The cup used
+            # to be at (13,2) and the bottle at (16,1) -- two clear tiles out
+            # in the room, because the prop plane held one byte per cell and
+            # the counter had already spent it. A cup left standing in the
+            # middle of a kitchen floor says something quite different about
+            # who lives here, and it was the only sentence the data could
+            # write. The clutter plane is the second byte, so they are on the
+            # work surface now: the cup beside the range, the bottle at the
+            # end of the run.
+            ("plant_pot", 16, 5), ("cup", 13, 0), ("bottle", 16, 0),
             # Four at table and one pushed back and turned away, with the gap at
             # (13,4) it was pulled out of. §"evidence of use", and the cheapest
             # sentence of story in the house.
@@ -1881,7 +1934,10 @@ def house_plan(cells):
             # the settle under the library, and the table it looks at
             ("table", 8, 9), ("chair", 7, 9), ("chair_pulled", 9, 9),
             ("table", 1, 11), ("chair", 2, 10), ("chair", 2, 11),
-            ("floor_lamp", 3, 12), ("book_open", 2, 12),
+            # The book is ON the reading table under the west window now, left
+            # open where somebody put it down, rather than face down on the
+            # boards two tiles away because the table's cell was taken.
+            ("floor_lamp", 3, 12), ("book_open", 1, 11),
             ("barrel", 11, 10), ("crate", 10, 12), ("bench", 5, 12),
             # and the boots by the front door, with the dog beside them.
             #
@@ -2014,6 +2070,109 @@ def reachable(world, start, moves=ORTHOGONAL):
     return seen
 
 
+MIN_POCKET = 20      # cells; smaller than this is a nook, not lost land
+
+
+def vale_pockets(world, elev, blocked, spawn, gate):
+    """Land inside the vale that is cut off from BOTH the town and the world.
+
+    A pocket is land the player can see, walk at and never stand on: the fill
+    from the bed with the gate shut does not reach it, and neither does the
+    fill from outside the gate. An island in the sea is not one -- it is
+    unreachable on purpose -- which is why this asks about the vale and not
+    about the whole map.
+
+    Factored out because it is asked twice and the two askings must not be able
+    to disagree: unseal_pockets() below uses it to TAKE BACK the scattered
+    props that sealed one, and main() uses it afterwards as the proof that
+    none is left. A repair checked against a second implementation of the same
+    question is a repair that can report success while the check still fails.
+    """
+    probe = World(world.tiles, elev)
+    probe.blocked = blocked
+    everywhere = {(x, y) for y in range(H) for x in range(W)
+                  if probe.walkable(x, y)}
+    barred = World(world.tiles, elev)
+    barred.blocked = blocked | {gate}
+    orphaned = (everywhere - reachable(barred, spawn)
+                - reachable(barred, (gate[0] + 4, gate[1])))
+    lumps, seen = [], set()
+    for cell in sorted(orphaned):
+        if cell in seen:
+            continue
+        lump, stack = set(), [cell]
+        while stack:
+            here = stack.pop()
+            if here in seen or here not in orphaned:
+                continue
+            seen.add(here)
+            lump.add(here)
+            stack += [(here[0] + dx, here[1] + dy) for dx, dy in ORTHOGONAL]
+        if len(lump) >= MIN_POCKET and any(
+                VALE_BOX[0] <= c[0] <= VALE_BOX[2]
+                and VALE_BOX[1] <= c[1] <= VALE_BOX[3] for c in lump):
+            lumps.append(sorted(lump))
+    return lumps
+
+
+def unseal_pockets(world, elev, props, cliffs, spawn, gate, rounds=8):
+    """Scatter may not wall land off, so where it has, take it back.
+
+    THE FAILURE THIS REPLACES. `scatter_props` places a boulder wherever the
+    dice say and knows nothing about connectivity, so sooner or later one of
+    them lands in the last one-cell gap of a yard and thirty-four cells of the
+    vale stop being somewhere anyone can stand. main() has always checked for
+    that and died; what it has never had is an answer, so the "fix" was that
+    the seed happened not to do it. That is not a property of the generator,
+    it is luck, and it ran out the first time the RNG stream shifted.
+
+    The answer is the honest one: a POCKET IS THE SCATTER'S MISTAKE, so the
+    scatter gives the cells back. Every scattered solid prop on a pocket's
+    boundary is removed -- scattered, so nothing hand-placed is ever taken;
+    solid, so nothing that was not part of the seal is touched -- and the
+    question is asked again, because opening one pocket can reveal the next.
+    The check in main() stays exactly where it was: this makes the common case
+    survivable and a seal made of buildings and water is still a build failure,
+    which is what it should be.
+
+    Removing props can only ever OPEN the world, never close it, so no seal
+    proved elsewhere -- the house, the vale's own boundary -- can be broken by
+    running this.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from world_to_tiled import derive_blocked, props_by_plane
+    catalogue = catalogues()["props"]
+    # Scattered AND solid. `placed` props are somebody's decision and a lamppost
+    # that vanished because a yard behind it was pinched would be a bug with no
+    # trail; a non-solid prop was never part of a seal in the first place.
+    removable = {p["plane"] for p in catalogue.values()
+                 if p["solid"] and p["biome"] != "placed"}
+    taken = 0
+    for _ in range(rounds):
+        blocked_plane = derive_blocked([v for row in props for v in row],
+                                       [v for row in cliffs for v in row],
+                                       W, H, props_by_plane())
+        blocked = {(i % W, i // W) for i, v in enumerate(blocked_plane) if v}
+        lumps = vale_pockets(world, elev, blocked, spawn, gate)
+        if not lumps:
+            break
+        cleared = 0
+        for lump in lumps:
+            edge = set(lump)
+            for (cx, cy) in lump:
+                for dx, dy in ORTHOGONAL:
+                    nx, ny = cx + dx, cy + dy
+                    if not (0 <= nx < W and 0 <= ny < H) or (nx, ny) in edge:
+                        continue
+                    if props[ny][nx] in removable:
+                        props[ny][nx] = 0
+                        cleared += 1
+        if not cleared:
+            break        # the seal is made of something this cannot move
+        taken += cleared
+    return taken
+
+
 ## Story anchors whose difficulty is NOT their ring.
 ##
 ## Difficulty is position everywhere else in this file, and that is the design:
@@ -2128,7 +2287,7 @@ def encode(tiles):
     return base64.b64encode(zlib.compress(raw, 9)).decode("ascii")
 
 
-def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
+def scatter_props(world, elev, rng, reach, planes, keep_clear=frozenset()):
     """Put things in the world.
 
     The measured failure was that half of all possible screens showed exactly
@@ -2140,16 +2299,31 @@ def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
     by the tileset rather than guessed here. A prop occupies its foot cells and
     those become impassable when it says so, which is what stops a boulder being
     scenery you can stand inside.
+
+    TWO OFFERS PER CELL, ONE PER PLANE (#83). A cell used to get one draw: the
+    first thing that took it was the only thing on it, so a bush and the grit
+    around its foot were mutually exclusive and the grit always lost, because
+    the bush is offered first. That is not a rule anybody chose -- it is what
+    one byte per cell forced -- and it is half of why the lanes and the meadows
+    read as corduroy. Now the standing props are offered against the `props`
+    plane and the ground scatter against `clutter`, each with its own
+    occupancy, so a cell may carry a bush AND the grit under it. The renderer
+    draws flat clutter UNDER the prop standing on the same cell, which is what
+    makes that the right picture rather than pebbles painted up a trunk.
     """
-    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
-    catalogue = manifest["props"]["list"]
-    by_biome = {}
-    for prop in catalogue:
-        by_biome.setdefault(prop["biome"], []).append(prop)
+    by_plane_biome = {name: {} for name in PLANE_NAMES}
+    for name, by_id in catalogues().items():
+        for prop in by_id.values():
+            by_plane_biome[name].setdefault(prop["biome"], []).append(prop)
+    # Catalogue order within a biome, so the offer order is the order the
+    # catalogue was authored in and not whatever a dict happened to yield.
+    for name in PLANE_NAMES:
+        for bucket in by_plane_biome[name].values():
+            bucket.sort(key=lambda p: p["index"])
 
     blocked = set()
 
-    def free(x, y, foot, flat):
+    def free(plane, x, y, foot, flat):
         for fy in range(foot[1]):
             for fx in range(foot[0]):
                 cx, cy = x + fx, y - fy
@@ -2203,16 +2377,6 @@ def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
     for y in range(1, H - 1):
         for x in range(1, W - 1):
             material = ORDER[world.at(x, y)]
-            options = list(by_biome.get(material, []))
-
-            # Road furniture is authored for roads and the placement rule refuses
-            # roads — a signpost cannot stand in the lane the player walks down.
-            # A milestone was never *on* the road anyway; it was beside it. So
-            # props declared for path_dirt are offered to the walkable cells that
-            # touch a road, which is where they actually belong.
-            if beside_road(x, y) and world.at(x, y) != T["path_dirt"]:
-                options = options + by_biome.get("path_dirt", [])
-
             # `keep_clear` is asked here, before a single draw is taken,
             # rather than only inside free(). It has to be: the town's thirteen
             # interiors are floor now, they are reachable, and every one of
@@ -2222,25 +2386,42 @@ def scatter_props(world, elev, rng, reach, plane, keep_clear=frozenset()):
             # reason anybody chose. free() still checks the whole FOOTPRINT
             # against the same set, because a prop two cells tall anchored
             # outside a room can still reach into one.
-            if not options or (x, y) not in reach or (x, y) in keep_clear:
+            if (x, y) not in reach or (x, y) in keep_clear:
                 continue
-            for prop in options:
-                if rng.random() >= prop["density"]:
+            # Standing props first, then the ground scatter, each against its
+            # own plane. The order is not arbitrary: what stands on a cell is
+            # the decision, and the texture is what fills in around it.
+            for name in PLANE_NAMES:
+                plane = planes[name]
+                options = list(by_plane_biome[name].get(material, []))
+
+                # Road furniture is authored for roads and the placement rule
+                # refuses roads -- a signpost cannot stand in the lane the
+                # player walks down. A milestone was never *on* the road
+                # anyway; it was beside it. So props declared for path_dirt are
+                # offered to the walkable cells that touch a road, which is
+                # where they actually belong.
+                if beside_road(x, y) and world.at(x, y) != T["path_dirt"]:
+                    options = options + by_plane_biome[name].get("path_dirt", [])
+                if not options:
                     continue
-                foot = prop["foot"]
-                flat = bool(prop.get("flat"))
-                if not free(x, y, foot, flat):
+                for prop in options:
+                    if rng.random() >= prop["density"]:
+                        continue
+                    foot = prop["foot"]
+                    flat = bool(prop.get("flat"))
+                    if not free(plane, x, y, foot, flat):
+                        break
+                    plane[y][x] = prop["plane"]
+                    if prop["solid"]:
+                        for fy in range(foot[1]):
+                            for fx in range(foot[0]):
+                                blocked.add((x + fx, y - fy))
                     break
-                plane[y][x] = prop["plane"]
-                if prop["solid"]:
-                    for fy in range(foot[1]):
-                        for fx in range(foot[0]):
-                            blocked.add((x + fx, y - fy))
-                break
-    return plane, blocked
+    return planes, blocked
 
 
-def furnish_house(world, plane, plan):
+def furnish_house(world, planes, plan):
     """Put the furniture in, and refuse to lose a piece of it.
 
     The old version worked the internal wall out for itself, got it wrong, and
@@ -2253,22 +2434,26 @@ def furnish_house(world, plane, plan):
     it raises on anything it cannot place. A missing chair is a build failure
     now, which is the only weight that keeps a hand-placed layout honest.
     """
-    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
-    interior = {p["id"]: p for p in manifest["props"]["list"]
+    index = plane_index()
+    interior = {pid: (where, p) for pid, (where, p) in index.items()
                 if p["biome"] == "placed"}
     cell = plan["cell"]
     problems = []
 
     def put(name, x, y, on_wall=False):
-        prop = interior.get(name)
-        if prop is None:
+        if name not in interior:
             problems.append("%s is not in the catalogue" % name)
             return
+        where, prop = interior[name]
+        plane = planes[where]
         if not (0 <= x < W and 0 <= y < H):
             problems.append("%s at (%d,%d) is off the map" % (name, x, y))
             return
+        # Only against its OWN plane. A cup on a counter is two things on one
+        # cell and is the whole point of the second plane; a second counter on
+        # the counter is still a mistake.
         if plane[y][x]:
-            problems.append("%s at (%d,%d) lands on another prop" % (name, x, y))
+            problems.append("%s at (%d,%d) lands on another %s" % (name, x, y, where))
             return
         # A window stands IN a wall; everything else stands on a floor. Anything
         # else -- furniture on a wall, a window in mid-air -- is the bug this
@@ -2298,7 +2483,7 @@ def furnish_house(world, plane, plan):
     # trusted, because the failure mode is a run nobody can finish.
     solid_here = set()
     for (name, i, j) in plan["furniture"]:
-        prop = interior[name]
+        prop = interior[name][1]
         if not prop["solid"]:
             continue
         x, y = cell(i, j)
@@ -2312,7 +2497,7 @@ def furnish_house(world, plane, plan):
 
 
 
-def furnish_buildings(world, plane, plan):
+def furnish_buildings(world, planes, plan):
     """Put the town's interiors in, and refuse to lose a stick of them.
 
     The same contract as `furnish_house`, `stock_town` and `dress_facades`, and
@@ -2326,8 +2511,8 @@ def furnish_buildings(world, plane, plan):
     old `furnish_house` recomputed the internal wall, got it wrong, and dropped
     every piece that landed on one without saying so.
     """
-    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
-    interior = {p["id"]: p for p in manifest["props"]["list"]
+    index = plane_index()
+    interior = {pid: (where, p) for pid, (where, p) in index.items()
                 if p["biome"] == "placed"}
     problems = []
     placed = 0
@@ -2338,13 +2523,16 @@ def furnish_buildings(world, plane, plan):
             continue
         rooms += 1
         for (name, (x, y)) in spec["furniture"]:
-            prop = interior.get(name)
-            if prop is None:
+            if name not in interior:
                 problems.append("%s: %s is not in the catalogue" % (b["id"], name))
                 continue
+            where, prop = interior[name]
+            plane = planes[where]
+            # Against its own plane only -- see furnish_house. A tankard on the
+            # tavern counter is two bytes on one cell and is intended.
             if plane[y][x]:
-                problems.append("%s: %s at (%d,%d) lands on another prop"
-                                % (b["id"], name, x, y))
+                problems.append("%s: %s at (%d,%d) lands on another %s"
+                                % (b["id"], name, x, y, where))
                 continue
             # Furniture stands on a floor. Anything else -- a chair on a wall, a
             # dresser on the doorstep -- is the plan and the stamp having drifted
@@ -2372,7 +2560,7 @@ def furnish_buildings(world, plane, plan):
         # own axis, and which axis that is comes from the wall it is cut into.
         solid_here = set()
         for (name, (x, y)) in spec["furniture"]:
-            prop = interior.get(name)
+            prop = interior.get(name, (None, None))[1]
             if prop is None or not prop["solid"]:
                 continue
             for fy in range(prop["foot"][1]):
@@ -2745,7 +2933,7 @@ def facade_props(plan):
     return out
 
 
-def dress_facades(world, plane, plan):
+def dress_facades(world, planes, plan):
     """Put the facade down, and refuse to lose a piece of it.
 
     The same contract as furnish_house and stock_town, and the same reason: a
@@ -2762,8 +2950,7 @@ def dress_facades(world, plane, plan):
     from what was actually stamped, which is precisely the class of error that
     put an NPC inside his own front wall.
     """
-    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
-    catalogue = {p["id"]: p for p in manifest["props"]["list"]}
+    index = plane_index()
     problems = []
     placed = 0
     weathered = 0
@@ -2776,7 +2963,8 @@ def dress_facades(world, plane, plan):
         wanted_ground += 1 if optional else 0
         material = ORDER[world.at(x, y)]
         why = None
-        prop = catalogue.get(name)
+        where, prop = index.get(name, (None, None))
+        plane = planes[where] if where else None
         if prop is None:
             why = "%s is not in the catalogue" % name
         elif prop["solid"]:
@@ -2795,8 +2983,10 @@ def dress_facades(world, plane, plan):
         elif world.at(x, y) == T["door"]:
             why = "%s at (%d,%d) is standing in a doorway" % (name, x, y)
         elif plane[y][x]:
-            here = next((p["id"] for p in catalogue.values()
-                         if p["plane"] == plane[y][x]), "?")
+            # Named on its own plane: plane id 5 means one thing on `props`
+            # and another on `clutter`, so the lookup has to say which.
+            here = next((e["id"] for (w, e) in index.values()
+                         if w == where and e["plane"] == plane[y][x]), "?")
             why = "%s at (%d,%d) lands on %s" % (name, x, y, here)
         if why is not None:
             if not optional:
@@ -2821,7 +3011,7 @@ def dress_facades(world, plane, plan):
     return placed
 
 
-def stock_town(world, plane, plan, rng):
+def stock_town(world, planes, plan, rng):
     """Put the list down, and refuse to lose a piece of it.
 
     Same contract as furnish_house and for the same reason: `placed` props have
@@ -2829,21 +3019,21 @@ def stock_town(world, plane, plan, rng):
     them, and a silently dropped lamp is a dark street nobody can explain. The
     only prop allowed to be missing is none of them.
     """
-    manifest = json.load(open(os.path.join(ROOT, "assets", "tiles", "tiles.json")))
-    catalogue = {p["id"]: p for p in manifest["props"]["list"]}
+    index = plane_index()
     problems = []
     placed = 0
     for (name, x, y) in town_props(plan):
-        prop = catalogue.get(name)
+        where, prop = index.get(name, (None, None))
         if prop is None:
             problems.append("%s is not in the catalogue" % name)
             continue
+        plane = planes[where]
         if not (0 <= x < W and 0 <= y < H):
             problems.append("%s at (%d,%d) is off the map" % (name, x, y))
             continue
         if plane[y][x]:
-            here = next((p["id"] for p in catalogue.values()
-                         if p["plane"] == plane[y][x]), "?")
+            here = next((e["id"] for (w, e) in index.values()
+                         if w == where and e["plane"] == plane[y][x]), "?")
             problems.append("%s at (%d,%d) lands on %s" % (name, x, y, here))
             continue
         if not world.walkable(x, y):
@@ -3131,9 +3321,14 @@ def main():
     # it. The other order loses lamps: scatter_props refuses a cell that already
     # holds a prop, so whichever pass runs second is the one that gets dropped,
     # and a hand-made list is the wrong one to drop.
+    # One array per plane, handed to every placement pass as a dict so no pass
+    # has to know which plane a named thing goes on -- plane_index() answers
+    # that from the catalogue. See PLANE_NAMES above for the split.
     props = [[0] * W for _ in range(H)]
-    town_prop_count = stock_town(world, props, vale, rng)
-    dressed = dress_facades(world, props, vale)
+    clutter = [[0] * W for _ in range(H)]
+    planes = {"props": props, "clutter": clutter}
+    town_prop_count = stock_town(world, planes, vale, rng)
+    dressed = dress_facades(world, planes, vale)
     doorsteps = {b["doorstep"] for b in vale["buildings"]}
     doorsteps |= {plan["door_outside"], plan["spite"]}
     # THE INSIDE OF THE HOUSE IS NOT SCATTERED, IT IS FURNISHED.
@@ -3157,10 +3352,16 @@ def main():
     # the mayor's study. `vale["built"]` is every footprint including the four
     # walls, so it also keeps the scatter off the buildings that stay shut, which
     # were only ever safe because their roofs were solid.
-    scatter_props(world, elev, rng, reach, props,
+    scatter_props(world, elev, rng, reach, planes,
                   keep_clear=doorsteps | house_cells | vale["built"])
-    furnish_house(world, props, plan)
-    interior_count, interior_rooms = furnish_buildings(world, props, vale)
+    furnish_house(world, planes, plan)
+    interior_count, interior_rooms = furnish_buildings(world, planes, vale)
+
+    # SCATTER MAY NOT WALL LAND OFF. Run before the collision plane is derived
+    # for real, because everything downstream -- reachability, the anchors, the
+    # anomalies -- is measured against that plane and a repair afterwards would
+    # be measuring the world nobody ends up with. See unseal_pockets().
+    unsealed = unseal_pockets(world, elev, props, cliffs, spawn, vale["gate"])
 
     # The collision plane is *derived* from the finished prop plane rather than
     # accumulated while scattering, and it is derived by the same function the
@@ -3424,28 +3625,7 @@ def main():
     # the vale -- the whole north-west, the west field and the pond's west
     # shore -- off from everywhere, and 217 more sat behind the mayor's house
     # with no lane past it. Land the player can see and never stand on.
-    everywhere = {(x, y) for y in range(H) for x in range(W)
-                  if world.walkable(x, y)}
-    beyond = reachable(barred, (gate[0] + 4, gate[1]))
-    orphaned = everywhere - penned - beyond
-    lumps = []
-    unseen = set()
-    for cell in sorted(orphaned):
-        if cell in unseen:
-            continue
-        lump = set()
-        stack = [cell]
-        while stack:
-            here = stack.pop()
-            if here in unseen or here not in orphaned:
-                continue
-            unseen.add(here)
-            lump.add(here)
-            stack += [(here[0] + dx, here[1] + dy) for dx, dy in ORTHOGONAL]
-        if len(lump) >= 20 and any(VALE_BOX[0] <= c[0] <= VALE_BOX[2]
-                                   and VALE_BOX[1] <= c[1] <= VALE_BOX[3]
-                                   for c in lump):
-            lumps.append(sorted(lump))
+    lumps = vale_pockets(world, elev, blocked, spawn, gate)
     if lumps:
         raise SystemExit(
             "%d pocket(s) of the vale are cut off from both the town and the "
@@ -3638,6 +3818,13 @@ def main():
         "tiles_b64_deflate": encode(tiles),
         "elevation_b64_deflate": encode_elevation(elev),
         "props_b64_deflate": encode_plane(props),
+        # THE SECOND PROP PLANE (#83). Same encoding, same one byte per cell,
+        # indexing its own catalogue in assets/tiles/tiles.json. It is what
+        # lies on the ground or sits on the prop standing there -- grit in a
+        # lane, a rug, a cup on a counter -- and it is never solid, which is
+        # why `blocked` below is derived from `props` and `cliffs` and never
+        # from this. Mostly zero, so it deflates to about a kilobyte.
+        "clutter_b64_deflate": encode_plane(clutter),
         # A prop's art is 64x96 and its collision is one or two cells at its
         # foot, so solidity cannot be derived from the prop plane alone — the
         # anchor cell is not the whole footprint. Exported as its own plane
@@ -3699,12 +3886,26 @@ def main():
           % (len(reach), 100.0 * len(reach) / max(1, sum(
               1 for y in range(H) for x in range(W) if world.walkable(x, y)))))
     filled = sum(1 for row in props for v in row if v)
+    cluttered = sum(1 for row in clutter for v in row if v)
+    both = sum(1 for y in range(H) for x in range(W) if props[y][x] and clutter[y][x])
     # `blocked` is solid prop footprints UNION cliff cells, so reporting its
     # size as "of them solid" over-counted every prop report by the number of
     # cliffs printed on the very next line — 2,337 against 1,759 actually solid.
     solid_props = len(blocked - faces)
     print("props: %d placed (%.1f%% of cells), %d of them solid"
           % (filled, 100.0 * filled / (W * H), solid_props))
+    # The two planes and their overlap, because the overlap IS the feature: a
+    # zero here after #83 landed would mean the second plane is being written
+    # and never used, which no other number in this report would show.
+    print("clutter: %d placed (%.1f%% of cells), %d cells carry a prop and "
+          "clutter both"
+          % (cluttered, 100.0 * cluttered / (W * H), both))
+    if unsealed:
+        # Said out loud rather than repaired quietly. A number that starts
+        # climbing means the scatter is crowding the town, which is worth
+        # knowing even though the pass has already dealt with it.
+        print("  %d scattered solid prop(s) taken back where they had sealed a "
+              "pocket of the vale off" % unsealed)
     print("cliff cells: %d (%d cells of made road the terrace may not cross)"
           % (len(faces), len(made)))
     in_vale = [a for a in anomalies

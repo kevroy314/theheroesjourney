@@ -97,7 +97,8 @@ Layers come out in this order, and every name except `base`, `edits` and
 | 3 | `regions` | object | yes | Region anchors, as point objects named by region id. Some carry a `rect` as well — see below. |
 | 4 | `anomalies` | object | yes | Where the holes in reality are, with their tier and the area each opens. |
 | 5 | `interactables` | object | yes | The door, the stove, the counter, the animals — points naming a catalogue entry. |
-| 6 | `props` | object | **yes** | Every tree, barrel and bed in the world, as tile objects you can drag, retype, delete and add. **7,587** of them. |
+| 6 | `props` | object | **yes** | Every tree, barrel and bed in the world, as tile objects you can drag, retype, delete and add. **5,918** of them. |
+| 6b | `clutter` | object | **yes** | The second prop plane: what lies on a cell, or on the prop standing there — grit in a lane, a rug, a cup on a counter. **2,435** of them, and never solid. Its own tileset (`clutter.tsj`), so the panel you pick from is the panel of things that do not collide. |
 | 7 | `cliffs` | object | **yes** | Every cell of every terrace edge, as tile objects. Presence is all you say; the left/middle/right pieces are worked out for you. |
 | 8 | `indoors` | object | yes | One point per building the player can walk into, carrying the footprint as `w`/`h` and the name the run header shows as `place`. |
 | 9 | `markers` | object | yes | Every key the world file carries as a single `{x, y, …}`: `centre` and `spawn`. |
@@ -174,7 +175,7 @@ does not look it:
 | property | on | is |
 |---|---|---|
 | `hj_schema` | the map | a complete description of the world file's shape and key order. Delete it and the import refuses to run |
-| `hj_gen_planes` | the map | the props and cliffs the generator last produced |
+| `hj_gen_planes` | the map | the props, clutter and cliffs the generator last produced |
 | `hj_gen_x` / `hj_gen_y` | every object | where the generator last put it — the pin test |
 | `hj_keys` | records with more than `x`/`y` | the record's original key order, which is half of why the round trip is byte-identical |
 | `hj_json` | rarely | which fields were structured and had to be JSON-encoded into a string property |
@@ -186,9 +187,9 @@ the import skips every one of them.
 ## Props and cliffs
 
 These used to be invisible. The world file carries them as byte planes —
-`props_b64_deflate`, `cliffs_b64_deflate`, one byte per cell — and a byte is the
-one thing Tiled cannot show you, so 7,587 props shipped as an opaque blob and
-you could not move a single barrel.
+`props_b64_deflate`, `clutter_b64_deflate`, `cliffs_b64_deflate`, one byte per
+cell — and a byte is the one thing Tiled cannot show you, so 8,353 props shipped
+as an opaque blob and you could not move a single barrel.
 
 They are object layers now. **The plane is still what the game loads**; the
 objects are the editing format, folded back into the plane on import. That split
@@ -196,18 +197,46 @@ is deliberate:
 
 * `scripts/ui/TileWorld.gd` indexes the prop plane per cell inside `_draw`, every
   frame. A plane answers that in O(1) with no work at load time.
-* 7,587 objects is about 440 KB of JSON. Parsing that at every launch, on a
+* 8,353 objects is about 480 KB of JSON. Parsing that at every launch, on a
   phone, to build a lookup one byte already answers, buys nothing.
 * One byte per cell is the *runtime's* constraint — there is nowhere to draw two
   props on one cell. Making objects the source of truth would let you express a
   world the game cannot render. The import says which two objects are stacked and
   on which cell, and keeps the topmost.
 
+### Two planes, and which one a thing goes on
+
+There are **two** prop planes and they are numbered independently, so props id
+5 and clutter id 5 are different things that may be on the same cell.
+
+| | `props` | `clutter` |
+| --- | --- | --- |
+| what it holds | what **occupies** the cell — it stands up in the 96px slot | what does **not** — it lies on the floor, or sits on the thing standing there |
+| may be solid | yes | **never** |
+| examples | tree, barrel, counter, lamppost, window | grit, a wheel rut, a rug, the damp at a wall's foot, a cup, an open book |
+| tileset | `props.tsj` | `clutter.tsj` |
+| catalogue | `props.list` in `tiles.json` | `clutter.list` in the same file |
+
+That is why one cup collides and another does not: it does not. **Nothing on the
+clutter plane ever blocks**, and not as a rule anybody has to keep — the
+collision plane is derived from `props` and `cliffs` and the deriver is never
+handed `clutter` at all, so a clutter object you place on a doorway is a
+decoration in a doorway and never an invisible wall.
+
+Order within one cell is decided by the entry's own `flat`: flat clutter is
+drawn **under** the prop (grit round the foot of a bush), everything else
+**over** it (the cup on the counter). You do not set that per object; it is a
+property of the art.
+
+The two planes are also two budgets. A plane byte is one byte, so each
+catalogue stops at 255 entries — `python3 tools/add_prop.py verify` prints how
+many ids are left on each.
+
 ### Picking a prop by name, not by number
 
-The export writes `world/props.tsj` and `world/cliffs.tsj` from
-`assets/tiles/props.png`, `assets/tiles/cliffs.png` and the catalogue in
-`assets/tiles/tiles.json`. So a prop in Tiled is a **tile object**: you pick it
+The export writes `world/props.tsj`, `world/clutter.tsj` and `world/cliffs.tsj`
+from `assets/tiles/props.png`, `assets/tiles/clutter.png`,
+`assets/tiles/cliffs.png` and the catalogue in `assets/tiles/tiles.json`. So a prop in Tiled is a **tile object**: you pick it
 out of the tileset panel by its picture, its object Name is the catalogue id
 (`tree_pine`, `well`, `barrel`), and the tileset carries `name`, `biome`,
 `solid`, `foot_w` and `foot_h` as tile properties you can read in the sidebar.
@@ -231,7 +260,7 @@ This is the hard part. With a plane, "absent" means nothing: regenerate and the
 tree comes back. It works here for the same reason an erased tile works, and by
 the same mechanism — a base, and overrides on top of it:
 
-| | terrain | props and cliffs |
+| | terrain | props, clutter and cliffs |
 | --- | --- | --- |
 | the generated layer | the `base` tile layer | `hj_gen_planes` on the map |
 | your layer | the `edits` tile layer | the difference between the objects and that |
@@ -252,7 +281,8 @@ meaningful by the map remembering what the generator last said. The export
 reports all four counts:
 
 ```
-  props   7587 objects — 3 placed by hand, 1 deleted, 0 retyped
+  clutter 2435 objects — 2 placed by hand, 2 deleted, 0 retyped
+  props   5918 objects — 3 placed by hand, 1 deleted, 0 retyped
 ```
 
 Overrides are addressed by cell, so a resize moves them with the `edits` layer
@@ -370,17 +400,18 @@ of the same zlib stream. Not "an equivalent file": the same bytes.
 
 Every export checks it. It takes a scratch copy of the map, blanks the `edits`
 layer, puts every generated object back at its `hj_gen` position, rebuilds the
-props and cliffs layers from `hj_gen_planes`, drops everything hand-added,
-imports that, and compares against the real file:
+props, clutter and cliffs layers from `hj_gen_planes`, drops everything
+hand-added, imports that, and compares against the real file:
 
 ```
-world/overworld.tmj  256x256, 29 tiles in the set
+world/overworld.tmj  256x256, 33 tiles in the set
   base    re-seeded from data/world/overworld.json (locked)
   edits   0 cells kept
-  objects 0 pinned by hand, 45 new from the generator, 0 kept ...
-  cliffs  504 objects — 0 placed by hand, 0 deleted, 0 retyped
-  props   7587 objects — 0 placed by hand, 0 deleted, 0 retyped
-  round trip: byte-identical (62579 bytes reproduced exactly)
+  objects 0 pinned by hand, 0 new from the generator, 0 kept ...
+  cliffs  478 objects — 0 placed by hand, 0 deleted, 0 retyped
+  clutter 2435 objects — 0 placed by hand, 0 deleted, 0 retyped
+  props   5918 objects — 0 placed by hand, 0 deleted, 0 retyped
+  round trip: byte-identical (68849 bytes reproduced exactly)
 ```
 
 That includes `blocked_b64_deflate`, which is *recomputed* rather than copied —
@@ -431,6 +462,7 @@ that already contains the hand position.
 | `world/overworld.tmj` | **yes** | The only copy of your hand-drawn edits. |
 | `world/tileset.tsj` | **yes** | Regenerated from the atlas, but carries hand-authored Wang/terrain sets that nothing else has. |
 | `world/props.tsj` | yes | The props tileset, regenerated from `props.png` and `tiles.json` on every export. |
+| `world/clutter.tsj` | yes | The clutter tileset, same, from `clutter.png`. |
 | `world/cliffs.tsj` | yes | The cliff pieces, same. |
 | `world/heroes.tiled-project` | yes | Tiled's project settings. Written once, then yours. |
 | `world/open-in-tiled.sh` | yes | The launcher. |
@@ -450,8 +482,8 @@ line. That is deliberate — 65,536 CSV integers per layer is a 270 KB diff that
 is no more readable — but it does mean `git diff` will not show you what you
 painted. `npm run world:import -- --check` will.
 
-The props and cliffs, being objects, are the opposite: 8,091 of them make
-`overworld.tmj` about **1.9 MB**, and a moved barrel is four readable lines of
+The props, clutter and cliffs, being objects, are the opposite: 8,831 of them
+make `overworld.tmj` about **2.2 MB**, and a moved barrel is four readable lines of
 diff. That is the price of being able to see them, and it is paid in the map,
 not in the game — `data/world/overworld.json` is 61 KB, and it grows with the
 prop count and with nothing else.
@@ -459,7 +491,7 @@ prop count and with nothing else.
 ### Living with 8,000 objects in Tiled
 
 - Turn the `props` layer off (the eye in the Layers panel) while you are painting
-  terrain. Tiled draws every object in a visible layer, and 7,587 sprites of
+  terrain. Tiled draws every object in a visible layer, and 5,918 sprites of
   64x96 is enough to make panning stutter on a big view.
 - **Select the layer before you select an object.** With `props` active, a
   rubber-band selection across a screen of forest selects a few hundred objects
@@ -503,7 +535,7 @@ too. Two regions carry one today: `the_town` and `the_house`.
 The planes are the one exception, and only half an exception. *Which* plane is
 the props plane is a fact about the art, not about the value — every plane in the
 file is the same 65,536 bytes — so `PLANE_KEYS` in `world_to_tiled.py` names them
-by key prefix. That is three words of hardcoding. Everything behind it, including
+by key prefix. That is four words of hardcoding. Everything behind it, including
 the atlas geometry, the cell size and the catalogue of what each byte means, is
 read out of `assets/tiles/tiles.json` at run time.
 An elevation field, difficulty rings, anomaly spawn points and the
@@ -531,9 +563,11 @@ is the evidence for it.
 - **A prop id with no catalogue entry.** Both halves stop and name the id and
   the cell. That is the honest answer when art is deleted out from under a world
   that is already drawing it — dropping the prop would be a silent hole.
-- **Two props on one cell.** The runtime has one byte per cell and nowhere to put
-  the second. The import names both and the cell, and keeps the topmost.
-- **A `props` or `cliffs` layer you delete.** The import refuses rather than
+- **Two props on one cell.** One byte per cell *per plane*, so a cell takes one
+  prop and one piece of clutter and no more. Two objects on one cell of the same
+  layer: the import names both and the cell, and keeps the topmost. A prop and a
+  piece of clutter on one cell is not a collision — it is the point.
+- **A `props`, `clutter` or `cliffs` layer you delete.** The import refuses rather than
   emptying the plane. Re-export if that is really what you meant.
 - **A resize.** Prop and cliff overrides move with the `edits` layer under
   `--resize` / `--anchor`, and are dropped with a note if the shift cannot be

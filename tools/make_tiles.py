@@ -12,7 +12,8 @@ all from the same palette and the same handful of generators:
   variants   2 alternates per material, chosen by hash(x,y)  -> tileset_var.png
   overlays   16 materials x (16 edge + 16 corner) x 3 seeds  -> overlays.png
   cliffs     16 elevation faces, lips and corners            -> cliffs.png
-  props      50 objects that stand on the ground             -> props.png
+  props      objects that stand on the ground                -> props.png
+  clutter    what lies on the ground, or on those objects     -> clutter.png
 
 Read docs/ART-DIRECTION-OVERWORLD.md before changing anything here; it is the
 measured brief this file answers. The five rules that shape the code:
@@ -3947,7 +3948,6 @@ PROPS = [
     _p("floor_lamp", "furniture", "placed", 0.0, kind="lamp",
        light=dict(radius=4.5, color="#FFC880", flicker=0.08, kind="lamp"), sway=dict(amount=0.5, speed=1.8, mode='breathe')),
     _p("plant_pot", "furniture", "placed", 0.0, solid=True, kind="pot", sway=dict(amount=0.6, speed=0.55)),
-    _p("rug", "furniture", "placed", 0.0, shadow=False, outline=False, kind="rug"),
 
     # --- placed: the house that is actually a house ---------------------------
     # §"the asset backlog": a furniture set for a real house (bed, table,
@@ -3964,12 +3964,6 @@ PROPS = [
        # beam is two bands.
        shaft=dict(length=9.0, width=0.34, spread=0.1, bars=2,
                   color="#FFEFD2", intensity=0.95)),
-    _p("candle", "clutter", "placed", 0.0, shadow=False, kind="candle",
-       light=dict(radius=2.5, color="#FFC880", flicker=0.45, kind="fire"), sway=dict(amount=0.9, speed=2.8, mode='breathe')),
-    _p("cup", "clutter", "placed", 0.0, shadow=False, kind="cup"),
-    _p("boots", "clutter", "placed", 0.0, shadow=False, kind="boots"),
-    _p("book_open", "clutter", "placed", 0.0, shadow=False, kind="book"),
-    _p("bottle", "clutter", "placed", 0.0, shadow=False, kind="bottle"),
     _p("street_lamp", "structure", "placed", 0.0, solid=True, kind="street_lamp",
        light=dict(radius=7.5, color="#FFD08A", flicker=0.10, kind="lamp"), sway=dict(amount=0.6, speed=1.35, mode='breathe')),
     # Not solid. An animal that walks is not a wall: marking these solid baked a
@@ -4002,7 +3996,6 @@ PROP_ORDER = [
     "barrel", "crate", "well", "cart", "market_stall", "lamppost", "bench",
     "standing_stone",
     "bed", "table", "chair", "bookshelf", "chest", "floor_lamp", "plant_pot",
-    "rug",
 ]
 
 # The hand-authored spine ends here. Everything below is generated, and every
@@ -4016,11 +4009,93 @@ assert len(PROPS) >= len(PROP_ORDER)
 PROP_ORDER = PROP_ORDER + [p["id"] for p in PROPS[len(PROP_ORDER):]]
 
 
+# --- the clutter plane --------------------------------------------------------
+#
+# THE SECOND CATALOGUE, AND WHY THERE IS ONE (#83).
+#
+# `props` and `clutter` are two byte planes over the same grid, each with its
+# own catalogue and its own atlas, so a cell can hold one of each. The split is
+# not "big things and small things"; it is:
+#
+#   props     what OCCUPIES the cell. It stands up in the 96px slot, it is
+#             drawn from the ground upward, and it may be solid.
+#   clutter   what does NOT occupy the cell. It lies on the floor, or it sits
+#             on the thing that is standing there, it is drawn entirely inside
+#             the bottom of the slot, and IT IS NEVER SOLID.
+#
+# Two consequences, and both are the point:
+#
+#   * A cup can stand on a counter. Before this there was one byte per cell, so
+#     the cup stood on the floor beside the counter, which says something quite
+#     different about who lives there. The workaround -- a `counter_with_cup`
+#     prop -- multiplies a finite authored catalogue combinatorially, which is
+#     the thing tools/add_prop.py exists to prevent.
+#   * The catalogue is no longer capped at 255 entries in total. Each plane
+#     indexes its own list, so the budget is 255 + 255. That is the whole reason
+#     this is a second PLANE rather than a wider one: widening props to a uint16
+#     would raise the cap and leave the defect (still one thing per cell), while
+#     doubling a dense 65,536-cell array that is empty in seven cells out of
+#     eight. A second byte plane costs a second mostly-zero blob that deflates
+#     to about a kilobyte, and every lookup stays a byte.
+#
+# The membership rule is checked and not merely stated -- see the assert below
+# and world_pass() in tools/validate_data.py -- and it invents no new
+# declaration: `solid` already says it. Collision cannot go wrong even if the
+# rule did: derive_blocked() in tools/world_to_tiled.py is never handed the
+# clutter plane at all, so a clutter byte hand-placed in Tiled cannot block
+# either.
+#
+# Same 64x96 slot and the same bottom-centre anchor as props, deliberately. A
+# cup that must appear ON a counter has to be drawn 14px up inside its slot, so
+# a smaller cell would make the one placement this exists for undrawable -- and
+# sharing the geometry means the renderer's blit, HJMotion's bounding-box
+# measurement and Tiled's tile-object arithmetic are the same code with a
+# different texture.
+
+CLUTTER = [
+    # --- floor coverings ------------------------------------------------------
+    # A rug is the clearest case for the split there is: it is a thing on the
+    # floor that furniture and animals stand ON, and while it was a prop the
+    # cell it covered could hold nothing else.
+    _p("rug", "furniture", "placed", 0.0, shadow=False, outline=False, kind="rug"),
+    # The damp at the foot of a wall. It was competing with the town's benches
+    # and the square's grit for the one byte on a pavement cell, and losing
+    # silently -- dress_facades() calls a wall stain optional, so a bench
+    # already on that cell simply meant no stain and nobody was told.
+    _p("wall_base", "structure", "placed", 0.0, shadow=False, outline=False,
+       kind="wall_base"),
+
+    # --- evidence of use ------------------------------------------------------
+    # docs/AESTHETIC-EDA.md calls this the cheapest narrative device there is,
+    # and names these four: a cup on the counter, an open book on the table,
+    # boots by the door, a chair pulled out. Two of them worked before, because
+    # they sit on the floor; the other two read as a cup on the floor and a book
+    # on the floor. They are here, and they are the reason this plane exists.
+    _p("candle", "clutter", "placed", 0.0, shadow=False, kind="candle",
+       light=dict(radius=2.5, color="#FFC880", flicker=0.45, kind="fire"), sway=dict(amount=0.9, speed=2.8, mode='breathe')),
+    _p("cup", "clutter", "placed", 0.0, shadow=False, kind="cup"),
+    _p("boots", "clutter", "placed", 0.0, shadow=False, kind="boots"),
+    _p("book_open", "clutter", "placed", 0.0, shadow=False, kind="book"),
+    _p("bottle", "clutter", "placed", 0.0, shadow=False, kind="bottle"),
+]
+
+# Index i is clutter-plane value i+1, exactly as PROP_ORDER is for props. Same
+# append-only rule and the same reason: the byte is stored in world data and in
+# hand edits, so reordering silently rewrites every map ever made.
+CLUTTER_ORDER = [p["id"] for p in CLUTTER]
+
+
 # --- ground scatter, per biome ------------------------------------------------
 #
 # §1: "a scatter set per biome -- 6-10 tiny sprites each (8x8 to 16x16), placed
 # at sub-tile offsets, non-colliding, purely decorative." The sub-tile offset is
 # the point and it lives in `ox`/`oy`; see b_scatter for why it has to.
+#
+# ON THE CLUTTER PLANE, not the prop plane, because b_scatter's own docstring
+# already made the argument for it: "tiny, unoutlined, unshadowed, never solid.
+# This is texture, not furniture." Sixty-two entries of texture were spending
+# sixty-two of the two hundred and fifty-five ids a thing that stands up could
+# have had, which is most of why the catalogue reached 254 with two slots left.
 #
 # Density is the set's whole budget divided by its members, so adding a seventh
 # pebble to a biome does not make that biome noisier -- it makes it more varied,
@@ -4097,13 +4172,13 @@ SCATTER_PARAMS = {
 for _biome, _set in SCATTER_SETS.items():
     for _i, (_kind, _pal, _n) in enumerate(_set):
         _ox, _oy = SCATTER_OFFSETS[_i % len(SCATTER_OFFSETS)]
-        PROPS.append(_p("%s_bits_%d" % (_biome, _i + 1), "scatter", _biome,
-                        SCATTER_BUDGET * SCATTER_WEIGHT.get(_biome, 1.0)
-                        / len(_set),
-                        shadow=False, outline=False,
-                        kind=_kind, pal=_pal, n=_n, ox=_ox, oy=_oy,
-                        **SCATTER_PARAMS.get((_biome, _i + 1), {})))
-        PROP_ORDER.append(PROPS[-1]["id"])
+        CLUTTER.append(_p("%s_bits_%d" % (_biome, _i + 1), "scatter", _biome,
+                          SCATTER_BUDGET * SCATTER_WEIGHT.get(_biome, 1.0)
+                          / len(_set),
+                          shadow=False, outline=False,
+                          kind=_kind, pal=_pal, n=_n, ox=_ox, oy=_oy,
+                          **SCATTER_PARAMS.get((_biome, _i + 1), {})))
+        CLUTTER_ORDER.append(CLUTTER[-1]["id"])
 
 
 # --- prop variants ------------------------------------------------------------
@@ -4139,9 +4214,16 @@ VARIED = [
     "bramble", "milestone",
 ]
 
-_by_id = {p["id"]: p for p in PROPS}
+# Both catalogues, and the list each base came out of. A variant is the same
+# species as its base, so it goes on the same plane as its base -- and until
+# there were two planes, "give the grit three variants" was a request the
+# catalogue had no room to grant at all.
+_by_id = {p["id"]: p for p in PROPS + CLUTTER}
+_list_of = dict([(p["id"], (PROPS, PROP_ORDER)) for p in PROPS]
+                + [(p["id"], (CLUTTER, CLUTTER_ORDER)) for p in CLUTTER])
 for _base_id in VARIED:
     _base = _by_id[_base_id]
+    _dest, _dest_order = _list_of[_base_id]
     _base["density"] /= (1 + len(VARIANT_SCALE))
     for _k, _f in enumerate(VARIANT_SCALE):
         _params = dict(_base["params"])
@@ -4150,13 +4232,13 @@ for _base_id in VARIED:
                 _params[_key] = max(1, int(round(_params[_key] * _f)))
         # A variant is the same species: it moves the way its base moves, and a
         # bush whose _v2 stands still is a gap nobody notices for weeks.
-        PROPS.append(_p("%s_v%d" % (_base_id, _k + 2), _base["build"],
+        _dest.append(_p("%s_v%d" % (_base_id, _k + 2), _base["build"],
                         _base["biome"], _base["density"], solid=_base["solid"],
                         foot=tuple(_base["foot"]), shadow=_base["shadow"],
                         outline=_base["outline"], light=_base.get("light"),
                         sway=_base.get("sway"), shaft=_base.get("shaft"),
                         **_params))
-        PROP_ORDER.append(PROPS[-1]["id"])
+        _dest_order.append(_dest[-1]["id"])
 
 # --- placed: the rest of the town ---------------------------------------------
 #
@@ -4236,9 +4318,6 @@ for _pid, _kw in (
     # fifteen roofs is a large part of what makes them one town.
     ("chimney_brick", dict(build="structure", solid=False, kind="chimney",
                            pal="brick", w=6, h=30)),
-    # And the damp at the foot of it all.
-    ("wall_base", dict(build="structure", solid=False, kind="wall_base",
-                       shadow=False, outline=False)),
     # The ridge. No outline: an outline round a band that is meant to join up
     # with the identical band in the next cell draws a black line between them.
     ("roof_ridge", dict(build="structure", solid=False, kind="roof_ridge",
@@ -4253,24 +4332,47 @@ for _pid, _kw in (
                     **_kw))
     PROP_ORDER.append(_pid)
 
-# THE PROP PLANE IS ONE BYTE A CELL, so plane ids run 1..255 and 0 means
-# nothing is there. Overflowing it is not a soft failure: tools/make_world.py
-# packs the plane with `bytes(bytearray(...))` and dies with
+# EACH PLANE IS ONE BYTE A CELL, so plane ids run 1..255 within a plane and 0
+# means nothing is there. Overflowing is not a soft failure: tools/make_world.py
+# packs a plane with `bytes(bytearray(...))` and dies with
 # "ValueError: byte must be in range(0, 256)" from inside encode_plane, several
 # hundred lines and one tool away from the list that overflowed. Two slots are
 # left for tools/add_prop.py's authored tail, which is appended after this file
 # has run and is therefore invisible here.
 #
-# When this fires the answer is almost never "make the limit bigger" -- it is
-# that a variant that appears once, or a scatter member that says nothing the
-# other five in its set do not, has been added. #83's second prop plane is the
-# real fix and it buys another 255, not more than that.
+# There are two budgets now rather than one, which is what #83 bought: a prop
+# that stands up and a thing lying on the ground no longer compete for the same
+# 255 ids. When one of these fires the answer is still almost never "make the
+# limit bigger" -- it is that a variant that appears once, or a scatter member
+# that says nothing the other five in its set do not, has been added.
 AUTHORED_TAIL = 2
 assert len(PROP_ORDER) + AUTHORED_TAIL <= 255, (
     "%d props + %d authored will not fit in a one-byte prop plane"
     % (len(PROP_ORDER), AUTHORED_TAIL))
+assert len(CLUTTER_ORDER) <= 255, (
+    "%d clutter entries will not fit in a one-byte clutter plane"
+    % len(CLUTTER_ORDER))
 
-PROP_BY_ID = {p["id"]: p for p in PROPS}
+# THE ONE RULE THE CLUTTER PLANE RESTS ON, asserted here rather than trusted.
+# Nothing on the clutter plane is solid, so the plane never contributes to
+# collision -- see the catalogue comment above, and derive_blocked() in
+# tools/world_to_tiled.py, which is never handed this plane at all. Stated with
+# `solid` and not with a new keyword because `solid` already says it.
+assert not [p["id"] for p in CLUTTER if p["solid"]], (
+    "clutter entries must not be solid: %s"
+    % ", ".join(p["id"] for p in CLUTTER if p["solid"]))
+
+# Ids are unique across BOTH catalogues even though the planes are numbered
+# independently, because everything that names a prop -- an interior plan, a
+# Tiled object's Name, tools/add_prop.py's registry -- names it by id and would
+# otherwise have to say which plane it meant as well.
+assert len(set(PROP_ORDER) | set(CLUTTER_ORDER)) == len(PROP_ORDER) + len(CLUTTER_ORDER), (
+    "the same id is in both catalogues: %s"
+    % ", ".join(sorted(set(PROP_ORDER) & set(CLUTTER_ORDER))))
+
+# Keyed by id across both catalogues, so the sheets and the demo compositions
+# below can ask for a piece of furniture without knowing which plane it is on.
+PROP_BY_ID = {p["id"]: p for p in PROPS + CLUTTER}
 PROP_COLS = 8
 
 
@@ -4286,11 +4388,18 @@ def build_prop(pid):
     return img
 
 
-def build_props():
-    rows = (len(PROP_ORDER) + PROP_COLS - 1) // PROP_COLS
+def build_slots(order):
+    """One atlas for one plane, from that plane's own id order.
+
+    Takes the order rather than reading PROP_ORDER, because there are two
+    planes now and each has its own atlas with its own slot numbering: slot
+    index is the plane id minus one WITHIN a plane, and props.png and
+    clutter.png are numbered independently of one another.
+    """
+    rows = (len(order) + PROP_COLS - 1) // PROP_COLS
     atlas = Image.new("RGBA", (PROP_COLS * PROP_W, rows * PROP_H), (0, 0, 0, 0))
     sprites = {}
-    for i, pid in enumerate(PROP_ORDER):
+    for i, pid in enumerate(order):
         s = build_prop(pid)
         sprites[pid] = s
         atlas.paste(s, ((i % PROP_COLS) * PROP_W, (i // PROP_COLS) * PROP_H))
@@ -4656,7 +4765,8 @@ def furniture_sheet(sprites, scale=3, cols=6):
     the footprint in pixels. If the art does not reach the edges of the bright
     rectangle, the prop is too small.
     """
-    ids = [pid for pid in PROP_ORDER if PROP_BY_ID[pid]["biome"] == "placed"]
+    ids = [pid for pid in PROP_ORDER + CLUTTER_ORDER
+           if PROP_BY_ID[pid]["biome"] == "placed"]
     pad, label_h = 5, 11
     cw, ch = PROP_W * scale, PROP_H * scale
     rows = (len(ids) + cols - 1) // cols
@@ -4757,9 +4867,14 @@ def overlay_sheet(tiles, scale=3):
 
 
 def prop_sheet(sprites, scale=2, cols=8):
+    # Both planes, in plane order, props first. The sheet is the one place the
+    # whole catalogue is visible at once, and splitting it in two would make
+    # "does anything in the game look like this already" a question you have to
+    # ask twice.
+    every = PROP_ORDER + CLUTTER_ORDER
     pad, label_h = 4, 11
     cw, ch = PROP_W * scale, PROP_H * scale
-    rows = (len(PROP_ORDER) + cols - 1) // cols
+    rows = (len(every) + cols - 1) // cols
     sheet = Image.new("RGBA", (cols * (cw + pad) + pad, rows * (ch + label_h + pad) + pad),
                       tuple(R["grass_short"]["base"]) + (255,))
     d = ImageDraw.Draw(sheet)
@@ -4767,7 +4882,7 @@ def prop_sheet(sprites, scale=2, cols=8):
         font = ImageFont.load_default()
     except Exception:
         font = None
-    for i, pid in enumerate(PROP_ORDER):
+    for i, pid in enumerate(every):
         p = PROP_BY_ID[pid]
         cx = pad + (i % cols) * (cw + pad)
         cy = pad + (i // cols) * (ch + label_h + pad)
@@ -4865,7 +4980,30 @@ def rgb_delta(a, b):
 
 # --- output -------------------------------------------------------------------
 
-def manifest(overlay_rows, cliff_rows, prop_rows):
+def _plane_list(order):
+    """One plane's catalogue rows, in that plane's own id order.
+
+    Shared by `props` and `clutter` so the two sections cannot drift into
+    almost-the-same shape -- everything downstream reads them with one reader,
+    and a key present on one plane and missing on the other would be a silent
+    hole in whichever tool happened to look at the wrong one.
+    """
+    return [dict({"id": pid, "index": i, "plane": i + 1,
+                  "biome": PROP_BY_ID[pid]["biome"],
+                  "density": PROP_BY_ID[pid]["density"],
+                  "solid": PROP_BY_ID[pid]["solid"],
+                  "flat": PROP_BY_ID[pid]["flat"],
+                  "foot": PROP_BY_ID[pid]["foot"]},
+                 **({"light": PROP_BY_ID[pid]["light"]}
+                    if "light" in PROP_BY_ID[pid] else {}),
+                 **({"sway": PROP_BY_ID[pid]["sway"]}
+                    if "sway" in PROP_BY_ID[pid] else {}),
+                 **({"shaft": PROP_BY_ID[pid]["shaft"]}
+                    if "shaft" in PROP_BY_ID[pid] else {}))
+            for i, pid in enumerate(order)]
+
+
+def manifest(overlay_rows, cliff_rows, prop_rows, clutter_rows):
     """Everything a consumer needs, in one file, so nobody has to parse Python.
 
     tools/make_world.py currently reads ORDER out of this file's source and that
@@ -4918,20 +5056,26 @@ def manifest(overlay_rows, cliff_rows, prop_rows):
                          "at dusk, 'fire' burns at every hour, 'window' is lit "
                          "only while somebody is home"),
             },
-            "list": [
-                dict({"id": pid, "index": i, "plane": i + 1,
-                      "biome": PROP_BY_ID[pid]["biome"],
-                      "density": PROP_BY_ID[pid]["density"],
-                      "solid": PROP_BY_ID[pid]["solid"],
-                      "flat": PROP_BY_ID[pid]["flat"],
-                      "foot": PROP_BY_ID[pid]["foot"]},
-                     **({"light": PROP_BY_ID[pid]["light"]}
-                        if "light" in PROP_BY_ID[pid] else {}),
-                     **({"sway": PROP_BY_ID[pid]["sway"]}
-                        if "sway" in PROP_BY_ID[pid] else {}),
-                     **({"shaft": PROP_BY_ID[pid]["shaft"]}
-                        if "shaft" in PROP_BY_ID[pid] else {}))
-                for i, pid in enumerate(PROP_ORDER)],
+            "list": _plane_list(PROP_ORDER),
+        },
+        # THE SECOND PROP PLANE (#83). Same shape as `props` down to the key
+        # order, because everything that reads a plane -- the renderer, the
+        # generator, both halves of the Tiled round trip -- reads them through
+        # the same code and a section that was almost the same shape would be a
+        # branch in every one of those places. The differences are the two that
+        # matter: a different atlas with its own independent slot numbering,
+        # and `solid` is false on every entry.
+        "clutter": {
+            "file": "clutter.png", "cols": PROP_COLS, "rows": clutter_rows,
+            "slot": [PROP_W, PROP_H],
+            "anchor": [PROP_AX, PROP_AY],
+            "layout": "slot i (0-based) at (64*(i%8), 96*(i//8)); plane value = i+1",
+            "draw": "dst = (cell.x*32 + 16 - 32, cell.y*32 + 32 - 96)",
+            "_": ("what lies on the ground or sits on the prop standing there. "
+                  "Drawn immediately after that prop, in the same Y-sorted row "
+                  "pass, and never solid -- the collision plane is derived from "
+                  "`props` and `cliffs` alone and never sees this one."),
+            "list": _plane_list(CLUTTER_ORDER),
         },
         "shadow": {"rgb": list(SHADOW), "alpha": SHADOW_A},
     }
@@ -4967,11 +5111,17 @@ def main():
     cl_atlas, _cl, cl_rows = build_cliffs()
     save(cl_atlas, "cliffs.png")
 
-    pr_atlas, pr_sprites, pr_rows = build_props()
+    pr_atlas, pr_sprites, pr_rows = build_slots(PROP_ORDER)
     save(pr_atlas, "props.png")
 
+    cu_atlas, cu_sprites, cu_rows = build_slots(CLUTTER_ORDER)
+    save(cu_atlas, "clutter.png")
+    # The sheets and the demo compositions below ask for a piece by id and do
+    # not care which plane it came off, so they get one dictionary.
+    pr_sprites = dict(pr_sprites, **cu_sprites)
+
     with open(os.path.join(OUT, "tiles.json"), "w", encoding="utf-8") as f:
-        json.dump(manifest(ov_rows, cl_rows, pr_rows), f, indent=2, sort_keys=True)
+        json.dump(manifest(ov_rows, cl_rows, pr_rows, cu_rows), f, indent=2, sort_keys=True)
         f.write("\n")
     written.append("tiles.json")
 
@@ -4992,10 +5142,14 @@ def main():
     print("overlays   %4d  (%d materials x 32 cases x %d variants)"
           % (n_over, len(OVERLAY_MATS), VARIANTS))
     print("cliffs     %4d" % len(CLIFF_ORDER))
-    print("props      %4d" % len(PROP_ORDER))
+    print("props      %4d  (%d of 255 plane ids free)"
+          % (len(PROP_ORDER), 255 - len(PROP_ORDER) - AUTHORED_TAIL))
+    print("clutter    %4d  (%d of 255 plane ids free)"
+          % (len(CLUTTER_ORDER), 255 - len(CLUTTER_ORDER)))
     print("           ----")
     print("total      %4d sprites\n"
-          % (len(ORDER) * (1 + BASE_VARIANTS) + n_over + len(CLIFF_ORDER) + len(PROP_ORDER)))
+          % (len(ORDER) * (1 + BASE_VARIANTS) + n_over + len(CLIFF_ORDER)
+             + len(PROP_ORDER) + len(CLUTTER_ORDER)))
 
     print("4x4 repeat seam test on the base fills: joint step vs the tile's own")
     print("%-14s %-5s  %-14s %-14s %s"

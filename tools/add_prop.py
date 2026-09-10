@@ -35,9 +35,16 @@ Subcommands:
     add       ingest -> ... -> register one prop
     reapply   re-append every authored prop after make_tiles.py has regenerated
               the atlas and wiped them (it will; it owns those files)
-    verify    check the catalogue against the authored registry and re-run the
-              art checks
+    verify    check both catalogues against the authored registry, re-run the
+              art checks, and report the free plane ids left on each plane
     list      what has been authored, and at which plane id
+
+There are two planes and two catalogues (#83): `props` is what occupies a cell
+and may be solid, `clutter` is what lies on the ground or sits on the thing
+standing there and never is. They are numbered independently -- props plane 5
+and clutter plane 5 are two different things that can be on the same cell -- so
+every command here takes one plane at a time and `add` needs --plane to say
+which.
 
 The authored registry lives at art/props/authored.json with the finished 64x96
 sprites beside it, so `reapply` is byte-exact and needs neither the source image
@@ -61,8 +68,26 @@ import make_tiles as MT                                    # noqa: E402
 from cutout import CutoutError, cutout                     # noqa: E402
 
 TILES = os.path.join(ROOT, "assets", "tiles")
-ATLAS = os.path.join(TILES, "props.png")
 MANIFEST = os.path.join(TILES, "tiles.json")
+
+# THE TWO PROP PLANES (#83). `props` is what occupies a cell and may be solid;
+# `clutter` is what lies on the ground or sits on the thing standing there and
+# never is. Each has its own catalogue, its own atlas and its own 1..255 of
+# plane ids, so this tool has to be told which one it is appending to -- and
+# `verify` has two budgets to report rather than one.
+PLANES = ("props", "clutter")
+
+
+def atlas_path(plane):
+    """assets/tiles/props.png, assets/tiles/clutter.png.
+
+    Read out of the manifest rather than spelt out, because the manifest is
+    what tools/make_tiles.py wrote and what every other reader trusts; a second
+    spelling here is a second thing to disagree with it.
+    """
+    section = load_manifest().get(plane) or {}
+    return os.path.join(TILES, str(section.get("file", "%s.png" % plane)))
+
 STORE = os.path.join(ROOT, "art", "props")
 REGISTRY = os.path.join(STORE, "authored.json")
 
@@ -303,35 +328,52 @@ def save_manifest(man):
         f.write("\n")
 
 
-def check_catalogue(man, atlas):
+def check_catalogue(man, atlas, plane="props"):
     """Refuse to touch a catalogue that is already inconsistent. If any of this
     fails, something else renumbered the props and the world data is already
-    wrong; appending would only bury it."""
-    p = man.get("props")
+    wrong; appending would only bury it.
+
+    One plane at a time. The two planes are numbered independently -- plane id
+    5 on `props` and plane id 5 on `clutter` are different things standing on
+    the same cell -- so consistency is a per-plane question and checking them
+    together would be checking a fact that does not exist."""
+    p = man.get(plane)
     if not p:
-        die("tiles.json has no props section.")
+        die("tiles.json has no %s section." % plane)
     for key, want in (("cols", MT.PROP_COLS), ("slot", [W, H]),
                       ("anchor", [MT.PROP_AX, MT.PROP_AY])):
         if p.get(key) != want:
-            die("props.%s is %r, expected %r. The slot geometry changed; this "
-                "tool would write sprites into the wrong place." % (key, p.get(key), want))
+            die("%s.%s is %r, expected %r. The slot geometry changed; this "
+                "tool would write sprites into the wrong place."
+                % (plane, key, p.get(key), want))
     seen = set()
     for i, e in enumerate(p["list"]):
         if e["index"] != i or e["plane"] != i + 1:
-            die("props.list[%d] is id=%r index=%d plane=%d -- the list has been "
+            die("%s.list[%d] is id=%r index=%d plane=%d -- the list has been "
                 "reordered or renumbered. Every world file and every hand edit "
                 "that stores plane ids is now wrong. Fix that before adding "
-                "anything." % (i, e["id"], e["index"], e["plane"]))
+                "anything." % (plane, i, e["id"], e["index"], e["plane"]))
         if e["id"] in seen:
             die("duplicate prop id %r at index %d." % (e["id"], i))
         seen.add(e["id"])
+    # Nothing on the clutter plane may be solid: the collision plane is derived
+    # from `props` and `cliffs` alone, so a solid clutter entry is a prop that
+    # says it stops you and then does not. Asserted in tools/make_tiles.py too;
+    # asserted again here because this tool writes the manifest as well.
+    if plane == "clutter":
+        bad = [e["id"] for e in p["list"] if e.get("solid")]
+        if bad:
+            die("clutter entries must not be solid: %s. Nothing on the clutter "
+                "plane reaches the collision plane, so this one would block "
+                "nothing while claiming to." % ", ".join(bad))
     rows = (len(p["list"]) + MT.PROP_COLS - 1) // MT.PROP_COLS
     if p.get("rows") != rows:
-        die("props.rows is %r but %d props need %d rows."
-            % (p.get("rows"), len(p["list"]), rows))
+        die("%s.rows is %r but %d entries need %d rows."
+            % (plane, p.get("rows"), len(p["list"]), rows))
     if atlas.size != (MT.PROP_COLS * W, p["rows"] * H):
-        die("props.png is %dx%d but the manifest says %d cols x %d rows."
-            % (atlas.size[0], atlas.size[1], p["cols"], p["rows"]))
+        die("%s is %dx%d but the manifest says %d cols x %d rows."
+            % (p.get("file", plane), atlas.size[0], atlas.size[1],
+               p["cols"], p["rows"]))
     return p["list"]
 
 
@@ -344,9 +386,33 @@ def sha(path_or_img):
 
 def load_registry():
     if not os.path.exists(REGISTRY):
-        return {"base_count": None, "props": []}
+        return {"base_count": {}, "props": []}
     with open(REGISTRY, encoding="utf-8") as f:
         return json.load(f)
+
+
+def plane_of(record):
+    """Which plane an authored record lives on.
+
+    Absent means `props`, because every record written before there were two
+    planes was a props record and rewriting them to say so would be a change to
+    a file whose whole job is to remember what was already true."""
+    return str(record.get("plane_key") or "props")
+
+
+def base_counts(reg):
+    """The drawn catalogue size, per plane, the registry was built against.
+
+    `base_count` used to be one integer, when there was one plane. An integer
+    still reads as the props count so an old registry is understood rather than
+    rejected -- it is the file that says which plane id the world data means,
+    and refusing to read it would be the worst possible time to be strict."""
+    counts = reg.get("base_count")
+    if isinstance(counts, dict):
+        return {k: int(v) for k, v in counts.items()}
+    if counts is None:
+        return {}
+    return {"props": int(counts)}
 
 
 def save_registry(reg):
@@ -356,32 +422,40 @@ def save_registry(reg):
         f.write("\n")
 
 
-def append_prop(entry, sprite, replace=False):
-    """The only function in this repo outside make_tiles.py that writes
-    props.png or the props section of tiles.json.
+def append_prop(entry, sprite, replace=False, plane="props"):
+    """The only function in this repo outside make_tiles.py that writes an
+    atlas or a plane's section of tiles.json.
 
-    Appends one slot. Then proves, against the bytes it started from, that
-    nothing that already existed moved -- both in the manifest and in the atlas
-    pixels. If either check fails nothing is written.
+    Appends one slot to ONE plane. Then proves, against the bytes it started
+    from, that nothing that already existed moved -- both in the manifest and
+    in the atlas pixels. If either check fails nothing is written.
     """
     man = load_manifest()
-    atlas = Image.open(ATLAS).convert("RGBA")
-    before_list = check_catalogue(man, atlas)
+    image = os.path.join(TILES, str(man[plane]["file"]))
+    atlas = Image.open(image).convert("RGBA")
+    before_list = check_catalogue(man, atlas, plane)
     before_px = atlas.tobytes()
-    before_json = json.dumps(before_list, sort_keys=True)
 
     existing = {e["id"]: e["index"] for e in before_list}
     if entry["id"] in existing:
         if not replace:
-            die("prop id %r is already at index %d. Adding it again would give "
-                "the same thing two plane ids. Use --replace to redraw it in "
-                "place (index and plane keep their values), or choose another "
-                "--id." % (entry["id"], existing[entry["id"]]))
+            die("prop id %r is already at index %d of the %s plane. Adding it "
+                "again would give the same thing two plane ids. Use --replace "
+                "to redraw it in place (index and plane keep their values), or "
+                "choose another --id." % (entry["id"], existing[entry["id"]], plane))
         idx = existing[entry["id"]]
     else:
         idx = len(before_list)
+    # The plane byte is one byte, so id 255 is the last one there is and 0
+    # means "nothing here". Caught before anything is written, because the
+    # alternative is make_world.py dying inside encode_plane with
+    # "byte must be in range(0, 256)", one tool away from the list that
+    # overflowed. #83 bought a second budget, not an unlimited one.
+    if idx + 1 > 255:
+        die("the %s plane is full: %d entries, and a plane id must fit in one "
+            "byte. Nothing written." % (plane, len(before_list)))
 
-    rows = max(man["props"]["rows"], (idx + MT.PROP_COLS) // MT.PROP_COLS)
+    rows = max(man[plane]["rows"], (idx + MT.PROP_COLS) // MT.PROP_COLS)
     if atlas.size[1] < rows * H:
         grown = Image.new("RGBA", (MT.PROP_COLS * W, rows * H), (0, 0, 0, 0))
         grown.paste(atlas, (0, 0))
@@ -406,7 +480,7 @@ def append_prop(entry, sprite, replace=False):
             [e for e in before_list if e["index"] != idx], sort_keys=True):
         die("internal check failed: an existing catalogue entry changed. "
             "Nothing written.")
-    old = Image.frombytes("RGBA", Image.open(ATLAS).size, before_px)
+    old = Image.frombytes("RGBA", Image.open(image).size, before_px)
     for e in before_list:
         if e["index"] == idx:
             continue
@@ -415,11 +489,10 @@ def append_prop(entry, sprite, replace=False):
         if old.crop(box).tobytes() != atlas.crop(box).tobytes():
             die("internal check failed: slot %d (%r) changed pixels. Nothing "
                 "written." % (e["index"], e["id"]))
-    del before_json
 
-    man["props"]["list"] = lst
-    man["props"]["rows"] = rows
-    atlas.save(ATLAS)
+    man[plane]["list"] = lst
+    man[plane]["rows"] = rows
+    atlas.save(image)
     save_manifest(man)
     return idx, rows
 
@@ -573,7 +646,7 @@ def preview(sprite, pid, biomes, out_png):
             continue
         gw, gh = 9, 5
         grid = [[b] * gw for _ in range(gh)]
-        neighbour = next((p["id"] for p in MT.PROPS
+        neighbour = next((p["id"] for p in MT.PROPS + MT.CLUTTER
                           if p["biome"] == b and p["id"] != pid), None)
         placed = [(2, 3, sprite), (5, 3, sprite)]
         if neighbour:
@@ -604,9 +677,15 @@ def preview(sprite, pid, biomes, out_png):
 
 def cmd_add(a):
     os.makedirs(STORE, exist_ok=True)
+    if a.plane == "clutter" and a.solid:
+        die("--solid is not available on the clutter plane. Nothing there "
+            "reaches the collision plane, so a solid clutter entry would be a "
+            "prop that says it stops you and then does not. If it should stop "
+            "the player, it stands up and belongs on --plane props.")
     # Before anything else, and specifically before --generate can spend quota:
     # if the catalogue has already been renumbered, stop here.
-    check_catalogue(load_manifest(), Image.open(ATLAS).convert("RGBA"))
+    check_catalogue(load_manifest(),
+                    Image.open(atlas_path(a.plane)).convert("RGBA"), a.plane)
     src = a.src
     if a.generate:
         if not a.spend_quota:
@@ -708,118 +787,143 @@ def cmd_add(a):
              "foot": [int(v) for v in a.foot.lower().split("x")]}
     say("register")
     reg = load_registry()
-    man_len = len(load_manifest()["props"]["list"])
-    authored = {p["id"] for p in reg["props"]}
-    if reg["base_count"] is None:
-        reg["base_count"] = man_len
-    elif man_len != reg["base_count"] + len([p for p in reg["props"]
-                                             if p["id"] in authored]):
-        die("the catalogue has %d props but the registry expects %d "
+    man_len = len(load_manifest()[a.plane]["list"])
+    counts = base_counts(reg)
+    mine = [p for p in reg["props"] if plane_of(p) == a.plane]
+    if a.plane not in counts:
+        counts[a.plane] = man_len
+        reg["base_count"] = counts
+    elif man_len != counts[a.plane] + len(mine):
+        die("the %s catalogue has %d entries but the registry expects %d "
             "(%d drawn + %d authored). tools/make_tiles.py has probably been "
-            "re-run, which rewrites props.png and tiles.json from scratch. Run "
-            "`tools/add_prop.py reapply` first."
-            % (man_len, reg["base_count"] + len(reg["props"]),
-               reg["base_count"], len(reg["props"])))
+            "re-run, which rewrites the atlases and tiles.json from scratch. "
+            "Run `tools/add_prop.py reapply` first."
+            % (a.plane, man_len, counts[a.plane] + len(mine),
+               counts[a.plane], len(mine)))
 
     # Append first. Only once the atlas and the manifest have accepted the
     # sprite does the authored copy on disk change -- otherwise a refused add
     # leaves a sprite file that disagrees with the atlas and `reapply` jams.
     sprite_path = os.path.join(STORE, a.id + ".png")
-    idx, rows = append_prop(entry, sprite, replace=a.replace)
+    idx, rows = append_prop(entry, sprite, replace=a.replace, plane=a.plane)
     sprite.save(sprite_path)
-    say("  appended      %s at index %d, plane id %d (atlas %d rows)"
-        % (a.id, idx, idx + 1, rows))
+    say("  appended      %s at index %d of %s, plane id %d (atlas %d rows)"
+        % (a.id, idx, a.plane, idx + 1, rows))
 
-    rec = dict(entry, index=idx, plane=idx + 1, sprite=os.path.relpath(sprite_path, ROOT),
+    rec = dict(entry, index=idx, plane=idx + 1, plane_key=a.plane,
+               sprite=os.path.relpath(sprite_path, ROOT),
                source=os.path.relpath(os.path.abspath(src), ROOT),
                sprite_sha=sha(sprite), ramps=ramps,
                args=dict(size=a.size, bg_tol=a.bg_tol, luma=[a.luma_lo, a.luma_hi],
                          saturate=a.saturate, crop=a.crop, drop_shadow=a.drop_shadow,
                          coverage=a.coverage, fill_holes=a.fill_holes))
     reg["props"] = [p for p in reg["props"] if p["id"] != a.id] + [rec]
-    reg["props"].sort(key=lambda p: p["index"])
+    reg["props"].sort(key=lambda p: (plane_of(p), p["index"]))
     save_registry(reg)
     say("  registry      %s" % os.path.relpath(REGISTRY, ROOT))
     say("")
-    say("Done. The prop is plane id %d. It is in the atlas and the catalogue; "
-        "it is not in the world until tools/make_world.py runs." % (idx + 1))
+    say("Done. The prop is %s plane id %d. It is in the atlas and the "
+        "catalogue; it is not in the world until tools/make_world.py runs."
+        % (a.plane, idx + 1))
     return 0 if ok else 1
 
 
 def cmd_reapply(a):
-    """make_tiles.py owns props.png and tiles.json and rewrites both from
-    scratch. That is correct and must stay true. This puts the authored props
-    back on top, in their recorded order, at their recorded plane ids -- or
-    refuses, loudly, if it cannot."""
+    """make_tiles.py owns the atlases and tiles.json and rewrites all of them
+    from scratch. That is correct and must stay true. This puts the authored
+    props back on top, per plane, in their recorded order, at their recorded
+    plane ids -- or refuses, loudly, if it cannot."""
     reg = load_registry()
     if not reg["props"]:
         say("nothing authored")
         return 0
+    counts = base_counts(reg)
     man = load_manifest()
-    lst = man["props"]["list"]
-    check_catalogue(man, Image.open(ATLAS).convert("RGBA"))
-    have = {e["id"] for e in lst}
-    missing = [p for p in reg["props"] if p["id"] not in have]
-    if not missing:
+    for plane in PLANES:
+        mine = [p for p in reg["props"] if plane_of(p) == plane]
+        if not mine:
+            continue
+        lst = man[plane]["list"]
+        check_catalogue(man, Image.open(atlas_path(plane)).convert("RGBA"), plane)
+        have = {e["id"] for e in lst}
+        missing = [p for p in mine if p["id"] not in have]
+        if not missing:
+            continue
+        base = len(lst) - len([p for p in mine if p["id"] in have])
+        if base != counts.get(plane):
+            die("the drawn %s catalogue is %d entries but this registry was "
+                "built against %s. Re-appending would give the authored props "
+                "different plane ids than the world data already stores.\n"
+                "            Either restore the drawn catalogue to %s entries, "
+                "or accept the renumbering deliberately: edit base_count in %s "
+                "and re-generate the world."
+                % (plane, base, counts.get(plane), counts.get(plane),
+                   os.path.relpath(REGISTRY, ROOT)))
+        for p in sorted(missing, key=lambda p: p["index"]):
+            path = os.path.join(ROOT, p["sprite"])
+            if not os.path.exists(path):
+                die("the sprite for %r is gone (%s). It cannot be re-appended "
+                    "without re-running `add`." % (p["id"], p["sprite"]))
+            sprite = Image.open(path).convert("RGBA")
+            if sha(sprite) != p["sprite_sha"]:
+                die("the sprite for %r has changed on disk since it was "
+                    "appended. Re-run `add --replace` deliberately rather than "
+                    "letting a silent edit into the atlas." % p["id"])
+            entry = {k: p[k] for k in ("id", "biome", "density", "solid", "foot")}
+            idx, rows = append_prop(entry, sprite, plane=plane)
+            if idx != p["index"]:
+                die("%r would land at index %d of %s, not %d. Nothing further "
+                    "written." % (p["id"], idx, plane, p["index"]))
+            say("re-appended  %s at index %d of %s, plane %d"
+                % (p["id"], idx, plane, idx + 1))
+        man = load_manifest()
+    if not any(p["id"] not in {e["id"] for e in man[plane_of(p)]["list"]}
+               for p in reg["props"]):
         say("all %d authored props are present" % len(reg["props"]))
-        return cmd_verify(a)
-    base = len(lst) - len([p for p in reg["props"] if p["id"] in have])
-    if base != reg["base_count"]:
-        die("the drawn catalogue is %d props but this registry was built "
-            "against %d. Re-appending would give the authored props different "
-            "plane ids than the world data already stores.\n"
-            "            Either restore the drawn catalogue to %d props, or "
-            "accept the renumbering deliberately: edit base_count in %s and "
-            "re-generate the world."
-            % (base, reg["base_count"], reg["base_count"],
-               os.path.relpath(REGISTRY, ROOT)))
-    for p in sorted(missing, key=lambda p: p["index"]):
-        path = os.path.join(ROOT, p["sprite"])
-        if not os.path.exists(path):
-            die("the sprite for %r is gone (%s). It cannot be re-appended "
-                "without re-running `add`." % (p["id"], p["sprite"]))
-        sprite = Image.open(path).convert("RGBA")
-        if sha(sprite) != p["sprite_sha"]:
-            die("the sprite for %r has changed on disk since it was appended. "
-                "Re-run `add --replace` deliberately rather than letting a "
-                "silent edit into the atlas." % p["id"])
-        entry = {k: p[k] for k in ("id", "biome", "density", "solid", "foot")}
-        idx, rows = append_prop(entry, sprite)
-        if idx != p["index"]:
-            die("%r would land at index %d, not %d. Nothing further written."
-                % (p["id"], idx, p["index"]))
-        say("re-appended  %s at index %d, plane %d" % (p["id"], idx, idx + 1))
-    return 0
+    return cmd_verify(a)
 
 
 def cmd_verify(a):
+    """The catalogue, per plane, and every authored prop still where it was.
+
+    Two budgets are reported rather than one because there are two planes and
+    they are numbered independently -- "how much room is left" is a question
+    with two answers, and the answer that matters is the one for the plane the
+    next thing belongs on.
+
+    The binding limit is the PLANE, not the atlas. An atlas grows a row for
+    eight more slots whenever it needs one; a plane id has to fit in one byte,
+    so 255 is where the catalogue actually stops.
+    """
     man = load_manifest()
-    atlas = Image.open(ATLAS).convert("RGBA")
-    lst = check_catalogue(man, atlas)
-    say("catalogue    %d props, %d rows, %d free slots"
-        % (len(lst), man["props"]["rows"],
-           man["props"]["rows"] * MT.PROP_COLS - len(lst)))
     reg = load_registry()
     bad = 0
+    for plane in PLANES:
+        atlas = Image.open(atlas_path(plane)).convert("RGBA")
+        lst = check_catalogue(man, atlas, plane)
+        say("%-12s %3d entries, %2d rows, %3d of 255 plane ids free"
+            % (plane, len(lst), man[plane]["rows"], 255 - len(lst)))
     for p in reg["props"]:
+        plane = plane_of(p)
+        lst = man[plane]["list"]
         here = [e for e in lst if e["id"] == p["id"]]
         if not here:
-            say("MISSING      %s (was plane %d) -- run `reapply`"
-                % (p["id"], p["plane"]))
+            say("MISSING      %s (was %s plane %d) -- run `reapply`"
+                % (p["id"], plane, p["plane"]))
             bad += 1
             continue
         if here[0]["index"] != p["index"]:
-            say("MOVED        %s is at index %d, registry says %d -- world data "
-                "that stores plane %d now means something else"
-                % (p["id"], here[0]["index"], p["index"], p["plane"]))
+            say("MOVED        %s is at index %d of %s, registry says %d -- "
+                "world data that stores plane %d now means something else"
+                % (p["id"], here[0]["index"], plane, p["index"], p["plane"]))
             bad += 1
             continue
         sx = (p["index"] % MT.PROP_COLS) * W
         sy = (p["index"] // MT.PROP_COLS) * H
-        cur = atlas.crop((sx, sy, sx + W, sy + H))
-        say("ok           %s  plane %d  %s" % (p["id"], p["plane"],
-                                               "pixels match" if sha(cur) == p["sprite_sha"]
-                                               else "PIXELS DIFFER"))
+        cur = Image.open(atlas_path(plane)).convert("RGBA").crop((sx, sy, sx + W, sy + H))
+        say("ok           %s  %s plane %d  %s"
+            % (p["id"], plane, p["plane"],
+               "pixels match" if sha(cur) == p["sprite_sha"] else "PIXELS DIFFER"))
         if sha(cur) != p["sprite_sha"]:
             bad += 1
         if a.art:
@@ -830,11 +934,12 @@ def cmd_verify(a):
 def cmd_list(a):
     man = load_manifest()
     reg = {p["id"] for p in load_registry()["props"]}
-    for e in man["props"]["list"]:
-        say("%3d  plane %3d  %-16s %-12s d=%-6s %-5s foot=%s%s"
-            % (e["index"], e["plane"], e["id"], e["biome"], e["density"],
-               "solid" if e["solid"] else "", e["foot"],
-               "   <- authored" if e["id"] in reg else ""))
+    for plane in PLANES:
+        for e in man[plane]["list"]:
+            say("%-8s %3d  plane %3d  %-16s %-12s d=%-6s %-5s foot=%s%s"
+                % (plane, e["index"], e["plane"], e["id"], e["biome"],
+                   e["density"], "solid" if e["solid"] else "", e["foot"],
+                   "   <- authored" if e["id"] in reg else ""))
     return 0
 
 
@@ -851,6 +956,11 @@ def main():
                    help="required with --generate: this costs real image quota")
     p.add_argument("--tab", help="ChatGPT tab URL substring for --generate")
     p.add_argument("--id", required=True, help="catalogue id, e.g. well_covered")
+    p.add_argument("--plane", choices=PLANES, default="props",
+                   help="which plane it lives on: 'props' if it occupies the "
+                        "cell and stands up in it, 'clutter' if it lies on the "
+                        "ground or sits on the thing that is standing there. "
+                        "Each plane has its own atlas and its own 255 ids")
     p.add_argument("--biome", required=True,
                    help="the material it scatters on, or 'placed' for hand placement")
     p.add_argument("--density", type=float, default=0.0,
@@ -905,7 +1015,7 @@ def main():
     p.add_argument("--art", action="store_true", help="also re-run the art checks")
     p.set_defaults(fn=cmd_verify)
 
-    p = sub.add_parser("list", help="the whole props catalogue")
+    p = sub.add_parser("list", help="both catalogues, plane by plane")
     p.set_defaults(fn=cmd_list)
 
     a = ap.parse_args()

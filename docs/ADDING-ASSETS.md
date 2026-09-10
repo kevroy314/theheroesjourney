@@ -112,7 +112,7 @@ and 3x, because 1:1 is where a sprite is actually judged.
 still a well at 1:1 on a phone.
 
 The verify block prints the art-direction checks as numbers. Every threshold is
-calibrated against the 233 props already in the game, so "fails a check" means
+calibrated against the 254 catalogue entries already in the game, so "fails a check" means
 "unlike anything else in this world", not "unlike my taste":
 
 ```
@@ -278,12 +278,36 @@ pipeline is 1.4 seconds. Only the last row costs quota.
 
 ---
 
+## Two planes, and which one you are appending to
+
+There are **two** prop catalogues and two atlases, numbered independently
+(#83):
+
+* `--plane props` (the default) — things that **occupy** a cell. They stand up
+  in the 96px slot and may be `--solid`. `props.png`.
+* `--plane clutter` — things that **do not**: grit, a wheel rut, a rug, a cup
+  on a counter. Drawn on top of whatever prop is standing on the same cell (or
+  under it, if the art is flat), and **never solid** — `--solid` with
+  `--plane clutter` is refused, because nothing on that plane reaches the
+  collision plane and a solid entry there would block nothing while claiming
+  to.
+
+So "the catalogue is full" is now two questions, and `verify` answers both:
+
+```
+props        185 entries, 24 rows,  70 of 255 plane ids free
+clutter       69 entries,  9 rows, 186 of 255 plane ids free
+```
+
+The binding limit is the **plane**, not the atlas: an atlas grows a row for
+eight more slots whenever it needs one, and a plane id has to fit in one byte.
+
 ## Appending is the only safe edit
 
 Prop **plane ids are stored in world data and in hand edits**. Slot index in
-`props.png` is the plane id minus one. Renumbering the catalogue silently
-rewrites every map ever generated and every object anyone has placed in Tiled.
-So the tool appends, and it will not do anything else:
+an atlas is the plane id minus one, *within that plane*. Renumbering a
+catalogue silently rewrites every map ever generated and every object anyone
+has placed in Tiled. So the tool appends, and it will not do anything else:
 
 1. **It refuses to start on a catalogue that has already moved.** Before any
    work — and specifically before `--generate` can spend quota — it checks that
@@ -315,8 +339,8 @@ scratch. That must stay true — it is why the whole tileset is reproducible. So
 run of it wipes every appended prop, and the recovery is one command:
 
 ```
-python3 tools/make_tiles.py      # props.png back to 70 slots
-python3 tools/add_prop.py verify # MISSING  tree_windswept (was plane 71)
+python3 tools/make_tiles.py      # props.png back to the drawn catalogue
+python3 tools/add_prop.py verify # MISSING  tree_windswept (was props plane 185)
 python3 tools/add_prop.py reapply
 ```
 

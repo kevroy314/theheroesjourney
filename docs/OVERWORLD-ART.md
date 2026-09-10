@@ -35,7 +35,8 @@ it before changing any of the numbers below.
 | fill variants | 75 | `tileset_var.png` | 3 alternates each, chosen by `hash(x,y)` |
 | **overlays** | **1536** | `overlays.png` | 16 materials x (16 edge + 16 corner) x 3 seeds |
 | cliffs | 16 | `cliffs.png` | terrace lip, face, cast shadow |
-| props | 70 | `props.png` | things that stand on the ground |
+| props | 185 | `props.png` | things that **occupy** a cell — they stand up in the slot and may be solid |
+| clutter | 69 | `clutter.png` | things that **do not** — grit, a rut, a rug, a cup on a counter. Never solid |
 
 `assets/tiles/tiles.json` is the machine-readable manifest for all five sets —
 order, walkability, precedence, atlas layouts, the prop table with densities and
@@ -219,14 +220,33 @@ needs already exists in `make_world.py` and is currently discarded.
 
 ### Props
 
-**70 objects.** The measured fault this fixes is that half of all screens in the
+**185 props and 69 clutter entries.** The measured fault this fixes is that half of all screens in the
 game show one texture repeated fifty-seven times and the room the player wakes
 in has no bed.
 
 `props.png` is **8 columns of 64 x 96 slots**. Slot *i* is at
 `(64*(i%8), 96*(i//8))`; the byte-plane value for prop *i* is **i + 1**, and 0
 means nothing is there. `tiles.json` carries the full table: id, index, biome,
-density, `solid`, `foot`.
+density, `solid`, `flat`, `foot`.
+
+**There are two prop planes, and `clutter.png` is the second one.** Same 8
+columns, same 64 x 96 slot, same anchor, same table — and its own numbering,
+so clutter id 5 and props id 5 are different things that may be on the same
+cell. Which plane a thing belongs on is one question: *does it occupy the
+cell?* A barrel does and may be solid; grit, a rug, a wall's damp foot, a cup
+on a counter do not, and nothing on the clutter plane is ever solid. The
+collision plane is derived from `props` and `cliffs` alone and never sees the
+clutter plane, so that is a property of the code rather than a promise about
+the art.
+
+Two planes means two budgets of 255 plane ids rather than one shared 255.
+`python3 tools/add_prop.py verify` prints what is left on each, and
+`tools/add_prop.py add --plane clutter` appends to the second.
+
+**Within one cell the drawing order comes from `flat`**: flat clutter is drawn
+under the prop standing there (grit round the foot of a bush), everything else
+over it (the cup on the counter). It is derived from the art's own
+declarations — no collision, no cast shadow, no outline — not authored twice.
 
 **Anchoring — the contract.** Every prop's anchor is the **bottom-centre of its
 slot, (32, 96)**, and the anchor is placed at the bottom-centre of the prop's
@@ -510,5 +530,6 @@ list plus the overlay, cliff and prop tables, and is the better thing to read.
 
 The overlay, elevation and prop layers need no change to `overworld.json`'s
 existing plane: overlays are derived at load from the tile plane it already has.
-Cliffs want an `elev_b64_deflate` plane and props a `props_b64_deflate` plane —
-both additive, both described in §2.2c and §2.3 of the art direction.
+Cliffs want an `elev_b64_deflate` plane, props a `props_b64_deflate` plane and
+clutter a `clutter_b64_deflate` plane — all additive, and described in §2.2c
+and §2.3 of the art direction.

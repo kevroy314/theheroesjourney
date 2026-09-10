@@ -23,6 +23,932 @@
     ],
     "rows": 4
   },
+  "clutter": {
+    "_": "what lies on the ground or sits on the prop standing there. Drawn immediately after that prop, in the same Y-sorted row pass, and never solid -- the collision plane is derived from `props` and `cliffs` alone and never sees this one.",
+    "anchor": [
+      32,
+      96
+    ],
+    "cols": 8,
+    "draw": "dst = (cell.x*32 + 16 - 32, cell.y*32 + 32 - 96)",
+    "file": "clutter.png",
+    "layout": "slot i (0-based) at (64*(i%8), 96*(i//8)); plane value = i+1",
+    "list": [
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "rug",
+        "index": 0,
+        "plane": 1,
+        "solid": false
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "wall_base",
+        "index": 1,
+        "plane": 2,
+        "solid": false
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "flat": false,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "candle",
+        "index": 2,
+        "light": {
+          "color": "#FFC880",
+          "flicker": 0.45,
+          "kind": "fire",
+          "radius": 2.5
+        },
+        "plane": 3,
+        "solid": false,
+        "sway": {
+          "amount": 0.9,
+          "mode": "breathe",
+          "speed": 2.8
+        }
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "flat": false,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "cup",
+        "index": 3,
+        "plane": 4,
+        "solid": false
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "flat": false,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "boots",
+        "index": 4,
+        "plane": 5,
+        "solid": false
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "flat": false,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "book_open",
+        "index": 5,
+        "plane": 6,
+        "solid": false
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "flat": false,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "bottle",
+        "index": 6,
+        "plane": 7,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.01,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_short_bits_1",
+        "index": 7,
+        "plane": 8,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.01,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_short_bits_2",
+        "index": 8,
+        "plane": 9,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.01,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_short_bits_3",
+        "index": 9,
+        "plane": 10,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.01,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_short_bits_4",
+        "index": 10,
+        "plane": 11,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.01,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_short_bits_5",
+        "index": 11,
+        "plane": 12,
+        "solid": false
+      },
+      {
+        "biome": "grass_short",
+        "density": 0.01,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_short_bits_6",
+        "index": 12,
+        "plane": 13,
+        "solid": false
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_tall_bits_1",
+        "index": 13,
+        "plane": 14,
+        "solid": false
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_tall_bits_2",
+        "index": 14,
+        "plane": 15,
+        "solid": false
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_tall_bits_3",
+        "index": 15,
+        "plane": 16,
+        "solid": false
+      },
+      {
+        "biome": "grass_tall",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "grass_tall_bits_4",
+        "index": 16,
+        "plane": 17,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sand_bits_1",
+        "index": 17,
+        "plane": 18,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sand_bits_2",
+        "index": 18,
+        "plane": 19,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sand_bits_3",
+        "index": 19,
+        "plane": 20,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sand_bits_4",
+        "index": 20,
+        "plane": 21,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sand_bits_5",
+        "index": 21,
+        "plane": 22,
+        "solid": false
+      },
+      {
+        "biome": "sand",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "sand_bits_6",
+        "index": 22,
+        "plane": 23,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "dune_bits_1",
+        "index": 23,
+        "plane": 24,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "dune_bits_2",
+        "index": 24,
+        "plane": 25,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "dune_bits_3",
+        "index": 25,
+        "plane": 26,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "dune_bits_4",
+        "index": 26,
+        "plane": 27,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "dune_bits_5",
+        "index": 27,
+        "plane": 28,
+        "solid": false
+      },
+      {
+        "biome": "dune",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "dune_bits_6",
+        "index": 28,
+        "plane": 29,
+        "solid": false
+      },
+      {
+        "biome": "hardpan",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "hardpan_bits_1",
+        "index": 29,
+        "plane": 30,
+        "solid": false
+      },
+      {
+        "biome": "hardpan",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "hardpan_bits_2",
+        "index": 30,
+        "plane": 31,
+        "solid": false
+      },
+      {
+        "biome": "hardpan",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "hardpan_bits_3",
+        "index": 31,
+        "plane": 32,
+        "solid": false
+      },
+      {
+        "biome": "hardpan",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "hardpan_bits_4",
+        "index": 32,
+        "plane": 33,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "scree_bits_1",
+        "index": 33,
+        "plane": 34,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "scree_bits_2",
+        "index": 34,
+        "plane": 35,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "scree_bits_3",
+        "index": 35,
+        "plane": 36,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "scree_bits_4",
+        "index": 36,
+        "plane": 37,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "scree_bits_5",
+        "index": 37,
+        "plane": 38,
+        "solid": false
+      },
+      {
+        "biome": "scree",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "scree_bits_6",
+        "index": 38,
+        "plane": 39,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "snow_bits_1",
+        "index": 39,
+        "plane": 40,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "snow_bits_2",
+        "index": 40,
+        "plane": 41,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "snow_bits_3",
+        "index": 41,
+        "plane": 42,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "snow_bits_4",
+        "index": 42,
+        "plane": 43,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "snow_bits_5",
+        "index": 43,
+        "plane": 44,
+        "solid": false
+      },
+      {
+        "biome": "snow",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "snow_bits_6",
+        "index": 44,
+        "plane": 45,
+        "solid": false
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "undergrowth_bits_1",
+        "index": 45,
+        "plane": 46,
+        "solid": false
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "undergrowth_bits_2",
+        "index": 46,
+        "plane": 47,
+        "solid": false
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "undergrowth_bits_3",
+        "index": 47,
+        "plane": 48,
+        "solid": false
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "undergrowth_bits_4",
+        "index": 48,
+        "plane": 49,
+        "solid": false
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "undergrowth_bits_5",
+        "index": 49,
+        "plane": 50,
+        "solid": false
+      },
+      {
+        "biome": "undergrowth",
+        "density": 0.008333333333333333,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "undergrowth_bits_6",
+        "index": 50,
+        "plane": 51,
+        "solid": false
+      },
+      {
+        "biome": "mud",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "mud_bits_1",
+        "index": 51,
+        "plane": 52,
+        "solid": false
+      },
+      {
+        "biome": "mud",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "mud_bits_2",
+        "index": 52,
+        "plane": 53,
+        "solid": false
+      },
+      {
+        "biome": "mud",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "mud_bits_3",
+        "index": 53,
+        "plane": 54,
+        "solid": false
+      },
+      {
+        "biome": "mud",
+        "density": 0.0125,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "mud_bits_4",
+        "index": 54,
+        "plane": 55,
+        "solid": false
+      },
+      {
+        "biome": "ice",
+        "density": 0.016666666666666666,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "ice_bits_1",
+        "index": 55,
+        "plane": 56,
+        "solid": false
+      },
+      {
+        "biome": "ice",
+        "density": 0.016666666666666666,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "ice_bits_2",
+        "index": 56,
+        "plane": 57,
+        "solid": false
+      },
+      {
+        "biome": "ice",
+        "density": 0.016666666666666666,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "ice_bits_3",
+        "index": 57,
+        "plane": 58,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.018750000000000003,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "path_dirt_bits_1",
+        "index": 58,
+        "plane": 59,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.018750000000000003,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "path_dirt_bits_2",
+        "index": 59,
+        "plane": 60,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.018750000000000003,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "path_dirt_bits_3",
+        "index": 60,
+        "plane": 61,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.018750000000000003,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "path_dirt_bits_4",
+        "index": 61,
+        "plane": 62,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.018750000000000003,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "path_dirt_bits_5",
+        "index": 62,
+        "plane": 63,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.018750000000000003,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "path_dirt_bits_6",
+        "index": 63,
+        "plane": 64,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.018750000000000003,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "path_dirt_bits_7",
+        "index": 64,
+        "plane": 65,
+        "solid": false
+      },
+      {
+        "biome": "path_dirt",
+        "density": 0.018750000000000003,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "path_dirt_bits_8",
+        "index": 65,
+        "plane": 66,
+        "solid": false
+      },
+      {
+        "biome": "floor_stone",
+        "density": 0.030000000000000002,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "floor_stone_bits_1",
+        "index": 66,
+        "plane": 67,
+        "solid": false
+      },
+      {
+        "biome": "floor_stone",
+        "density": 0.030000000000000002,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "floor_stone_bits_2",
+        "index": 67,
+        "plane": 68,
+        "solid": false
+      },
+      {
+        "biome": "floor_stone",
+        "density": 0.030000000000000002,
+        "flat": true,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "floor_stone_bits_3",
+        "index": 68,
+        "plane": 69,
+        "solid": false
+      }
+    ],
+    "rows": 9,
+    "slot": [
+      64,
+      96
+    ]
+  },
   "order": [
     "floor_boards",
     "floor_stone",
@@ -1262,33 +2188,20 @@
       {
         "biome": "placed",
         "density": 0.0,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "rug",
-        "index": 69,
-        "plane": 70,
-        "solid": false
-      },
-      {
-        "biome": "placed",
-        "density": 0.0,
         "flat": false,
         "foot": [
           1,
           1
         ],
         "id": "stove",
-        "index": 70,
+        "index": 69,
         "light": {
           "color": "#FF8C42",
           "flicker": 0.35,
           "kind": "fire",
           "radius": 4.0
         },
-        "plane": 71,
+        "plane": 70,
         "solid": true
       },
       {
@@ -1300,6 +2213,19 @@
           1
         ],
         "id": "counter",
+        "index": 70,
+        "plane": 71,
+        "solid": true
+      },
+      {
+        "biome": "placed",
+        "density": 0.0,
+        "flat": false,
+        "foot": [
+          1,
+          1
+        ],
+        "id": "shelf_open",
         "index": 71,
         "plane": 72,
         "solid": true
@@ -1312,7 +2238,7 @@
           1,
           1
         ],
-        "id": "shelf_open",
+        "id": "chair_pulled",
         "index": 72,
         "plane": 73,
         "solid": true
@@ -1325,28 +2251,15 @@
           1,
           1
         ],
-        "id": "chair_pulled",
-        "index": 73,
-        "plane": 74,
-        "solid": true
-      },
-      {
-        "biome": "placed",
-        "density": 0.0,
-        "flat": false,
-        "foot": [
-          1,
-          1
-        ],
         "id": "window_lit",
-        "index": 74,
+        "index": 73,
         "light": {
           "color": "#FFD9A0",
           "flicker": 0.0,
           "kind": "window",
           "radius": 5.0
         },
-        "plane": 75,
+        "plane": 74,
         "shaft": {
           "bars": 2,
           "color": "#FFEFD2",
@@ -1365,91 +2278,15 @@
           1,
           1
         ],
-        "id": "candle",
-        "index": 75,
-        "light": {
-          "color": "#FFC880",
-          "flicker": 0.45,
-          "kind": "fire",
-          "radius": 2.5
-        },
-        "plane": 76,
-        "solid": false,
-        "sway": {
-          "amount": 0.9,
-          "mode": "breathe",
-          "speed": 2.8
-        }
-      },
-      {
-        "biome": "placed",
-        "density": 0.0,
-        "flat": false,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "cup",
-        "index": 76,
-        "plane": 77,
-        "solid": false
-      },
-      {
-        "biome": "placed",
-        "density": 0.0,
-        "flat": false,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "boots",
-        "index": 77,
-        "plane": 78,
-        "solid": false
-      },
-      {
-        "biome": "placed",
-        "density": 0.0,
-        "flat": false,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "book_open",
-        "index": 78,
-        "plane": 79,
-        "solid": false
-      },
-      {
-        "biome": "placed",
-        "density": 0.0,
-        "flat": false,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "bottle",
-        "index": 79,
-        "plane": 80,
-        "solid": false
-      },
-      {
-        "biome": "placed",
-        "density": 0.0,
-        "flat": false,
-        "foot": [
-          1,
-          1
-        ],
         "id": "street_lamp",
-        "index": 80,
+        "index": 74,
         "light": {
           "color": "#FFD08A",
           "flicker": 0.1,
           "kind": "lamp",
           "radius": 7.5
         },
-        "plane": 81,
+        "plane": 75,
         "solid": true,
         "sway": {
           "amount": 0.6,
@@ -1466,8 +2303,8 @@
           1
         ],
         "id": "dog",
-        "index": 81,
-        "plane": 82,
+        "index": 75,
+        "plane": 76,
         "solid": false
       },
       {
@@ -1479,814 +2316,8 @@
           1
         ],
         "id": "cat",
-        "index": 82,
-        "plane": 83,
-        "solid": false
-      },
-      {
-        "biome": "grass_short",
-        "density": 0.01,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_short_bits_1",
-        "index": 83,
-        "plane": 84,
-        "solid": false
-      },
-      {
-        "biome": "grass_short",
-        "density": 0.01,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_short_bits_2",
-        "index": 84,
-        "plane": 85,
-        "solid": false
-      },
-      {
-        "biome": "grass_short",
-        "density": 0.01,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_short_bits_3",
-        "index": 85,
-        "plane": 86,
-        "solid": false
-      },
-      {
-        "biome": "grass_short",
-        "density": 0.01,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_short_bits_4",
-        "index": 86,
-        "plane": 87,
-        "solid": false
-      },
-      {
-        "biome": "grass_short",
-        "density": 0.01,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_short_bits_5",
-        "index": 87,
-        "plane": 88,
-        "solid": false
-      },
-      {
-        "biome": "grass_short",
-        "density": 0.01,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_short_bits_6",
-        "index": 88,
-        "plane": 89,
-        "solid": false
-      },
-      {
-        "biome": "grass_tall",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_tall_bits_1",
-        "index": 89,
-        "plane": 90,
-        "solid": false
-      },
-      {
-        "biome": "grass_tall",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_tall_bits_2",
-        "index": 90,
-        "plane": 91,
-        "solid": false
-      },
-      {
-        "biome": "grass_tall",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_tall_bits_3",
-        "index": 91,
-        "plane": 92,
-        "solid": false
-      },
-      {
-        "biome": "grass_tall",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "grass_tall_bits_4",
-        "index": 92,
-        "plane": 93,
-        "solid": false
-      },
-      {
-        "biome": "sand",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "sand_bits_1",
-        "index": 93,
-        "plane": 94,
-        "solid": false
-      },
-      {
-        "biome": "sand",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "sand_bits_2",
-        "index": 94,
-        "plane": 95,
-        "solid": false
-      },
-      {
-        "biome": "sand",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "sand_bits_3",
-        "index": 95,
-        "plane": 96,
-        "solid": false
-      },
-      {
-        "biome": "sand",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "sand_bits_4",
-        "index": 96,
-        "plane": 97,
-        "solid": false
-      },
-      {
-        "biome": "sand",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "sand_bits_5",
-        "index": 97,
-        "plane": 98,
-        "solid": false
-      },
-      {
-        "biome": "sand",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "sand_bits_6",
-        "index": 98,
-        "plane": 99,
-        "solid": false
-      },
-      {
-        "biome": "dune",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "dune_bits_1",
-        "index": 99,
-        "plane": 100,
-        "solid": false
-      },
-      {
-        "biome": "dune",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "dune_bits_2",
-        "index": 100,
-        "plane": 101,
-        "solid": false
-      },
-      {
-        "biome": "dune",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "dune_bits_3",
-        "index": 101,
-        "plane": 102,
-        "solid": false
-      },
-      {
-        "biome": "dune",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "dune_bits_4",
-        "index": 102,
-        "plane": 103,
-        "solid": false
-      },
-      {
-        "biome": "dune",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "dune_bits_5",
-        "index": 103,
-        "plane": 104,
-        "solid": false
-      },
-      {
-        "biome": "dune",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "dune_bits_6",
-        "index": 104,
-        "plane": 105,
-        "solid": false
-      },
-      {
-        "biome": "hardpan",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "hardpan_bits_1",
-        "index": 105,
-        "plane": 106,
-        "solid": false
-      },
-      {
-        "biome": "hardpan",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "hardpan_bits_2",
-        "index": 106,
-        "plane": 107,
-        "solid": false
-      },
-      {
-        "biome": "hardpan",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "hardpan_bits_3",
-        "index": 107,
-        "plane": 108,
-        "solid": false
-      },
-      {
-        "biome": "hardpan",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "hardpan_bits_4",
-        "index": 108,
-        "plane": 109,
-        "solid": false
-      },
-      {
-        "biome": "scree",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "scree_bits_1",
-        "index": 109,
-        "plane": 110,
-        "solid": false
-      },
-      {
-        "biome": "scree",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "scree_bits_2",
-        "index": 110,
-        "plane": 111,
-        "solid": false
-      },
-      {
-        "biome": "scree",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "scree_bits_3",
-        "index": 111,
-        "plane": 112,
-        "solid": false
-      },
-      {
-        "biome": "scree",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "scree_bits_4",
-        "index": 112,
-        "plane": 113,
-        "solid": false
-      },
-      {
-        "biome": "scree",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "scree_bits_5",
-        "index": 113,
-        "plane": 114,
-        "solid": false
-      },
-      {
-        "biome": "scree",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "scree_bits_6",
-        "index": 114,
-        "plane": 115,
-        "solid": false
-      },
-      {
-        "biome": "snow",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "snow_bits_1",
-        "index": 115,
-        "plane": 116,
-        "solid": false
-      },
-      {
-        "biome": "snow",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "snow_bits_2",
-        "index": 116,
-        "plane": 117,
-        "solid": false
-      },
-      {
-        "biome": "snow",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "snow_bits_3",
-        "index": 117,
-        "plane": 118,
-        "solid": false
-      },
-      {
-        "biome": "snow",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "snow_bits_4",
-        "index": 118,
-        "plane": 119,
-        "solid": false
-      },
-      {
-        "biome": "snow",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "snow_bits_5",
-        "index": 119,
-        "plane": 120,
-        "solid": false
-      },
-      {
-        "biome": "snow",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "snow_bits_6",
-        "index": 120,
-        "plane": 121,
-        "solid": false
-      },
-      {
-        "biome": "undergrowth",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "undergrowth_bits_1",
-        "index": 121,
-        "plane": 122,
-        "solid": false
-      },
-      {
-        "biome": "undergrowth",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "undergrowth_bits_2",
-        "index": 122,
-        "plane": 123,
-        "solid": false
-      },
-      {
-        "biome": "undergrowth",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "undergrowth_bits_3",
-        "index": 123,
-        "plane": 124,
-        "solid": false
-      },
-      {
-        "biome": "undergrowth",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "undergrowth_bits_4",
-        "index": 124,
-        "plane": 125,
-        "solid": false
-      },
-      {
-        "biome": "undergrowth",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "undergrowth_bits_5",
-        "index": 125,
-        "plane": 126,
-        "solid": false
-      },
-      {
-        "biome": "undergrowth",
-        "density": 0.008333333333333333,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "undergrowth_bits_6",
-        "index": 126,
-        "plane": 127,
-        "solid": false
-      },
-      {
-        "biome": "mud",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "mud_bits_1",
-        "index": 127,
-        "plane": 128,
-        "solid": false
-      },
-      {
-        "biome": "mud",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "mud_bits_2",
-        "index": 128,
-        "plane": 129,
-        "solid": false
-      },
-      {
-        "biome": "mud",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "mud_bits_3",
-        "index": 129,
-        "plane": 130,
-        "solid": false
-      },
-      {
-        "biome": "mud",
-        "density": 0.0125,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "mud_bits_4",
-        "index": 130,
-        "plane": 131,
-        "solid": false
-      },
-      {
-        "biome": "ice",
-        "density": 0.016666666666666666,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "ice_bits_1",
-        "index": 131,
-        "plane": 132,
-        "solid": false
-      },
-      {
-        "biome": "ice",
-        "density": 0.016666666666666666,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "ice_bits_2",
-        "index": 132,
-        "plane": 133,
-        "solid": false
-      },
-      {
-        "biome": "ice",
-        "density": 0.016666666666666666,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "ice_bits_3",
-        "index": 133,
-        "plane": 134,
-        "solid": false
-      },
-      {
-        "biome": "path_dirt",
-        "density": 0.018750000000000003,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "path_dirt_bits_1",
-        "index": 134,
-        "plane": 135,
-        "solid": false
-      },
-      {
-        "biome": "path_dirt",
-        "density": 0.018750000000000003,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "path_dirt_bits_2",
-        "index": 135,
-        "plane": 136,
-        "solid": false
-      },
-      {
-        "biome": "path_dirt",
-        "density": 0.018750000000000003,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "path_dirt_bits_3",
-        "index": 136,
-        "plane": 137,
-        "solid": false
-      },
-      {
-        "biome": "path_dirt",
-        "density": 0.018750000000000003,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "path_dirt_bits_4",
-        "index": 137,
-        "plane": 138,
-        "solid": false
-      },
-      {
-        "biome": "path_dirt",
-        "density": 0.018750000000000003,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "path_dirt_bits_5",
-        "index": 138,
-        "plane": 139,
-        "solid": false
-      },
-      {
-        "biome": "path_dirt",
-        "density": 0.018750000000000003,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "path_dirt_bits_6",
-        "index": 139,
-        "plane": 140,
-        "solid": false
-      },
-      {
-        "biome": "path_dirt",
-        "density": 0.018750000000000003,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "path_dirt_bits_7",
-        "index": 140,
-        "plane": 141,
-        "solid": false
-      },
-      {
-        "biome": "path_dirt",
-        "density": 0.018750000000000003,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "path_dirt_bits_8",
-        "index": 141,
-        "plane": 142,
-        "solid": false
-      },
-      {
-        "biome": "floor_stone",
-        "density": 0.030000000000000002,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "floor_stone_bits_1",
-        "index": 142,
-        "plane": 143,
-        "solid": false
-      },
-      {
-        "biome": "floor_stone",
-        "density": 0.030000000000000002,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "floor_stone_bits_2",
-        "index": 143,
-        "plane": 144,
-        "solid": false
-      },
-      {
-        "biome": "floor_stone",
-        "density": 0.030000000000000002,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "floor_stone_bits_3",
-        "index": 144,
-        "plane": 145,
+        "index": 76,
+        "plane": 77,
         "solid": false
       },
       {
@@ -2298,8 +2329,8 @@
           1
         ],
         "id": "grass_tuft_v2",
-        "index": 145,
-        "plane": 146,
+        "index": 77,
+        "plane": 78,
         "solid": false,
         "sway": {
           "amount": 1.6,
@@ -2315,8 +2346,8 @@
           1
         ],
         "id": "grass_tuft_v3",
-        "index": 146,
-        "plane": 147,
+        "index": 78,
+        "plane": 79,
         "solid": false,
         "sway": {
           "amount": 1.6,
@@ -2332,8 +2363,8 @@
           1
         ],
         "id": "scree_stone_v2",
-        "index": 147,
-        "plane": 148,
+        "index": 79,
+        "plane": 80,
         "solid": false
       },
       {
@@ -2345,8 +2376,8 @@
           1
         ],
         "id": "scree_stone_v3",
-        "index": 148,
-        "plane": 149,
+        "index": 80,
+        "plane": 81,
         "solid": false
       },
       {
@@ -2358,8 +2389,8 @@
           1
         ],
         "id": "tree_pine_v2",
-        "index": 149,
-        "plane": 150,
+        "index": 81,
+        "plane": 82,
         "solid": true,
         "sway": {
           "amount": 1.5,
@@ -2375,8 +2406,8 @@
           1
         ],
         "id": "tree_pine_v3",
-        "index": 150,
-        "plane": 151,
+        "index": 82,
+        "plane": 83,
         "solid": true,
         "sway": {
           "amount": 1.5,
@@ -2392,8 +2423,8 @@
           1
         ],
         "id": "jungle_fern_v2",
-        "index": 151,
-        "plane": 152,
+        "index": 83,
+        "plane": 84,
         "solid": false,
         "sway": {
           "amount": 1.7,
@@ -2409,8 +2440,8 @@
           1
         ],
         "id": "jungle_fern_v3",
-        "index": 152,
-        "plane": 153,
+        "index": 84,
+        "plane": 85,
         "solid": false,
         "sway": {
           "amount": 1.7,
@@ -2426,8 +2457,8 @@
           1
         ],
         "id": "tree_broad_v2",
-        "index": 153,
-        "plane": 154,
+        "index": 85,
+        "plane": 86,
         "solid": true,
         "sway": {
           "amount": 2.2,
@@ -2443,8 +2474,8 @@
           1
         ],
         "id": "tree_broad_v3",
-        "index": 154,
-        "plane": 155,
+        "index": 86,
+        "plane": 87,
         "solid": true,
         "sway": {
           "amount": 2.2,
@@ -2460,8 +2491,8 @@
           1
         ],
         "id": "stone_small_v2",
-        "index": 155,
-        "plane": 156,
+        "index": 87,
+        "plane": 88,
         "solid": false
       },
       {
@@ -2473,8 +2504,8 @@
           1
         ],
         "id": "stone_small_v3",
-        "index": 156,
-        "plane": 157,
+        "index": 88,
+        "plane": 89,
         "solid": false
       },
       {
@@ -2486,8 +2517,8 @@
           1
         ],
         "id": "bush_v2",
-        "index": 157,
-        "plane": 158,
+        "index": 89,
+        "plane": 90,
         "solid": false,
         "sway": {
           "amount": 1.0,
@@ -2503,8 +2534,8 @@
           1
         ],
         "id": "bush_v3",
-        "index": 158,
-        "plane": 159,
+        "index": 90,
+        "plane": 91,
         "solid": false,
         "sway": {
           "amount": 1.0,
@@ -2520,8 +2551,8 @@
           1
         ],
         "id": "flowers_gold_v2",
-        "index": 159,
-        "plane": 160,
+        "index": 91,
+        "plane": 92,
         "solid": false,
         "sway": {
           "amount": 1.2,
@@ -2537,8 +2568,8 @@
           1
         ],
         "id": "flowers_gold_v3",
-        "index": 160,
-        "plane": 161,
+        "index": 92,
+        "plane": 93,
         "solid": false,
         "sway": {
           "amount": 1.2,
@@ -2554,8 +2585,8 @@
           1
         ],
         "id": "beach_weed_v2",
-        "index": 161,
-        "plane": 162,
+        "index": 93,
+        "plane": 94,
         "solid": false,
         "sway": {
           "amount": 1.6,
@@ -2571,8 +2602,8 @@
           1
         ],
         "id": "beach_weed_v3",
-        "index": 162,
-        "plane": 163,
+        "index": 94,
+        "plane": 95,
         "solid": false,
         "sway": {
           "amount": 1.6,
@@ -2588,8 +2619,8 @@
           1
         ],
         "id": "dune_grass_v2",
-        "index": 163,
-        "plane": 164,
+        "index": 95,
+        "plane": 96,
         "solid": false,
         "sway": {
           "amount": 1.8,
@@ -2605,8 +2636,8 @@
           1
         ],
         "id": "dune_grass_v3",
-        "index": 164,
-        "plane": 165,
+        "index": 96,
+        "plane": 97,
         "solid": false,
         "sway": {
           "amount": 1.8,
@@ -2622,8 +2653,8 @@
           1
         ],
         "id": "scrub_v2",
-        "index": 165,
-        "plane": 166,
+        "index": 97,
+        "plane": 98,
         "solid": false,
         "sway": {
           "amount": 1.0,
@@ -2639,8 +2670,8 @@
           1
         ],
         "id": "scrub_v3",
-        "index": 166,
-        "plane": 167,
+        "index": 98,
+        "plane": 99,
         "solid": false,
         "sway": {
           "amount": 1.0,
@@ -2656,8 +2687,8 @@
           1
         ],
         "id": "flowers_red_v2",
-        "index": 167,
-        "plane": 168,
+        "index": 99,
+        "plane": 100,
         "solid": false,
         "sway": {
           "amount": 1.2,
@@ -2673,8 +2704,8 @@
           1
         ],
         "id": "flowers_red_v3",
-        "index": 168,
-        "plane": 169,
+        "index": 100,
+        "plane": 101,
         "solid": false,
         "sway": {
           "amount": 1.2,
@@ -2690,8 +2721,8 @@
           1
         ],
         "id": "shell_v2",
-        "index": 169,
-        "plane": 170,
+        "index": 101,
+        "plane": 102,
         "solid": false
       },
       {
@@ -2703,8 +2734,8 @@
           1
         ],
         "id": "shell_v3",
-        "index": 170,
-        "plane": 171,
+        "index": 102,
+        "plane": 103,
         "solid": false
       },
       {
@@ -2716,8 +2747,8 @@
           1
         ],
         "id": "reed_bed_v2",
-        "index": 171,
-        "plane": 172,
+        "index": 103,
+        "plane": 104,
         "solid": false,
         "sway": {
           "amount": 2.0,
@@ -2733,8 +2764,8 @@
           1
         ],
         "id": "reed_bed_v3",
-        "index": 172,
-        "plane": 173,
+        "index": 104,
+        "plane": 105,
         "solid": false,
         "sway": {
           "amount": 2.0,
@@ -2750,8 +2781,8 @@
           1
         ],
         "id": "driftwood_v2",
-        "index": 173,
-        "plane": 174,
+        "index": 105,
+        "plane": 106,
         "solid": false
       },
       {
@@ -2763,8 +2794,8 @@
           1
         ],
         "id": "driftwood_v3",
-        "index": 174,
-        "plane": 175,
+        "index": 106,
+        "plane": 107,
         "solid": false
       },
       {
@@ -2776,8 +2807,8 @@
           1
         ],
         "id": "crag_v2",
-        "index": 175,
-        "plane": 176,
+        "index": 107,
+        "plane": 108,
         "solid": true
       },
       {
@@ -2789,8 +2820,8 @@
           1
         ],
         "id": "crag_v3",
-        "index": 176,
-        "plane": 177,
+        "index": 108,
+        "plane": 109,
         "solid": true
       },
       {
@@ -2802,8 +2833,8 @@
           1
         ],
         "id": "sand_mound_v2",
-        "index": 177,
-        "plane": 178,
+        "index": 109,
+        "plane": 110,
         "solid": false
       },
       {
@@ -2815,8 +2846,8 @@
           1
         ],
         "id": "sand_mound_v3",
-        "index": 178,
-        "plane": 179,
+        "index": 110,
+        "plane": 111,
         "solid": false
       },
       {
@@ -2828,8 +2859,8 @@
           1
         ],
         "id": "tree_lone_v2",
-        "index": 179,
-        "plane": 180,
+        "index": 111,
+        "plane": 112,
         "solid": true,
         "sway": {
           "amount": 2.0,
@@ -2845,8 +2876,8 @@
           1
         ],
         "id": "tree_lone_v3",
-        "index": 180,
-        "plane": 181,
+        "index": 112,
+        "plane": 113,
         "solid": true,
         "sway": {
           "amount": 2.0,
@@ -2862,8 +2893,8 @@
           1
         ],
         "id": "tree_dead_v2",
-        "index": 181,
-        "plane": 182,
+        "index": 113,
+        "plane": 114,
         "solid": true,
         "sway": {
           "amount": 1.0,
@@ -2879,8 +2910,8 @@
           1
         ],
         "id": "tree_dead_v3",
-        "index": 182,
-        "plane": 183,
+        "index": 114,
+        "plane": 115,
         "solid": true,
         "sway": {
           "amount": 1.0,
@@ -2896,8 +2927,8 @@
           1
         ],
         "id": "sea_rock_v2",
-        "index": 183,
-        "plane": 184,
+        "index": 115,
+        "plane": 116,
         "solid": true
       },
       {
@@ -2909,8 +2940,8 @@
           1
         ],
         "id": "sea_rock_v3",
-        "index": 184,
-        "plane": 185,
+        "index": 116,
+        "plane": 117,
         "solid": true
       },
       {
@@ -2922,8 +2953,8 @@
           1
         ],
         "id": "dry_shrub_v2",
-        "index": 185,
-        "plane": 186,
+        "index": 117,
+        "plane": 118,
         "solid": false,
         "sway": {
           "amount": 1.1,
@@ -2939,8 +2970,8 @@
           1
         ],
         "id": "dry_shrub_v3",
-        "index": 186,
-        "plane": 187,
+        "index": 118,
+        "plane": 119,
         "solid": false,
         "sway": {
           "amount": 1.1,
@@ -2956,8 +2987,8 @@
           1
         ],
         "id": "boulder_v2",
-        "index": 187,
-        "plane": 188,
+        "index": 119,
+        "plane": 120,
         "solid": true
       },
       {
@@ -2969,8 +3000,8 @@
           1
         ],
         "id": "boulder_v3",
-        "index": 188,
-        "plane": 189,
+        "index": 120,
+        "plane": 121,
         "solid": true
       },
       {
@@ -2982,8 +3013,8 @@
           1
         ],
         "id": "snow_drift_v2",
-        "index": 189,
-        "plane": 190,
+        "index": 121,
+        "plane": 122,
         "solid": false
       },
       {
@@ -2995,8 +3026,8 @@
           1
         ],
         "id": "snow_drift_v3",
-        "index": 190,
-        "plane": 191,
+        "index": 122,
+        "plane": 123,
         "solid": false
       },
       {
@@ -3008,8 +3039,8 @@
           1
         ],
         "id": "stump_v2",
-        "index": 191,
-        "plane": 192,
+        "index": 123,
+        "plane": 124,
         "solid": true
       },
       {
@@ -3021,8 +3052,8 @@
           1
         ],
         "id": "stump_v3",
-        "index": 192,
-        "plane": 193,
+        "index": 124,
+        "plane": 125,
         "solid": true
       },
       {
@@ -3034,8 +3065,8 @@
           1
         ],
         "id": "cactus_round_v2",
-        "index": 193,
-        "plane": 194,
+        "index": 125,
+        "plane": 126,
         "solid": false
       },
       {
@@ -3047,8 +3078,8 @@
           1
         ],
         "id": "cactus_round_v3",
-        "index": 194,
-        "plane": 195,
+        "index": 126,
+        "plane": 127,
         "solid": false
       },
       {
@@ -3060,8 +3091,8 @@
           1
         ],
         "id": "palm_shore_v2",
-        "index": 195,
-        "plane": 196,
+        "index": 127,
+        "plane": 128,
         "solid": true,
         "sway": {
           "amount": 2.8,
@@ -3077,8 +3108,8 @@
           1
         ],
         "id": "palm_shore_v3",
-        "index": 196,
-        "plane": 197,
+        "index": 128,
+        "plane": 129,
         "solid": true,
         "sway": {
           "amount": 2.8,
@@ -3094,8 +3125,8 @@
           1
         ],
         "id": "log_fallen_v2",
-        "index": 197,
-        "plane": 198,
+        "index": 129,
+        "plane": 130,
         "solid": true
       },
       {
@@ -3107,8 +3138,8 @@
           1
         ],
         "id": "log_fallen_v3",
-        "index": 198,
-        "plane": 199,
+        "index": 130,
+        "plane": 131,
         "solid": true
       },
       {
@@ -3120,8 +3151,8 @@
           1
         ],
         "id": "cactus_tall_v2",
-        "index": 199,
-        "plane": 200,
+        "index": 131,
+        "plane": 132,
         "solid": true
       },
       {
@@ -3133,8 +3164,8 @@
           1
         ],
         "id": "cactus_tall_v3",
-        "index": 200,
-        "plane": 201,
+        "index": 132,
+        "plane": 133,
         "solid": true
       },
       {
@@ -3146,8 +3177,8 @@
           1
         ],
         "id": "tide_pool_v2",
-        "index": 201,
-        "plane": 202,
+        "index": 133,
+        "plane": 134,
         "solid": false
       },
       {
@@ -3159,8 +3190,8 @@
           1
         ],
         "id": "tide_pool_v3",
-        "index": 202,
-        "plane": 203,
+        "index": 134,
+        "plane": 135,
         "solid": false
       },
       {
@@ -3172,8 +3203,8 @@
           1
         ],
         "id": "marsh_reeds_v2",
-        "index": 203,
-        "plane": 204,
+        "index": 135,
+        "plane": 136,
         "solid": false,
         "sway": {
           "amount": 2.0,
@@ -3189,8 +3220,8 @@
           1
         ],
         "id": "marsh_reeds_v3",
-        "index": 204,
-        "plane": 205,
+        "index": 136,
+        "plane": 137,
         "solid": false,
         "sway": {
           "amount": 2.0,
@@ -3206,8 +3237,8 @@
           1
         ],
         "id": "cairn_v2",
-        "index": 205,
-        "plane": 206,
+        "index": 137,
+        "plane": 138,
         "solid": false
       },
       {
@@ -3219,8 +3250,8 @@
           1
         ],
         "id": "cairn_v3",
-        "index": 206,
-        "plane": 207,
+        "index": 138,
+        "plane": 139,
         "solid": false
       },
       {
@@ -3232,8 +3263,8 @@
           1
         ],
         "id": "banana_palm_v2",
-        "index": 207,
-        "plane": 208,
+        "index": 139,
+        "plane": 140,
         "solid": true,
         "sway": {
           "amount": 3.0,
@@ -3249,8 +3280,8 @@
           1
         ],
         "id": "banana_palm_v3",
-        "index": 208,
-        "plane": 209,
+        "index": 140,
+        "plane": 141,
         "solid": true,
         "sway": {
           "amount": 3.0,
@@ -3266,8 +3297,8 @@
           1
         ],
         "id": "grass_clump_v2",
-        "index": 209,
-        "plane": 210,
+        "index": 141,
+        "plane": 142,
         "solid": false,
         "sway": {
           "amount": 1.8,
@@ -3283,8 +3314,8 @@
           1
         ],
         "id": "grass_clump_v3",
-        "index": 210,
-        "plane": 211,
+        "index": 142,
+        "plane": 143,
         "solid": false,
         "sway": {
           "amount": 1.8,
@@ -3300,8 +3331,8 @@
           1
         ],
         "id": "ice_shard_v2",
-        "index": 211,
-        "plane": 212,
+        "index": 143,
+        "plane": 144,
         "solid": false
       },
       {
@@ -3313,8 +3344,8 @@
           1
         ],
         "id": "ice_shard_v3",
-        "index": 212,
-        "plane": 213,
+        "index": 144,
+        "plane": 145,
         "solid": false
       },
       {
@@ -3326,8 +3357,8 @@
           1
         ],
         "id": "bones_v2",
-        "index": 213,
-        "plane": 214,
+        "index": 145,
+        "plane": 146,
         "solid": false
       },
       {
@@ -3339,8 +3370,8 @@
           1
         ],
         "id": "bones_v3",
-        "index": 214,
-        "plane": 215,
+        "index": 146,
+        "plane": 147,
         "solid": false
       },
       {
@@ -3352,8 +3383,8 @@
           1
         ],
         "id": "mesa_rock_v2",
-        "index": 215,
-        "plane": 216,
+        "index": 147,
+        "plane": 148,
         "solid": true
       },
       {
@@ -3365,8 +3396,8 @@
           1
         ],
         "id": "mesa_rock_v3",
-        "index": 216,
-        "plane": 217,
+        "index": 148,
+        "plane": 149,
         "solid": true
       },
       {
@@ -3378,8 +3409,8 @@
           1
         ],
         "id": "giant_mushroom_v2",
-        "index": 217,
-        "plane": 218,
+        "index": 149,
+        "plane": 150,
         "solid": false
       },
       {
@@ -3391,8 +3422,8 @@
           1
         ],
         "id": "giant_mushroom_v3",
-        "index": 218,
-        "plane": 219,
+        "index": 150,
+        "plane": 151,
         "solid": false
       },
       {
@@ -3404,8 +3435,8 @@
           1
         ],
         "id": "vine_pillar_v2",
-        "index": 219,
-        "plane": 220,
+        "index": 151,
+        "plane": 152,
         "solid": true,
         "sway": {
           "amount": 1.4,
@@ -3421,8 +3452,8 @@
           1
         ],
         "id": "vine_pillar_v3",
-        "index": 220,
-        "plane": 221,
+        "index": 152,
+        "plane": 153,
         "solid": true,
         "sway": {
           "amount": 1.4,
@@ -3438,8 +3469,8 @@
           1
         ],
         "id": "fern_v2",
-        "index": 221,
-        "plane": 222,
+        "index": 153,
+        "plane": 154,
         "solid": false,
         "sway": {
           "amount": 1.5,
@@ -3455,8 +3486,8 @@
           1
         ],
         "id": "fern_v3",
-        "index": 222,
-        "plane": 223,
+        "index": 154,
+        "plane": 155,
         "solid": false,
         "sway": {
           "amount": 1.5,
@@ -3472,8 +3503,8 @@
           1
         ],
         "id": "skull_v2",
-        "index": 223,
-        "plane": 224,
+        "index": 155,
+        "plane": 156,
         "solid": false
       },
       {
@@ -3485,8 +3516,8 @@
           1
         ],
         "id": "skull_v3",
-        "index": 224,
-        "plane": 225,
+        "index": 156,
+        "plane": 157,
         "solid": false
       },
       {
@@ -3498,8 +3529,8 @@
           1
         ],
         "id": "thistle_v2",
-        "index": 225,
-        "plane": 226,
+        "index": 157,
+        "plane": 158,
         "solid": false,
         "sway": {
           "amount": 1.4,
@@ -3515,8 +3546,8 @@
           1
         ],
         "id": "thistle_v3",
-        "index": 226,
-        "plane": 227,
+        "index": 158,
+        "plane": 159,
         "solid": false,
         "sway": {
           "amount": 1.4,
@@ -3532,8 +3563,8 @@
           1
         ],
         "id": "crystal_v2",
-        "index": 227,
-        "plane": 228,
+        "index": 159,
+        "plane": 160,
         "solid": false
       },
       {
@@ -3545,8 +3576,8 @@
           1
         ],
         "id": "crystal_v3",
-        "index": 228,
-        "plane": 229,
+        "index": 160,
+        "plane": 161,
         "solid": false
       },
       {
@@ -3558,8 +3589,8 @@
           1
         ],
         "id": "palm_oasis_v2",
-        "index": 229,
-        "plane": 230,
+        "index": 161,
+        "plane": 162,
         "solid": true,
         "sway": {
           "amount": 2.8,
@@ -3575,8 +3606,8 @@
           1
         ],
         "id": "palm_oasis_v3",
-        "index": 230,
-        "plane": 231,
+        "index": 162,
+        "plane": 163,
         "solid": true,
         "sway": {
           "amount": 2.8,
@@ -3592,8 +3623,8 @@
           1
         ],
         "id": "mushroom_ring_v2",
-        "index": 231,
-        "plane": 232,
+        "index": 163,
+        "plane": 164,
         "solid": false
       },
       {
@@ -3605,8 +3636,8 @@
           1
         ],
         "id": "mushroom_ring_v3",
-        "index": 232,
-        "plane": 233,
+        "index": 164,
+        "plane": 165,
         "solid": false
       },
       {
@@ -3618,8 +3649,8 @@
           1
         ],
         "id": "marker_pole_v2",
-        "index": 233,
-        "plane": 234,
+        "index": 165,
+        "plane": 166,
         "solid": false
       },
       {
@@ -3631,8 +3662,8 @@
           1
         ],
         "id": "marker_pole_v3",
-        "index": 234,
-        "plane": 235,
+        "index": 166,
+        "plane": 167,
         "solid": false
       },
       {
@@ -3644,8 +3675,8 @@
           1
         ],
         "id": "bramble_v2",
-        "index": 235,
-        "plane": 236,
+        "index": 167,
+        "plane": 168,
         "solid": true,
         "sway": {
           "amount": 0.9,
@@ -3661,8 +3692,8 @@
           1
         ],
         "id": "bramble_v3",
-        "index": 236,
-        "plane": 237,
+        "index": 168,
+        "plane": 169,
         "solid": true,
         "sway": {
           "amount": 0.9,
@@ -3678,8 +3709,8 @@
           1
         ],
         "id": "milestone_v2",
-        "index": 237,
-        "plane": 238,
+        "index": 169,
+        "plane": 170,
         "solid": false
       },
       {
@@ -3691,8 +3722,8 @@
           1
         ],
         "id": "milestone_v3",
-        "index": 238,
-        "plane": 239,
+        "index": 170,
+        "plane": 171,
         "solid": false
       },
       {
@@ -3704,8 +3735,8 @@
           1
         ],
         "id": "fence_rail",
-        "index": 239,
-        "plane": 240,
+        "index": 171,
+        "plane": 172,
         "solid": true
       },
       {
@@ -3717,8 +3748,8 @@
           1
         ],
         "id": "field_gate",
-        "index": 240,
-        "plane": 241,
+        "index": 172,
+        "plane": 173,
         "solid": true
       },
       {
@@ -3730,8 +3761,8 @@
           1
         ],
         "id": "leaf_wall",
-        "index": 241,
-        "plane": 242,
+        "index": 173,
+        "plane": 174,
         "solid": true
       },
       {
@@ -3743,14 +3774,14 @@
           1
         ],
         "id": "campfire",
-        "index": 242,
+        "index": 174,
         "light": {
           "color": "#FF8C42",
           "flicker": 0.4,
           "kind": "fire",
           "radius": 5.5
         },
-        "plane": 243,
+        "plane": 175,
         "solid": true
       },
       {
@@ -3762,8 +3793,8 @@
           1
         ],
         "id": "trash_can",
-        "index": 243,
-        "plane": 244,
+        "index": 175,
+        "plane": 176,
         "solid": true
       },
       {
@@ -3775,8 +3806,8 @@
           1
         ],
         "id": "haystack",
-        "index": 244,
-        "plane": 245,
+        "index": 176,
+        "plane": 177,
         "solid": true
       },
       {
@@ -3788,8 +3819,8 @@
           1
         ],
         "id": "washing_line",
-        "index": 245,
-        "plane": 246,
+        "index": 177,
+        "plane": 178,
         "solid": false,
         "sway": {
           "amount": 1.3,
@@ -3805,8 +3836,8 @@
           1
         ],
         "id": "sign_shop",
-        "index": 246,
-        "plane": 247,
+        "index": 178,
+        "plane": 179,
         "solid": true,
         "sway": {
           "amount": 0.8,
@@ -3822,14 +3853,14 @@
           1
         ],
         "id": "window_stone",
-        "index": 247,
+        "index": 179,
         "light": {
           "color": "#FFC880",
           "flicker": 0.06,
           "kind": "window",
           "radius": 3.2
         },
-        "plane": 248,
+        "plane": 180,
         "solid": false
       },
       {
@@ -3841,14 +3872,14 @@
           1
         ],
         "id": "window_timber",
-        "index": 248,
+        "index": 180,
         "light": {
           "color": "#FFC880",
           "flicker": 0.06,
           "kind": "window",
           "radius": 3.2
         },
-        "plane": 249,
+        "plane": 181,
         "solid": false
       },
       {
@@ -3860,8 +3891,8 @@
           1
         ],
         "id": "sign_bracket",
-        "index": 249,
-        "plane": 250,
+        "index": 181,
+        "plane": 182,
         "solid": false,
         "sway": {
           "amount": 1.1,
@@ -3877,21 +3908,8 @@
           1
         ],
         "id": "chimney_brick",
-        "index": 250,
-        "plane": 251,
-        "solid": false
-      },
-      {
-        "biome": "placed",
-        "density": 0.0,
-        "flat": true,
-        "foot": [
-          1,
-          1
-        ],
-        "id": "wall_base",
-        "index": 251,
-        "plane": 252,
+        "index": 182,
+        "plane": 183,
         "solid": false
       },
       {
@@ -3903,8 +3921,8 @@
           1
         ],
         "id": "roof_ridge",
-        "index": 252,
-        "plane": 253,
+        "index": 183,
+        "plane": 184,
         "solid": false
       },
       {
@@ -3915,12 +3933,12 @@
           1
         ],
         "id": "tree_windswept",
-        "index": 253,
-        "plane": 254,
+        "index": 184,
+        "plane": 185,
         "solid": true
       }
     ],
-    "rows": 32,
+    "rows": 24,
     "slot": [
       64,
       96

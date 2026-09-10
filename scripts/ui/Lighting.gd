@@ -559,6 +559,12 @@ static func daylight() -> Color:
 ## plane value (atlas slot + 1, the same byte the world's prop plane stores) ->
 ## { radius: float, colour: Color, flicker: float }.
 static var _by_plane: Dictionary = {}
+## The same for the second prop plane (#83). A candle is on the clutter plane
+## because a candle stands ON a table rather than instead of one, and a candle
+## that stopped lighting the room the day it moved planes would be a bug with
+## no trail back to this file. Separate dictionary because the two planes are
+## numbered independently: props 5 and clutter 5 are different things.
+static var _by_clutter: Dictionary = {}
 static var _max_radius: float = 0.0
 static var _read := false
 
@@ -586,19 +592,31 @@ static func load_manifest() -> void:
 		var entry: Dictionary = row
 		var plane := int(entry.get("plane", 0))
 		if entry.has("light"):
-			_claim(plane, entry["light"])
+			_claim(_by_plane, plane, entry["light"])
 		if entry.has("shaft"):
 			_claim_shaft(plane, entry["shaft"], entry.get("light", {}))
 
+	# Clutter emits light too, but it cannot be an APERTURE: a shaft is the
+	# optics of a hole in a wall, and the clutter plane is what lies on the
+	# floor in front of one. So lights are read from both planes and shafts
+	# from the prop plane only.
+	var clutter: Dictionary = (parsed as Dictionary).get("clutter", {})
+	for row in clutter.get("list", []):
+		if not (row is Dictionary):
+			continue
+		var entry: Dictionary = row
+		if entry.has("light"):
+			_claim(_by_clutter, int(entry.get("plane", 0)), entry["light"])
 
-static func _claim(plane: int, spec: Variant) -> void:
+
+static func _claim(into: Dictionary, plane: int, spec: Variant) -> void:
 	if plane <= 0 or not (spec is Dictionary):
 		return
 	var light: Dictionary = spec
 	var radius: float = float(light.get("radius", 0.0))
 	if radius <= 0.0:
 		return
-	_by_plane[plane] = {
+	into[plane] = {
 		"radius": radius,
 		"colour": _colour(String(light.get("color", "#FFFFFF"))),
 		"flicker": clampf(float(light.get("flicker", 0.0)), 0.0, 1.0),
@@ -622,7 +640,7 @@ static func _colour(hex: String) -> Color:
 
 static func any_lights() -> bool:
 	load_manifest()
-	return not _by_plane.is_empty()
+	return not (_by_plane.is_empty() and _by_clutter.is_empty())
 
 
 ## How far outside the viewport a light can still reach, in tiles. Emitters this
@@ -669,11 +687,16 @@ static func index_world(world: HJWorld) -> void:
 	load_manifest()
 	if world == null or not world.loaded:
 		return
-	if _by_plane.is_empty() and _shaft_by_plane.is_empty():
+	if _by_plane.is_empty() and _by_clutter.is_empty() and _shaft_by_plane.is_empty():
 		return
 	var props: PackedByteArray = world.props
 	if props.size() != world.w * world.h:
 		return
+	# Read once outside the loop, and allowed to be empty: an older world file
+	# with no clutter plane should light the world it does have rather than
+	# refuse to index at all.
+	var clutter: PackedByteArray = world.clutter
+	var has_clutter := clutter.size() == world.w * world.h
 	# Kept so the shaft traces can ask the map where the walls are without every
 	# caller having to hand the world back in. The same instance HJWorld.shared()
 	# returns; nothing here holds it past invalidate().
@@ -682,27 +705,41 @@ static func index_world(world: HJWorld) -> void:
 		var row: int = y * world.w
 		for x in range(world.w):
 			var plane: int = props[row + x]
-			if plane == 0:
+			# The clutter byte on the same cell, read here so a cell carrying a
+			# stove AND a candle contributes both. Zero on the great majority
+			# of cells, and the two zero tests below are what keep this a
+			# one-off pass over 65,536 cells rather than 65,536 allocations.
+			var lit: int = clutter[row + x] if has_clutter else 0
+			if plane == 0 and lit == 0:
 				continue
 			var cell := Vector2i(x, y)
 			var key := Vector2i(x / BUCKET, y / BUCKET)
-			var spec: Dictionary = _by_plane.get(plane, {})
-			if not spec.is_empty():
-				var entry := {
-					"cell": cell,
-					"radius": float(spec["radius"]),
-					"colour": spec["colour"],
-					"flicker": float(spec["flicker"]),
-					"phase": phase_for(cell),
-					"kind": String(spec["kind"]),
-				}
-				if _buckets.has(key):
-					(_buckets[key] as Array).append(entry)
-				else:
-					_buckets[key] = [entry]
-			var aperture: Dictionary = _shaft_by_plane.get(plane, {})
-			if not aperture.is_empty():
-				_place_shaft(world, cell, key, aperture)
+			if plane != 0:
+				var spec: Dictionary = _by_plane.get(plane, {})
+				if not spec.is_empty():
+					_bucket_light(key, cell, spec)
+				var aperture: Dictionary = _shaft_by_plane.get(plane, {})
+				if not aperture.is_empty():
+					_place_shaft(world, cell, key, aperture)
+			if lit != 0:
+				var glow: Dictionary = _by_clutter.get(lit, {})
+				if not glow.is_empty():
+					_bucket_light(key, cell, glow)
+
+
+static func _bucket_light(key: Vector2i, cell: Vector2i, spec: Dictionary) -> void:
+	var entry := {
+		"cell": cell,
+		"radius": float(spec["radius"]),
+		"colour": spec["colour"],
+		"flicker": float(spec["flicker"]),
+		"phase": phase_for(cell),
+		"kind": String(spec["kind"]),
+	}
+	if _buckets.has(key):
+		(_buckets[key] as Array).append(entry)
+	else:
+		_buckets[key] = [entry]
 
 
 ## Every emitter whose bucket overlaps a tile rectangle. Returns arrays, not

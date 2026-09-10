@@ -43,7 +43,9 @@ extends RefCounted
 
 const MANIFEST := "res://assets/tiles/tiles.json"
 
-## Layout of props.png. Must match `props` in the manifest; the renderer knows
+## Layout of props.png AND clutter.png -- both planes use the same 64x96 slot
+## and the same 8 columns, which is what lets one measure serve both. Must
+## match `props` in the manifest; the renderer knows
 ## the same three numbers and there is no third copy.
 const PROP_W := 64
 const PROP_H := 96
@@ -138,6 +140,12 @@ static func gain() -> float:
 ## plane value (atlas slot + 1, the same byte the world's prop plane stores) ->
 ## { mode: int, amount: float, speed: float, top: int, base: int }.
 static var _by_plane: Dictionary = {}
+## The same, for the second prop plane (#83). A separate dictionary rather than
+## one keyed by (plane, value) because the two planes are numbered
+## independently — props 5 and clutter 5 are different things — and because
+## this is read once per visible prop per frame, where one hash lookup is the
+## whole budget.
+static var _by_clutter: Dictionary = {}
 static var _shimmer_ids: Dictionary = {}    ## material id -> true
 static var _read := false
 
@@ -167,10 +175,21 @@ static func load_manifest() -> void:
 			continue
 		var entry: Dictionary = row
 		if entry.has("sway"):
-			_claim(int(entry.get("plane", 0)), entry["sway"])
+			_claim(_by_plane, int(entry.get("plane", 0)), entry["sway"])
+
+	# The clutter plane declares motion the same way and for the same reason —
+	# the candle flame breathes, and it is on that plane because a candle
+	# stands on a table rather than instead of one.
+	var clutter: Dictionary = doc.get("clutter", {})
+	for row in clutter.get("list", []):
+		if not (row is Dictionary):
+			continue
+		var entry: Dictionary = row
+		if entry.has("sway"):
+			_claim(_by_clutter, int(entry.get("plane", 0)), entry["sway"])
 
 
-static func _claim(plane: int, spec: Variant) -> void:
+static func _claim(into: Dictionary, plane: int, spec: Variant) -> void:
 	if plane <= 0 or not (spec is Dictionary):
 		return
 	var sway: Dictionary = spec
@@ -178,7 +197,7 @@ static func _claim(plane: int, spec: Variant) -> void:
 	var speed: float = float(sway.get("speed", 0.0))
 	if amount <= 0.0 or speed <= 0.0:
 		return
-	_by_plane[plane] = {
+	into[plane] = {
 		"mode": BREATHE if String(sway.get("mode", "sway")) == "breathe" else SWAY,
 		"amount": amount,
 		"speed": speed,
@@ -193,13 +212,20 @@ static func _claim(plane: int, spec: Variant) -> void:
 
 static func any() -> bool:
 	load_manifest()
-	return not _by_plane.is_empty()
+	return not (_by_plane.is_empty() and _by_clutter.is_empty())
 
 
 ## The motion a prop plane declares, or an empty dictionary. Hot: called once
 ## per visible prop per frame, so it is a single hash lookup and nothing else.
 static func for_plane(plane: int) -> Dictionary:
 	return _by_plane.get(plane, {})
+
+
+## The same for a byte of the clutter plane. Separate call rather than a flag,
+## so a caller that reads the wrong plane's byte cannot silently get the other
+## plane's answer for it.
+static func for_clutter(plane: int) -> Dictionary:
+	return _by_clutter.get(plane, {})
 
 
 static func shimmers(material: int) -> bool:
@@ -225,19 +251,28 @@ static func shimmers(material: int) -> bool:
 static var _scanned := false
 
 
-static func index_atlas(atlas: Texture2D) -> void:
+static func index_atlas(atlas: Texture2D, clutter_atlas: Texture2D = null) -> void:
 	if _scanned:
 		return
 	_scanned = true
 	load_manifest()
-	if _by_plane.is_empty() or atlas == null:
+	_measure(_by_plane, atlas)
+	_measure(_by_clutter, clutter_atlas)
+
+
+## One atlas against the specs indexed off it. Each plane has its own image and
+## its own slot numbering, so measuring a clutter slot in props.png would read
+## whatever prop happens to sit at the same index — a real hazard rather than a
+## theoretical one, because both atlases are 8 columns of 64x96.
+static func _measure(specs: Dictionary, atlas: Texture2D) -> void:
+	if specs.is_empty() or atlas == null:
 		return
 	var img := atlas.get_image()
 	if img == null:
 		return
 	if img.is_compressed() and img.decompress() != OK:
 		return
-	for plane in _by_plane:
+	for plane in specs:
 		var slot: int = int(plane) - 1
 		var frame := Rect2i((slot % PROP_COLS) * PROP_W, (slot / PROP_COLS) * PROP_H,
 			PROP_W, PROP_H)
@@ -246,7 +281,7 @@ static func index_atlas(atlas: Texture2D) -> void:
 		var used := img.get_region(frame).get_used_rect()
 		if used.size.y <= 1:
 			continue                # empty slot, or a single row: nothing to bend
-		var spec: Dictionary = _by_plane[plane]
+		var spec: Dictionary = specs[plane]
 		spec["top"] = used.position.y
 		spec["base"] = used.position.y + used.size.y
 		spec["bands"] = clampi(used.size.y / BAND_HEIGHT + 1, 1, BANDS)
@@ -257,6 +292,7 @@ static func invalidate() -> void:
 	_read = false
 	_scanned = false
 	_by_plane.clear()
+	_by_clutter.clear()
 	_shimmer_ids.clear()
 
 

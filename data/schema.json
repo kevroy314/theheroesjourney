@@ -1243,6 +1243,7 @@
       "tiles_b64_deflate",
       "elevation_b64_deflate",
       "props_b64_deflate",
+      "clutter_b64_deflate",
       "blocked_b64_deflate",
       "cliffs_b64_deflate",
       "terrace_levels"
@@ -1307,6 +1308,7 @@
       "color": "#RRGGBB; defaults to the prop's own `light` colour, or to first light",
       "intensity": "float 0.0 to 1.0, default 1.0"
     },
+    "_clutter_plane": "clutter_b64_deflate is the SECOND prop plane (#83): one byte per cell, same base64+deflate packing as props_b64_deflate, indexing the `clutter` list in assets/tiles/tiles.json rather than the `props` list. The split is what occupies a cell versus what does not -- a prop stands up in the 96px slot and may be solid; clutter lies on the floor, or sits on the thing standing there, and never is. Two consequences: a cup can stand on a counter, which one byte per cell made impossible, and the catalogue's budget is 255 per plane rather than 255 in total. Collision is unaffected by construction, not by declaration -- derive_blocked() in tools/world_to_tiled.py is handed `props` and `cliffs` and never this, so a clutter byte hand-placed in Tiled cannot block either, and world_pass() proves it against the world by finding every blocked cell an owner. Draw order within a cell comes from the entry's own `flat`: flat clutter is drawn UNDER the prop (grit round the foot of a bush), everything else OVER it (the cup).",
     "_prop_flat": "Whether a prop is texture lying ON the ground rather than a thing standing up off it -- grit, a rut, fallen leaves, a damp patch, a rug. Derived in _p() from the three declarations that already say it (no collision, no cast shadow, no outline) and emitted so that the reader in the other tool does not have to re-derive it: scatter_props() in tools/make_world.py uses it to decide what may stand in a lane the player walks down. Absent reads as false, which keeps everything off the road that was ever off the road. A prop that is both flat and solid is an error -- see world_pass()."
   }
 }

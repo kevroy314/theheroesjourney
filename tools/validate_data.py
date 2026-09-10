@@ -704,15 +704,42 @@ def world_pass(report, docs, schema):
     # it reads it by key. So a misspelt field does not draw a wrong light, it
     # draws no light at all, and a stove that has quietly stopped glowing is the
     # kind of loss nobody notices until somebody asks why the kitchen is dark.
+    # BOTH PROP PLANES (#83). `props` is what occupies a cell and `clutter` is
+    # what lies on it or sits on the thing standing there; the manifest emits
+    # the same contracts on both, so every check below walks both. Checking
+    # only `props` would have left the candle's light, the grit's `flat` claim
+    # and every clutter entry's biome unchecked the moment they moved plane --
+    # a whole catalogue silently outside the validator, which is the exact
+    # failure this file exists to remove.
+    plane_lists = {name: tiles[name]["list"] for name in ("props", "clutter")
+                   if isinstance(tiles.get(name), dict)}
+    plane_keys = {"props": "props_b64_deflate", "clutter": "clutter_b64_deflate"}
+    every_prop = [(name, entry) for name in ("props", "clutter")
+                  for entry in plane_lists.get(name, [])]
+
+    # NOTHING ON THE CLUTTER PLANE MAY BE SOLID. The collision plane is derived
+    # from `props` and `cliffs` alone, so a solid clutter entry is a prop that
+    # says it stops you and then does not -- and nobody would find that by
+    # walking into it, because walking into it works.
+    for entry in plane_lists.get("clutter", []):
+        if entry.get("solid"):
+            report.error("assets/tiles/tiles.json",
+                         "clutter '%s' is solid, but the clutter plane never "
+                         "reaches the collision plane, so it would block "
+                         "nothing while claiming to" % entry["id"])
+
     spec_light = spec.get("prop_light", {})
     hexcolour = re.compile(r"^#[0-9A-Fa-f]{6}$")
     emitters = set()
-    for prop in tiles["props"]["list"]:
+    for plane_name, prop in every_prop:
         light = prop.get("light")
         if light is None:
             continue
-        emitters.add(prop["plane"])
-        where = "prop '%s' light" % prop["id"]
+        # Keyed by (plane, value) because the two planes are numbered
+        # independently: props 5 and clutter 5 are different things, and a set
+        # of bare integers would say a candle was placed because a bench was.
+        emitters.add((plane_name, prop["plane"]))
+        where = "%s '%s' light" % (plane_name, prop["id"])
         for key in spec_light.get("required", []):
             if key not in light:
                 report.error("assets/tiles/tiles.json",
@@ -756,12 +783,12 @@ def world_pass(report, docs, schema):
     # stillness is what everything else is doing.
     spec_sway = spec.get("prop_sway", {})
     movers = set()
-    for prop in tiles["props"]["list"]:
+    for plane_name, prop in every_prop:
         sway = prop.get("sway")
         if sway is None:
             continue
-        movers.add(prop["plane"])
-        where = "prop '%s' sway" % prop["id"]
+        movers.add((plane_name, prop["plane"]))
+        where = "%s '%s' sway" % (plane_name, prop["id"])
         for key in spec_sway.get("required", []):
             if key not in sway:
                 report.error("assets/tiles/tiles.json",
@@ -790,12 +817,21 @@ def world_pass(report, docs, schema):
     # given the key at all.
     spec_shaft = spec.get("prop_shaft", {})
     apertures = set()
-    for prop in tiles["props"]["list"]:
+    for plane_name, prop in every_prop:
         shaft = prop.get("shaft")
         if shaft is None:
             continue
+        # A shaft is the optics of a hole in a wall, and a hole in a wall
+        # occupies the cell it is in. HJLighting reads `shaft` off the prop
+        # plane only, so one declared on clutter would be a window that throws
+        # no beam and says nothing about why.
+        if plane_name != "props":
+            report.error("assets/tiles/tiles.json",
+                         "%s '%s' declares a shaft, but only the props plane "
+                         "is read for apertures -- a hole in a wall is a thing "
+                         "that occupies its cell" % (plane_name, prop["id"]))
         apertures.add(prop["plane"])
-        where = "prop '%s' shaft" % prop["id"]
+        where = "%s '%s' shaft" % (plane_name, prop["id"])
         for key in spec_shaft.get("required", []):
             if key not in shaft:
                 report.error("assets/tiles/tiles.json",
@@ -839,10 +875,10 @@ def world_pass(report, docs, schema):
     # for an invisible boulder in the middle of a road, and a `flat` that is not
     # a boolean reads as truthy for any non-empty value -- which puts a tree in
     # the lane on a typo. Both are errors rather than warnings for that reason.
-    for prop in tiles["props"]["list"]:
+    for plane_name, prop in every_prop:
         if "flat" not in prop:
             continue
-        where = "prop '%s'" % prop["id"]
+        where = "%s '%s'" % (plane_name, prop["id"])
         if not isinstance(prop["flat"], bool):
             report.error("assets/tiles/tiles.json",
                          "%s flat is %r; it must be true or false"
@@ -915,15 +951,23 @@ def world_pass(report, docs, schema):
     # placed", not "does the rule I think it follows allow it". The two diverged
     # the moment road furniture started being offered to cells *beside* a road:
     # the inference said never, the world said fourteen signposts.
+    # Per plane, because a byte only means something against the catalogue it
+    # indexes. The scatter now writes standing props to `props` and ground
+    # texture to `clutter`, so reading the grit's plane id out of the props
+    # plane would report every scatter member as never placed.
     present = set()
-    plane = _plane(world, "props_b64_deflate", width * height)
-    if plane:
-        by_plane = {p["plane"]: p["id"] for p in tiles["props"]["list"]}
-        for value in set(plane):
+    decoded = {}
+    for name, key in plane_keys.items():
+        bytes_ = _plane(world, key, width * height)
+        decoded[name] = bytes_
+        if not bytes_:
+            continue
+        by_plane = {p["plane"]: p["id"] for p in plane_lists.get(name, [])}
+        for value in set(bytes_):
             if value:
-                present.add(by_plane.get(value, ""))
+                present.add((name, by_plane.get(value, "")))
 
-    for prop in tiles["props"]["list"]:
+    for plane_name, prop in every_prop:
         biome = prop["biome"]
         if biome == "placed":
             continue                      # put somewhere on purpose, not scattered
@@ -932,10 +976,11 @@ def world_pass(report, docs, schema):
                          "prop '%s' declares biome '%s', which is not a material"
                          % (prop["id"], biome))
             continue
-        if plane and prop["id"] in present:
+        if decoded.get(plane_name) and (plane_name, prop["id"]) in present:
             continue                      # observed in the world; nothing to say
         room = (placeable_flat if prop.get("flat") else placeable)[biome]
-        if room == 0 or plane:
+        seen_plane = decoded.get(plane_name)
+        if room == 0 or seen_plane:
             total = grid.count(order.index(biome))
             if total == 0:
                 reason = "the world contains no %s at all" % biome
@@ -949,19 +994,56 @@ def world_pass(report, docs, schema):
                 reason = ("%s exists (%d cells) but this prop stands up off the "
                           "ground, and scatter_props keeps everything but flat "
                           "texture out of a lane" % (biome, total))
-            if plane and room != 0:
+            if seen_plane and room != 0:
                 reason = ("%s has %d placeable cells but the generator placed none "
                           "-- density too low, or crowded out" % (biome, room))
             report.warn("assets/tiles/tiles.json",
-                        "prop '%s' does not appear in the world: %s" % (prop["id"], reason))
+                        "%s '%s' does not appear in the world: %s"
+                        % (plane_name, prop["id"], reason))
 
     # A declared light nobody ever placed lights nothing. Checking the placement
     # as well as the declaration is the same argument as the prop check above:
     # ground truth is the plane the generator produced, not the rule it follows.
-    if emitters and plane and not (emitters & set(plane)):
+    lit_somewhere = set()
+    for name, bytes_ in decoded.items():
+        for value in set(bytes_ or b""):
+            if value:
+                lit_somewhere.add((name, value))
+    if emitters and lit_somewhere and not (emitters & lit_somewhere):
         report.warn("data/world/overworld.json",
                     "%d props declare a light and not one of them is placed "
                     "anywhere in the world" % len(emitters))
+
+    # THE CLUTTER PLANE NEVER BLOCKS, PROVED AGAINST THE WORLD AND NOT ONLY
+    # AGAINST THE CATALOGUE (#83). derive_blocked() is handed `props` and
+    # `cliffs` and never `clutter`, so this can only fail if that changes --
+    # which is exactly when it should be caught, because the symptom would be
+    # an invisible wall on a cell with a cup on it.
+    blocked = _plane(world, "blocked_b64_deflate", width * height)
+    clutter_plane = decoded.get("clutter")
+    props_plane = decoded.get("props")
+    cliffs_plane = _plane(world, "cliffs_b64_deflate", width * height)
+    if blocked and clutter_plane and props_plane and cliffs_plane:
+        solid_planes = {p["plane"] for p in plane_lists.get("props", [])
+                        if p.get("solid")}
+        # A solid prop blocks its whole foot, which grows north, so a cell can
+        # be blocked by a prop anchored up to `foot[1]-1` rows south of it.
+        reach_north = max([p["foot"][1] for p in plane_lists.get("props", [])
+                           if p.get("solid")] or [1])
+        stray = 0
+        for i, value in enumerate(blocked):
+            if not value or cliffs_plane[i]:
+                continue
+            x, y = i % width, i // width
+            if any(props_plane[(y + dy) * width + x] in solid_planes
+                   for dy in range(reach_north) if y + dy < height):
+                continue
+            stray += 1
+        if stray:
+            report.error("data/world/overworld.json",
+                         "%d blocked cell(s) are explained by neither a cliff "
+                         "nor a solid prop. The clutter plane must never reach "
+                         "collision -- see derive_blocked()." % stray)
 
 
 def _plane(world, key, expected):

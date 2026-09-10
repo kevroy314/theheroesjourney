@@ -23,9 +23,9 @@ npm run world:export              # data/world/overworld.json -> world/overworld
 npm run check                     # tools/validate_data.py
 ```
 
-`make_world.py` opens `assets/tiles/tiles.json` in four places (`solid_ids`,
-`scatter_props`, `furnish_house`, `stock_town`), so the atlas step is a hard
-prerequisite, not a habit. There is **no npm alias for `make_world.py` on
+`make_world.py` reads `assets/tiles/tiles.json` in `solid_ids()`,
+`standing_planes()` and `catalogues()` — the last of which every placement pass
+now goes through, so the atlas step is a hard prerequisite, not a habit. There is **no npm alias for `make_world.py` on
 purpose** — it regenerates from scratch and overwrites anything imported from
 Tiled.
 
@@ -90,8 +90,9 @@ npm run world:check                        # what an import would change
 ```
 
 The export self-checks: it takes a scratch copy of the map, blanks `edits`, puts
-every generated object back at its `hj_gen` position, rebuilds props and cliffs
-from `hj_gen_planes`, imports that, and compares to `data/world/overworld.json`
+every generated object back at its `hj_gen` position, rebuilds props, clutter
+and cliffs from `hj_gen_planes`, imports that, and compares to
+`data/world/overworld.json`
 byte for byte — same key order, same `indent=1`, same base64 of the same zlib
 stream. `ROUND TRIP FAILED` names the diverging key, and it means the import
 would lose whatever you just added to the world schema.
@@ -118,7 +119,10 @@ w = json.load(open("data/world/overworld.json"))
 W = w["w"]
 props   = zlib.decompress(base64.b64decode(w["props_b64_deflate"]))
 blocked = zlib.decompress(base64.b64decode(w["blocked_b64_deflate"]))
-cat = {p["plane"]: p for p in json.load(open("assets/tiles/tiles.json"))["props"]["list"]}
+clutter = zlib.decompress(base64.b64decode(w["clutter_b64_deflate"]))
+tiles   = json.load(open("assets/tiles/tiles.json"))
+cat  = {p["plane"]: p for p in tiles["props"]["list"]}
+clut = {p["plane"]: p for p in tiles["clutter"]["list"]}   # a SEPARATE numbering
 ```
 
 Two things to check, and count both:
@@ -153,6 +157,18 @@ must run after nothing that can reopen it, and the fill is the proof.
 
 If you add a building or an enclosure, add the equivalent fill. It costs a few
 lines and it is the only honest way to know.
+
+**A pocket is the scatter's mistake, and the scatter gives the cells back.**
+`scatter_props` knows nothing about connectivity, so sooner or later a boulder
+lands in the last one-cell gap of a yard and thirty-odd cells of the vale stop
+being anywhere anyone can stand. main() has always died on that; what it never
+had was an answer, so "it passes" meant "this seed did not do it" — and that
+ran out the first time the RNG stream shifted. `unseal_pockets()` now removes
+every SCATTERED SOLID prop on a pocket's boundary and asks again, and
+`vale_pockets()` is the one function both the repair and the check use, so a
+repair cannot report success against a question the check asks differently.
+The check is still a `SystemExit`: a seal made of buildings and water is a
+build failure and should be.
 
 ## Adding a material, or deciding not to
 
@@ -256,10 +272,10 @@ cannot be a solid prop.** It was first patched at runtime in
 kept only so its two call sites name the intent; the fix belongs in the
 generator because the collision plane is generated.
 
-## The two structural limits
+## The structural limits
 
-Both are open issues, both will bite a placement pass, and neither has a
-workaround worth taking.
+One of the two is now closed; the other is still open, will bite a placement
+pass, and has no workaround worth taking.
 
 **Footprints grow east and north, and `(2, k)` is a lie (#82).** The art is
 centred on the anchor in a 64×96 slot, so a two-cell-wide prop can *block* its
@@ -273,11 +289,31 @@ touches `make_tiles.py`, `make_world.py`, `TileWorld.gd` and `validate_data.py`
 together, and it is a regeneration, which is free now and stops being free once
 props are hand-placed in Tiled.
 
-**One prop per cell, so nothing sits on anything (#83).** `props[y][x]` is one
-byte. A cup cannot stand on a counter; it stands on the floor beside it. Do not
-work around it with a `counter_with_cup` variant — that multiplies a finite
-authored catalogue combinatorially. The fix is a second, never-solid `clutter`
-plane.
+**One prop per cell — CLOSED (#83).** There are two planes now. `props[y][x]`
+is what OCCUPIES the cell and may be solid; `clutter[y][x]` is what does not —
+it lies on the floor or sits on the thing standing there, and it is never
+solid. So a cup stands on a counter, and a lane can carry grit *and* a
+milestone.
+
+Three things follow, and each has bitten something already:
+
+* **They are numbered independently.** Props id 5 and clutter id 5 are
+  different things. Anything that maps a plane byte to a catalogue entry has to
+  say which plane it means — `plane_index()` in `make_world.py` answers it from
+  the id, so a placement pass names a thing and never a plane.
+* **The budget is 255 PER PLANE**, not 255 in total, and that is the whole
+  reason it is a second plane rather than a wider byte. `python3
+  tools/add_prop.py verify` prints both. Moving the ground scatter, the rug,
+  the wall stain and the evidence-of-use set across took props from 254 to 185.
+* **Collision cannot go wrong, by construction.** `derive_blocked()` is handed
+  `props` and `cliffs` and never `clutter`, so a solid clutter entry would
+  block nothing while claiming to — which is why `make_tiles.py` asserts none
+  exists and `world_pass()` errors on one. `world_pass()` also finds an owner
+  for every cell in `blocked`, so a clutter byte that ever reached collision
+  would be an error and not a mystery.
+
+Draw order within a cell comes from the entry's own `flat`: flat clutter under
+the prop, everything else over it. Do not add a second word for that.
 
 ## `validate_data.py` is the gate
 

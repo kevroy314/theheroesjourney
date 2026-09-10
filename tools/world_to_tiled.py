@@ -18,7 +18,8 @@ tools/make_world.py is re-run?** The answer here is a layered map.
                       you drag is treated as pinned and stops following the
                       generator. Objects you add yourself are never touched.
       layers "props"  the byte planes, exploded into tile objects you can drag,
-        and "cliffs"  delete and add. They have no per-object identity to pin by
+      "clutter" and   delete and add. They have no per-object identity to pin by
+        "cliffs"
                       — a fresh seed is a fresh scatter — so the map remembers
                       the whole plane the generator last produced (hj_gen_planes)
                       and every cell where the objects disagree with it is an
@@ -116,7 +117,7 @@ P_PLANES = "hj_gen_planes"
 # atlas geometry, the tile size and the catalogue of what each value means are
 # all read from assets/tiles/tiles.json at run time, so a prop the asset
 # pipeline appends tomorrow is pickable today with no change here.
-PLANE_KEYS = ("props", "cliffs")
+PLANE_KEYS = ("props", "clutter", "cliffs")
 
 # blocked_b64_deflate is not edited and not carried verbatim: it is *derived*
 # from the props and cliffs planes on both sides of the trip, because a prop
@@ -251,10 +252,17 @@ def plane_catalogue(name):
            "tiles": {}, "by_value": {}, "by_name": {},
            "normalise": None, "default_slot": 0}
 
-    if name == "props":
+    if name in ("props", "clutter"):
         # plane value = slot + 1, which is the manifest's own `layout` rule and
         # what scripts/ui/TileWorld.gd indexes the atlas by. Read `plane` rather
         # than `index` so there is one truth, not two that can disagree.
+        #
+        # The two planes read identically and are numbered INDEPENDENTLY: props
+        # plane 5 and clutter plane 5 are different things that may be on the
+        # same cell. That is the whole of #83 in one line of code, and it is
+        # why each gets its own tileset file -- picking a cup out of a panel
+        # that also holds boulders is how a designer ends up wondering why one
+        # cup collides and another does not.
         for entry in section.get("list", []):
             value = int(entry["plane"])
             slot = value - 1
@@ -285,10 +293,17 @@ def plane_catalogue(name):
 
 
 def props_by_plane():
-    """plane value -> {solid, foot} for every prop in the catalogue.
+    """plane value -> {solid, foot} for every prop in the PROPS catalogue.
 
     Imported by tools/make_world.py so the generator and the importer derive the
     collision plane from one rule rather than two.
+
+    The clutter plane is deliberately absent. Nothing on it is solid, and the
+    way that is guaranteed is not a declaration anybody has to keep true: the
+    collision plane is derived from `props` and `cliffs` and this function is
+    the only catalogue derive_blocked() ever sees, so a clutter byte -- even
+    one placed by hand in Tiled, even one whose catalogue entry somehow said
+    `solid` -- cannot reach `blocked`.
     """
     out = {}
     for entry in tiles_manifest()["props"]["list"]:
@@ -991,8 +1006,11 @@ def build(args):
             from tiled_to_world import compose, render
             with open(WORLD_JSON, "rb") as handle:
                 reseed = render(compose(previous)).encode("utf-8") != handle.read()
-        except Exception:
-            reseed = True       # an unreadable map is not a reason to refuse
+        except (Exception, SystemExit):
+            # Same reason as below: a map that will not compose -- because the
+            # catalogue moved under it, say -- means "this is not this map's own
+            # output", which is exactly what reseed=True says.
+            reseed = True
 
     # --- the edits layer, carried across ---
     edits = [0] * (w * h)
@@ -1442,8 +1460,15 @@ def main():
                 recorded = list(_plane_bytes(gen_planes.get(key, ""), cells_n) or [])
                 if len(recorded) == len(current):
                     plane_cells += sum(1 for a, b in zip(current, recorded) if a != b)
-        except Exception:
-            plane_cells = 0     # an unreadable map is not a reason to refuse
+        except (Exception, SystemExit):
+            # An unreadable map is not a reason to refuse, and SystemExit has
+            # to be caught by name because it is a BaseException: the very case
+            # this arm exists for -- a map holding an object the catalogue no
+            # longer has, which is what --discard-edits is being run to throw
+            # away -- reaches here as objects_to_plane's SystemExit and used to
+            # sail straight past an `except Exception` and abort the command
+            # that was meant to fix it.
+            plane_cells = 0
         print("--discard-edits will destroy: %d hand-painted cells, %d hand-placed or "
               "hand-moved objects, %d hand-edited prop and cliff cells. This cannot be "
               "undone except from git." % (cells, pinned, plane_cells))

@@ -1,5 +1,7 @@
 {
-  "base_count": 253,
+  "base_count": {
+    "props": 184
+  },
   "props": [
     {
       "args": {
@@ -22,8 +24,9 @@
         1
       ],
       "id": "tree_windswept",
-      "index": 253,
-      "plane": 254,
+      "index": 184,
+      "plane": 185,
+      "plane_key": "props",
       "ramps": [
         "bark",
         "wood"

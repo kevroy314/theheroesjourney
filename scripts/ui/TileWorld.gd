@@ -60,6 +60,11 @@ var _tiles: Texture2D
 var _variants: Texture2D
 var _overlays: Texture2D
 var _props: Texture2D
+## The second prop plane's atlas (#83). Same 64x96 slot and same bottom-centre
+## anchor as props.png, deliberately: a cup that must appear ON a counter is
+## drawn raised inside its slot, so the two planes share one blit and one
+## anchor rule and differ only in which texture and which catalogue.
+var _clutter: Texture2D
 var _cliffs: Texture2D
 var _player: Texture2D
 var _cell := Vector2i.ZERO           ## the tile the character occupies
@@ -162,13 +167,18 @@ func _ready() -> void:
 	_variants = load("res://assets/tiles/tileset_var.png")
 	_overlays = load("res://assets/tiles/overlays.png")
 	_props = load("res://assets/tiles/props.png")
+	_clutter = load("res://assets/tiles/clutter.png")
 	_cliffs = load("res://assets/tiles/cliffs.png")
 	_player = load("res://assets/sprites/player.png")
 	# Once per launch, beside the texture loads for the same reason the light
 	# index is: measuring the props atlas is a fact about the art, not about
 	# this frame, and it must not happen on the first frame the player sees.
 	HJMotion.load_manifest()
-	HJMotion.index_atlas(_props)
+	# Both atlases. Each plane numbers its slots from its own image, so the
+	# clutter specs measured against props.png would be measuring whatever prop
+	# happens to sit at the same index -- and both atlases are 8 columns of
+	# 64x96, so that would silently produce a plausible wrong answer.
+	HJMotion.index_atlas(_props, _clutter)
 	if HJLighting.enabled:
 		var overlay := HJLightOverlay.new()
 		if overlay.has_shader():
@@ -547,35 +557,72 @@ func _draw_scenery(cam: Vector2, first: Vector2i, last: Vector2i) -> void:
 				_draw_critter(view, cam)
 		for x in range(maxi(0, first.x - 1), mini(world.w, last.x + 2)):
 			var plane := world.prop_at(x, y)
-			if plane == 0:
+			var lying := world.clutter_at(x, y)
+			if plane == 0 and lying == 0:
 				continue
+			# THREE THINGS ON ONE CELL, IN THE ONLY ORDER THAT IS TRUE (#83).
+			# A cell carries at most one prop and at most one piece of
+			# clutter, and which of the two is on top is a fact about the
+			# clutter: something that lies FLAT is on the floor and the prop
+			# stands in it (grit round the foot of a bush), while everything
+			# else sits on the prop (the cup on the counter). `flat` is the
+			# catalogue's own word for that and HJWorld reads it once at load,
+			# so this is a hash lookup and not a decision.
+			var under := lying != 0 and world.clutter_under.has(lying)
+			if under:
+				_draw_clutter(lying, x, y, cam)
 			# The prop plane still carries a painted dog and a painted cat on
 			# the cells they were placed on, from before either could walk. The
 			# live animal is drawn above; without this the dog leaves a copy of
 			# himself on the rug the moment he gets up.
-			if homes.has(Vector2i(x, y)):
-				continue
-			var slot := plane - 1
-			# Anchored bottom-centre of the cell: the art grows upward from the
-			# ground the prop is standing on, which is what makes it sit in the
-			# world rather than float on the grid.
-			var origin := Vector2(x * TILE + TILE / 2 - PROP_W / 2,
-				y * TILE + TILE - PROP_H)
-			var at := origin * float(zoom) - cam
-			# A prop that declares no motion, or motion switched off, takes the
-			# single untransformed blit it always took. This is the whole of the
-			# "degrade" clause: there is no branch inside the common path, only
-			# a branch around the uncommon one.
-			var spec: Dictionary = HJMotion.for_plane(plane) if _mgain > 0.0 else {}
-			if spec.is_empty():
-				draw_texture_rect_region(_props,
-					Rect2(at, Vector2(PROP_W, PROP_H) * float(zoom)),
-					Rect2((slot % PROP_COLS) * PROP_W, (slot / PROP_COLS) * PROP_H,
-						PROP_W, PROP_H))
-			else:
-				_draw_prop_moving(slot, at, spec, Vector2i(x, y))
+			if plane != 0 and not homes.has(Vector2i(x, y)):
+				var slot := plane - 1
+				# Anchored bottom-centre of the cell: the art grows upward from
+				# the ground the prop is standing on, which is what makes it sit
+				# in the world rather than float on the grid.
+				var origin := Vector2(x * TILE + TILE / 2 - PROP_W / 2,
+					y * TILE + TILE - PROP_H)
+				var at := origin * float(zoom) - cam
+				# A prop that declares no motion, or motion switched off, takes
+				# the single untransformed blit it always took. This is the whole
+				# of the "degrade" clause: there is no branch inside the common
+				# path, only a branch around the uncommon one.
+				var spec: Dictionary = HJMotion.for_plane(plane) if _mgain > 0.0 else {}
+				if spec.is_empty():
+					draw_texture_rect_region(_props,
+						Rect2(at, Vector2(PROP_W, PROP_H) * float(zoom)),
+						Rect2((slot % PROP_COLS) * PROP_W, (slot / PROP_COLS) * PROP_H,
+							PROP_W, PROP_H))
+				else:
+					_draw_prop_moving(_props, slot, at, spec, Vector2i(x, y))
+			if lying != 0 and not under:
+				_draw_clutter(lying, x, y, cam)
 	if not drawn_character:
 		_draw_character(cam)
+
+
+## One piece of clutter on one cell (#83).
+##
+## The same blit as a prop, off the other atlas and against the other
+## catalogue: same 64x96 slot, same bottom-centre anchor, same motion contract
+## (the candle flame breathes). It is a separate function only so the caller
+## can put it before or after the prop on the same cell without repeating any
+## of this, which is the whole of what the second plane buys.
+func _draw_clutter(plane: int, x: int, y: int, cam: Vector2) -> void:
+	if _clutter == null:
+		return
+	var slot := plane - 1
+	var origin := Vector2(x * TILE + TILE / 2 - PROP_W / 2,
+		y * TILE + TILE - PROP_H)
+	var at := origin * float(zoom) - cam
+	var spec: Dictionary = HJMotion.for_clutter(plane) if _mgain > 0.0 else {}
+	if spec.is_empty():
+		draw_texture_rect_region(_clutter,
+			Rect2(at, Vector2(PROP_W, PROP_H) * float(zoom)),
+			Rect2((slot % PROP_COLS) * PROP_W, (slot / PROP_COLS) * PROP_H,
+				PROP_W, PROP_H))
+	else:
+		_draw_prop_moving(_clutter, slot, at, spec, Vector2i(x, y))
 
 
 ## Every portal standing on one row, culled to the columns in view.
@@ -689,7 +736,8 @@ static func _profile(u: float) -> float:
 ## the shared edge lands on identical coordinates from either side: no seam to
 ## hide and nothing to fudge. The transform must be cleared afterwards — it is
 ## renderer state, and the character is drawn from inside the same loop.
-func _draw_prop_moving(slot: int, at: Vector2, spec: Dictionary, cell: Vector2i) -> void:
+func _draw_prop_moving(tex: Texture2D, slot: int, at: Vector2, spec: Dictionary,
+		cell: Vector2i) -> void:
 	var z := float(zoom)
 	var top: int = int(spec["top"])
 	var base: int = int(spec["base"])
@@ -718,7 +766,7 @@ func _draw_prop_moving(slot: int, at: Vector2, spec: Dictionary, cell: Vector2i)
 		var m := (off_high - off_low) / (y_high - y_low)
 		draw_set_transform_matrix(Transform2D(Vector2(1.0, 0.0), Vector2(m, sy),
 			Vector2(off_low - m * y_low, base_y * (1.0 - sy))))
-		draw_texture_rect_region(_props,
+		draw_texture_rect_region(tex,
 			Rect2(at.x, y_high, float(PROP_W) * z, y_low - y_high),
 			Rect2(col, row_px + float(upper), float(PROP_W), float(lower - upper)))
 		lower = upper

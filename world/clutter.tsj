@@ -1,0 +1,2087 @@
+{
+  "columns": 8,
+  "image": "../assets/tiles/clutter.png",
+  "imageheight": 864,
+  "imagewidth": 512,
+  "margin": 0,
+  "name": "clutter",
+  "spacing": 0,
+  "tilecount": 72,
+  "tiledversion": "1.12.2",
+  "tileheight": 96,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "rug"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "wall_base"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "candle"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "cup"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "boots"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "book_open"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "bottle"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "placed"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_short_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_short"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_short_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_short"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_short_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_short"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_short_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_short"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_short_bits_5"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_short"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_short_bits_6"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_short"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_tall_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_tall"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_tall_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_tall"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_tall_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_tall"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "grass_tall_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "grass_tall"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "sand_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "sand"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "sand_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "sand"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "sand_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "sand"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "sand_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "sand"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "sand_bits_5"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "sand"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "sand_bits_6"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "sand"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "dune_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "dune"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "dune_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "dune"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "dune_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "dune"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "dune_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "dune"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "dune_bits_5"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "dune"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "dune_bits_6"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "dune"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "hardpan_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "hardpan"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "hardpan_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "hardpan"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "hardpan_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "hardpan"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "hardpan_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "hardpan"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 33,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "scree_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "scree"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "scree_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "scree"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "scree_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "scree"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 36,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "scree_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "scree"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "scree_bits_5"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "scree"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "scree_bits_6"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "scree"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "snow_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "snow"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "snow_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "snow"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "snow_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "snow"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "snow_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "snow"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "snow_bits_5"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "snow"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 44,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "snow_bits_6"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "snow"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "undergrowth_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "undergrowth"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "undergrowth_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "undergrowth"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 47,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "undergrowth_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "undergrowth"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "undergrowth_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "undergrowth"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "undergrowth_bits_5"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "undergrowth"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 50,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "undergrowth_bits_6"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "undergrowth"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 51,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "mud_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "mud"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 52,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "mud_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "mud"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "mud_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "mud"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 54,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "mud_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "mud"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "ice_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "ice"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 56,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "ice_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "ice"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "ice_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "ice"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 58,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 60,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 61,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_4"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 62,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_5"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 63,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_6"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 64,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_7"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 65,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "path_dirt_bits_8"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "path_dirt"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 66,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "floor_stone_bits_1"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "floor_stone"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 67,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "floor_stone_bits_2"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "floor_stone"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": 68,
+      "properties": [
+        {
+          "name": "name",
+          "type": "string",
+          "value": "floor_stone_bits_3"
+        },
+        {
+          "name": "biome",
+          "type": "string",
+          "value": "floor_stone"
+        },
+        {
+          "name": "solid",
+          "type": "bool",
+          "value": false
+        },
+        {
+          "name": "foot_w",
+          "type": "int",
+          "value": 1
+        },
+        {
+          "name": "foot_h",
+          "type": "int",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "tilewidth": 64,
+  "type": "tileset",
+  "version": "1.10"
+}

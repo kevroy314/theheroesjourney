@@ -42,6 +42,24 @@ var props: PackedByteArray = PackedByteArray()
 var blocked: PackedByteArray = PackedByteArray()
 var prop_solid: Dictionary = {}
 
+## The second prop plane (#83): what lies on the cell, or on the prop standing
+## on it — grit in a lane, a rug, a cup on a counter. Its own catalogue with
+## its own 1..255, so plane id 5 here and plane id 5 in `props` are two
+## different things that may be on the same cell, and the catalogue is no
+## longer capped at 255 entries in total.
+##
+## NOT part of `blocked`, and not by convention: the generator derives the
+## collision plane from `props` and `cliffs` alone and never sees this one, so
+## there is nothing here for walkable() to consult.
+var clutter: PackedByteArray = PackedByteArray()
+## Clutter plane id -> true when the art lies flat on the ground rather than
+## sitting on top of whatever is standing there. It decides DRAW ORDER within
+## one cell and nothing else: flat clutter goes under the prop (grit round the
+## foot of a bush), everything else goes over it (the cup on the counter).
+## Read from the manifest's own `flat`, which is the same word scatter_props()
+## reads to decide what may lie in a lane.
+var clutter_under: Dictionary = {}
+
 ## Elevation quantised into steps. A smooth field has nowhere to put a cliff;
 ## terraces give it edges. The generator derives its cliff collision from this
 ## same plane, so the wall you can see and the wall you cannot walk through are
@@ -120,6 +138,7 @@ func load_world() -> void:
 				int(box.get("x", 0)), int(box.get("y", 0)),
 				int(box.get("w", 0)), int(box.get("h", 0)))
 	props = _plane(parsed, "props_b64_deflate")
+	clutter = _plane(parsed, "clutter_b64_deflate")
 	blocked = _plane(parsed, "blocked_b64_deflate")
 	cliffs = _plane(parsed, "cliffs_b64_deflate")
 	indoors.clear()
@@ -169,6 +188,15 @@ func _load_solid() -> void:
 	for id in parsed.get("solid_ids", []):
 		solid[int(id)] = true
 
+	# Which clutter ids lie flat. Built here rather than asked of the manifest
+	# per cell per frame: the renderer needs the answer inside its row loop and
+	# the answer never changes once the art is built.
+	clutter_under.clear()
+	for row in (parsed.get("clutter", {}) as Dictionary).get("list", []):
+		var entry: Dictionary = row
+		if bool(entry.get("flat", false)):
+			clutter_under[int(entry.get("plane", 0))] = true
+
 	var order: Array = parsed.get("order", [])
 	var index: Dictionary = {}
 	for i in range(order.size()):
@@ -211,6 +239,15 @@ func prop_at(x: int, y: int) -> int:
 	if x < 0 or y < 0 or x >= w or y >= h or i >= props.size():
 		return 0
 	return props[i]
+
+
+## What lies on a cell, or on the prop standing on it. 0 for none, and the
+## value indexes the manifest's `clutter` list, not its `props` list.
+func clutter_at(x: int, y: int) -> int:
+	var i := y * w + x
+	if x < 0 or y < 0 or x >= w or y >= h or i >= clutter.size():
+		return 0
+	return clutter[i]
 
 
 func at(x: int, y: int) -> int:
