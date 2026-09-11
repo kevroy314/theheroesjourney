@@ -62,3 +62,6 @@ AESTHETIC-SEEDS/
 
 # Local scratch, never committed.
 .scratch/
+
+# Agent worktrees, never committed.
+.claude/worktrees/
