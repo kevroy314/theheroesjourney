@@ -96,9 +96,16 @@ with no line under it merges into the shoulders.
 THE PALETTE IS THIS FILE'S OWN. The game's theme ramps were built desaturated
 on purpose and both SNES references are high-chroma -- the Secret of Mana girl
 carries a (232,80,184) dress against (248,216,160) skin -- so matching the
-theme would have thrown away the half of the reference that is colour. Twenty
-colours, four tones of nothing: three per material (lit / base / shade), one
-contour, and four spent on two eyes. Counts and reasoning are in `PALETTE`.
+theme would have thrown away the half of the reference that is colour.
+
+Twenty colours on the finished figure: three each for skin, hair, coat,
+trousers, boots and the gold trim, plus one contour, one sclera and one iris
+-- twenty-one declared, of which the trousers' darkest never appears, because
+the trousers are seven rows tall and their shaded side is the one pixel the
+contour takes. Chrono Trigger's NPC is 24 colours including the wall behind
+him and the Secret of Mana girl is 20 for a whole person, so this is the
+reference's budget rather than a modern one. Reasoning per hue is in
+`PALETTE`.
 """
 import math
 import os
@@ -110,7 +117,11 @@ SOLE = FH - 1                    # the feet are on the bottom row
 BULGE = 1.25                     # the superellipse exponent -- see the header
 MAX_RUN = 3                      # the contract
 
-OUT = "/home/kevin/fitrogue/.scratch/tries/curves"
+# Where the pictures go. Outside the repo tree on purpose -- a drawing under
+# consideration is not an asset and must not be able to turn into one by
+# accident -- and overridable so this can be run from a worktree without
+# writing into somebody else's comparison.
+OUT = os.environ.get("FIGURE_OUT", "/home/kevin/fitrogue/.scratch/tries/curves")
 
 
 # --- the palette ----------------------------------------------------------------
@@ -125,9 +136,9 @@ OUT = "/home/kevin/fitrogue/.scratch/tries/curves"
 # The hues are picked against the three grounds this gets rendered on (dark,
 # light, mid-green) rather than against a mood board. Plum and copper are the
 # two things a green field cannot swallow and a white page cannot bleach; the
-# indigo skirt is the value anchor, dark on all three; the gold collar is the
-# only saturated small object, at about four per cent of the figure, because
-# one bright accent is a focus and two are a clown.
+# indigo trousers are the value anchor, dark on all three; the gold collar is
+# the only saturated small object, at three per cent of the figure by pixel
+# count, because one bright accent is a focus and two are a clown.
 #
 # CONTOUR IS NOT BLACK. Both references use a dark warm neutral -- (48,48,48)
 # and (72,56,48) -- and pure black on a figure whose darkest garment tone is
@@ -140,7 +151,7 @@ PALETTE = {
     "skin":  [(253, 226, 190), (238, 183, 141), (191, 124, 100)],
     "hair":  [(249, 181, 88), (216, 121, 50), (150, 66, 42)],
     "coat":  [(199, 98, 132), (152, 55, 98), (95, 30, 69)],
-    "skirt": [(114, 116, 180), (73, 70, 133), (43, 41, 86)],
+    "skirt": [(114, 116, 180), (73, 70, 133), (43, 41, 86)],   # trousers
     "boot":  [(153, 106, 68), (110, 71, 47), (69, 43, 33)],
     "gold":  [(247, 205, 100), (208, 154, 57), (147, 99, 41)],
 }
@@ -345,9 +356,14 @@ def build_figure():
     # references sit at 46%, 52% and 57%; a quarter of the figure, which is
     # what a realistic proportion gives, reads as an adult from a distance and
     # as nothing at all up close.
-    hair = lobe(15.4, 8, 9.8, 6.2, 8.6)
-    skull = lobe(15.5, 12, 8.4, 7.0, 6.6)
-    jaw = lobe(15.7, 18, 6.4, 4.6, 3.6)
+    hair = lobe(15.4, 8, 9.8, 6.2, 9.0)
+    # The skull's widest row is the EYE's row, not the crown's. Put it higher
+    # -- which is where a skull's widest actually is -- and the face narrows
+    # to eleven pixels by the time the eyes are in it, and a three-pixel eye
+    # then sits on the boundary with its outer column in the contour. The
+    # face is the one place where anatomy loses to legibility.
+    skull = lobe(15.5, 14, 8.6, 8.6, 5.4)
+    jaw = lobe(15.6, 19, 7.0, 5.0, 3.0)
     head = merge(skull, jaw)
     # The braid. One side only, and its widest row is six below the hair
     # mass's, so the left edge of the head is handed from one form to the
@@ -357,16 +373,20 @@ def build_figure():
     # edge for five rows, which is how this failed its own check the first
     # time.
     braid = lobe(7.2, 14, 3.5, 3.4, 4.4)
-    braid_lo = lobe(8.4, 21, 3.0, 3.0, 4.0)
+    braid_lo = lobe(8.4, 20, 3.0, 2.4, 4.0)
     # ...and a shorter fall of hair on the other side, deliberately unequal.
-    fall = lobe(23.2, 12, 3.2, 3.4, 4.0)
+    fall = lobe(22.0, 15, 3.2, 4.2, 4.6)
 
     # --- the torso. Two shoulder caps a row apart, because a level pair is a
     # coat hanger. Then a chest, a core and a hip whose arcs cross: the waist
     # is not drawn anywhere, it is where the chest's lower arc and the hip's
     # upper arc are both on their way down.
-    sh_l = lobe(10.2, 24, 5.2, 3.0, 4.2)
-    sh_r = lobe(20.8, 25, 5.2, 3.2, 4.0)
+    # High enough to meet the jaw. A shoulder that starts two rows under the
+    # chin leaves a neck, and not one of the three references has one -- what
+    # it actually draws is a four-pixel dark stub, because at this size two
+    # rows of anything between two masses is a contour and nothing else.
+    sh_l = lobe(10.2, 24, 5.2, 4.0, 4.2)
+    sh_r = lobe(20.8, 25, 5.2, 5.0, 4.0)
     chest = lobe(15.5, 26, 9.8, 4.4, 6.2)
     core = lobe(15.5, 32, 7.8, 6.4, 5.6)
     hip = lobe(15.5, 37, 9.2, 5.2, 2.6)
@@ -381,10 +401,13 @@ def build_figure():
     # round its two ends are.
     arm_l = merge(lobe(6.8, 29, 3.4, 4.2, 4.6), lobe(7.6, 35, 2.9, 3.0, 3.4))
     arm_r = merge(lobe(24.4, 30, 3.3, 4.4, 4.2), lobe(23.6, 35, 2.8, 3.0, 3.2))
-    cuff_l = lobe(6.9, 38, 3.3, 2.4, 2.0)
-    cuff_r = lobe(24.5, 37, 3.2, 2.4, 2.0)
-    hand_l = lobe(7.4, 40, 2.4, 1.8, 2.0)
-    hand_r = lobe(24.0, 39, 2.3, 1.8, 2.0)
+    cuff_l = lobe(6.9, 37, 3.3, 2.4, 2.2)
+    cuff_r = lobe(24.5, 36, 3.2, 2.4, 2.2)
+    # The hands sit where the coat is still wide. Hung a row lower they clear
+    # its hem and come out as two islands of pure contour beside the knees --
+    # a thing the run check cannot see and one glance at the pixels can.
+    hand_l = lobe(7.3, 39, 2.4, 2.0, 2.0)
+    hand_r = lobe(24.1, 38, 2.3, 1.8, 2.0)
 
     # --- the legs. Three forms each as well, so the knee is a bulge, the
     # ankle a pinch and the boot a bulge -- a pair of straight stubs would
@@ -394,14 +417,14 @@ def build_figure():
     def leg(cx, dy):
         return merge(lobe(cx, 41 + dy, 3.5, 1.8, 2.8),
                      lobe(cx - 0.3, 44 + dy, 2.9, 2.2, 2.4),
-                     lobe(cx - 0.6, 46, 3.6, 2.0, 1.8))
+                     lobe(cx - 0.6, SOLE - 1, 3.6, 2.0, 1.8))
 
     return dict(hair=hair, skull=skull, jaw=jaw, head=head, braid=braid,
                 braid_lo=braid_lo, fall=fall, torso=torso, chest=chest,
                 hip=hip, flare=flare, arm_l=arm_l, arm_r=arm_r,
                 cuff_l=cuff_l, cuff_r=cuff_r, hand_l=hand_l, hand_r=hand_r,
-                boot_l=lobe(10.6, 46, 3.6, 2.0, 1.8),
-                boot_r=lobe(18.4, 46, 3.6, 2.0, 1.8),
+                boot_l=lobe(10.6, SOLE - 1, 3.6, 2.0, 1.8),
+                boot_r=lobe(18.4, SOLE - 1, 3.6, 2.0, 1.8),
                 leg_l=leg(11.2, 0), leg_r=leg(19.0, 1))
 
 
@@ -424,11 +447,22 @@ def face(img, F):
     on the inside read as a nose bridge with a highlight on it, and the face
     comes out cross-eyed.
     """
-    ey = 15
-    for x0, mirror in ((11, False), (18, True)):
-        hline(img, ey, x0, x0 + 2, CONTOUR)                 # the lash
-        for x in range(x0, x0 + 3):
-            j = (x0 + 2 - x) if mirror else (x - x0)
+    ey, ew, gap = 15, 3, 4
+    # Measured off the face rather than typed at it: the pair is centred on
+    # the skull's own row, so reshaping the head cannot walk an eye onto the
+    # contour, which is what it did twice while this was being drawn.
+    a, b = F["head"][ey + 1]
+    cx = (a + b) / 2.0
+    # Placed by solving for each end and mirroring, not by rounding each
+    # start: round() on a half is a coin toss in Python and it landed the
+    # left eye one column further out than the right, which at this size is
+    # not "asymmetric", it is a face looking somewhere.
+    lx = int(math.floor(cx - gap / 2.0 - ew + 0.5))
+    rx = int(math.ceil(cx + gap / 2.0 + ew - 0.5)) - ew + 1
+    for x0, mirror in ((lx, False), (rx, True)):
+        hline(img, ey, x0, x0 + ew - 1, CONTOUR)            # the lash
+        for x in range(x0, x0 + ew):
+            j = (x0 + ew - 1 - x) if mirror else (x - x0)
             dot(img, x, ey + 1, SCLERA if j == 0 else IRIS)
     hline(img, 19, 15, 16, PALETTE["skin"][2])              # the mouth, one row
 
@@ -499,7 +533,7 @@ def render():
     for y, (x0, x1) in sorted(F["head"].items()):
         if y < 13:
             continue
-        w = max(0, int(round(2.3 * (1.0 - (y - 13) / 8.0))))
+        w = max(0, int(round(2.4 * (1.0 - (y - 13) / 9.0))))
         for x in range(x0, x0 + w):
             dot(img, x, y, P["hair"][1])
         for x in range(x1 - w + 1, x1 + 1):
@@ -529,6 +563,36 @@ def edges(img):
         xs = [x for x in range(FW) if px[x, y][3] == 255]
         out.append((min(xs), max(xs)) if xs else None)
     return out
+
+
+def flat_runs(img):
+    """The same measurement turned ninety degrees: the longest run of COLUMNS
+    sharing a top-edge y or a bottom-edge y.
+
+    Reported and not enforced, and the distinction is deliberate rather than
+    convenient. The rule is about the figure's sides, where a straight run is
+    a modelling failure -- a form that went flat. Along the bottom it is not:
+    the sole of a boot really is flat, and so is a coat hem, and all three
+    references draw both that way (Abigail's two feet are flat five-pixel
+    bars). Enforcing it downward would buy scalloped shoes. It is printed so
+    that the claim "the sides are curved and the soles are not" is a number
+    somebody can check rather than a thing this file says about itself.
+    """
+    px = img.load()
+    cols = []
+    for x in range(FW):
+        ys = [y for y in range(FH) if px[x, y][3] == 255]
+        cols.append((min(ys), max(ys)) if ys else None)
+    best = 0
+    for i in (0, 1):
+        cur, prev = 0, None
+        for c in cols:
+            v = None if c is None else c[i]
+            cur = cur + 1 if (v is not None and v == prev) else \
+                (1 if v is not None else 0)
+            best = max(best, cur)
+            prev = v
+    return best
 
 
 def longest_run(img):
@@ -598,10 +662,10 @@ def main():
     e = edges(img)
     rows = [y for y, v in enumerate(e) if v]
     wide = max(v[1] - v[0] + 1 for v in e if v)
-    hues = len({p[:3] for p in img.getdata() if p[3] == 255})
+    hues = len({p[:3] for p in img.get_flattened_data() if p[3] == 255})
     print("figure   rows %d..%d (%d)   %d px across   %d opaque pixels"
           % (rows[0], rows[-1], len(rows), wide,
-             sum(1 for p in img.getdata() if p[3] == 255)))
+             sum(1 for p in img.get_flattened_data() if p[3] == 255)))
     print("colours  %d opaque" % hues)
     print("run      LONGEST %d  (%s edge, rows %d-%d at x=%s)"
           % (run, where[0], where[1], where[2], where[3]))
@@ -611,6 +675,8 @@ def main():
             print("         OVER: %d rows, %s edge, rows %d-%d at x=%s"
                   % r)
     print("         references: Stardew 6, Secret of Mana 6, Chrono Trigger 4")
+    print("         horizontal (soles and hems, measured not enforced): %d"
+          % flat_runs(img))
     print()
     for y, v in enumerate(e):
         if v:
@@ -619,9 +685,15 @@ def main():
 
     img.save(os.path.join(OUT, "figure.png"))
     strip(img, 1).save(os.path.join(OUT, "figure_1x.png"))
+    # Three as well as one and six, because three is the zoom the game
+    # actually runs at and neither of the other two is: at 1:1 you are
+    # checking that the silhouette survives, at 6x you are finding which
+    # pixel is wrong, and at 3x you are looking at what a player sees.
+    strip(img, 3).save(os.path.join(OUT, "figure_3x.png"))
     strip(img, 6).save(os.path.join(OUT, "figure_6x.png"))
     print()
-    print("wrote figure.png, figure_1x.png, figure_6x.png -> %s" % OUT)
+    print("wrote figure.png, figure_1x.png, figure_3x.png, figure_6x.png"
+          " -> %s" % OUT)
 
     if run > MAX_RUN:
         raise SystemExit(
